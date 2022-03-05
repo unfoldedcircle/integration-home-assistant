@@ -1,0 +1,8 @@
+<component name="CopyrightManager">
+  <settings default="MPL-2.0 SPDX identifier template">
+    <LanguageOptions name="Rust">
+      <option name="fileTypeOverride" value="3" />
+      <option name="block" value="false" />
+    </LanguageOptions>
+  </settings>
+</component>

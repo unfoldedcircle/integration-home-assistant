@@ -1,0 +1,42 @@
+[package]
+name = "uc-intg-hass"
+version = "0.1.0"
+edition = "2021"
+authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
+license = "MPL-2.0"
+description = "Unfolded Circle Home-Assistant integration for Remote Two"
+#repository = "https://github.com/TODO"
+#documentation = "TODO"
+
+[dependencies]
+# WebSockets server
+actix-web = { version = "4.0.0-rc.3", features = ["rustls"] }
+actix-web-actors = "4.0.0-beta.12"
+actix = "0.12"
+actix-tls = { version = "3.0.3", features = ["rustls"] }
+bytestring = "1"
+rustls = "0.20"
+rustls-pemfile = "0.3"
+# WebSockets client
+actix-codec = "0.5"
+awc = { version = "3.0.0-beta.21", features= ["rustls"] }
+bytes = "1.1"
+futures = "0.3"
+
+# JSON (de)serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_with = "1"
+
+config = { version = "0.11", default-features = false, features = ["yaml"] }
+
+env_logger = "0.9"
+log = "0.4"
+
+uuid = { version = "0.8", features = ["v4"] }
+time = {version = "0.3", default-features = false, features = ["std", "formatting"]}
+
+# Helpful macros for working with enums and strings
+strum = "0.23"
+strum_macros = "0.23"
+derive_more = "0.99"

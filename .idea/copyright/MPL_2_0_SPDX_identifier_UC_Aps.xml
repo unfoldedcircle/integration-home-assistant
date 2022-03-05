@@ -1,0 +1,6 @@
+<component name="CopyrightManager">
+  <copyright>
+    <option name="notice" value="Copyright (c) &amp;#36;originalComment.match(&quot;Copyright \(c\) (\d+)&quot;, 1, &quot;-&quot;, &quot;&amp;#36;today.year&quot;)&amp;#36;today.year Unfolded Circle ApS and/or its affiliates.&#10;SPDX-License-Identifier: MPL-2.0" />
+    <option name="myName" value="MPL-2.0 SPDX identifier UC Aps" />
+  </copyright>
+</component>
