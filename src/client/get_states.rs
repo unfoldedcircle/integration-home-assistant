@@ -3,20 +3,22 @@
 
 //! Actix actor handler implementation for the `GetStates` message
 
-use crate::client::messages::{AvailableEntities, GetStates};
-use crate::client::HomeAssistantClient;
-use crate::errors::ServiceError;
-use crate::server::{
-    AvailableEntity, ClimateFeature, ClimateOption, CoverFeature, EntityType, LightFeature,
-    MediaPlayerFeature, SensorOption,
-};
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use actix::Handler;
 use awc::ws;
 use log::{debug, error};
 use serde_json::{json, Value};
-use std::str::FromStr;
+
+use uc_api::{
+    AvailableEntity, ClimateFeature, ClimateOption, CoverFeature, EntityType, LightFeature,
+    MediaPlayerFeature, SensorOption,
+};
+
+use crate::client::messages::{AvailableEntities, GetStates};
+use crate::client::HomeAssistantClient;
+use crate::errors::ServiceError;
 
 impl Handler<GetStates> for HomeAssistantClient {
     type Result = Result<(), ServiceError>;

@@ -1,9 +1,10 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+use std::time::Duration;
+
 use log::warn;
 use serde_with::{serde_as, DurationMilliSeconds, DurationSeconds};
-use std::time::Duration;
 
 const DEF_CONNECTION_TIMEOUT: u8 = 3;
 
@@ -90,6 +91,7 @@ impl Default for HeartbeatSettings {
         }
     }
 }
+
 impl Default for Settings {
     fn default() -> Settings {
         Settings {

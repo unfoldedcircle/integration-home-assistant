@@ -6,6 +6,8 @@
 //! See <https://developers.home-assistant.io/docs/api/websocket/#subscribe-to-events> for further
 //! information.
 
+use log::debug;
+
 use crate::client::event::button::button_event_to_entity_change;
 use crate::client::event::climate::climate_event_to_entity_change;
 use crate::client::event::cover::cover_event_to_entity_change;
@@ -18,8 +20,6 @@ use crate::client::messages::EntityEvent;
 use crate::client::model::Event;
 use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
-
-use log::debug;
 
 mod button;
 mod climate;

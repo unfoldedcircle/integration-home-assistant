@@ -1,21 +1,20 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::messages::R2Request;
-use crate::messages::R2RequestMsg;
-use crate::server::ws::{api_messages, WsConn};
+use std::str::FromStr;
 
 use actix_web_actors::ws::WebsocketContext;
 use log::{error, warn};
-use std::str::FromStr;
+
+use uc_api::ws::WsMessage;
+
+use crate::messages::R2Request;
+use crate::messages::R2RequestMsg;
+use crate::server::ws::WsConn;
 
 impl WsConn {
     /// Handle request messages from R2
-    pub(crate) fn on_request(
-        &mut self,
-        request: api_messages::WsMessage,
-        ctx: &mut WebsocketContext<WsConn>,
-    ) {
+    pub(crate) fn on_request(&mut self, request: WsMessage, ctx: &mut WebsocketContext<WsConn>) {
         let id = match request.id {
             None => {
                 self.send_missing_field_error(0, "id", ctx);

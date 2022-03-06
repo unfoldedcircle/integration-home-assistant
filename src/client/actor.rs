@@ -3,11 +3,11 @@
 
 //! Actix `Actor` trait implementation.
 
-use crate::client::messages::{ConnectionEvent, ConnectionState};
-use crate::client::HomeAssistantClient;
-
 use actix::{Actor, Context};
 use log::debug;
+
+use crate::client::messages::{ConnectionEvent, ConnectionState};
+use crate::client::HomeAssistantClient;
 
 impl Actor for HomeAssistantClient {
     type Context = Context<Self>;

@@ -3,11 +3,12 @@
 
 //! Actix Actor message definitions for HomeAssistantClient
 
-use crate::errors::ServiceError;
-use crate::server::{AvailableEntity, EntityChange, EntityCommand};
-
 use actix::prelude::Message;
 use awc::ws::CloseCode;
+
+use uc_api::{AvailableEntity, EntityChange, EntityCommand};
+
+use crate::errors::ServiceError;
 
 /*
 TODO controller -> HA

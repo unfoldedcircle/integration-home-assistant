@@ -1,10 +1,7 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::messages::{NewR2Session, R2SessionDisconnect};
-use crate::server::ws::api_messages::WsMessage;
-use crate::server::ws::{api_messages, WsConn};
-use crate::Controller;
+use std::time::{Duration, Instant};
 
 use actix::{
     fut, Actor, ActorContext, ActorFutureExt, Addr, AsyncContext, ContextFutureSpawner, Handler,
@@ -13,7 +10,12 @@ use actix::{
 use actix_web_actors::ws::{CloseCode, CloseReason, Message, ProtocolError, WebsocketContext};
 use bytestring::ByteString;
 use log::{debug, error, info, warn};
-use std::time::{Duration, Instant};
+
+use uc_api::ws::{WsError, WsMessage, WsResponse};
+
+use crate::messages::{NewR2Session, R2SessionDisconnect, SendWsMessage};
+use crate::server::ws::WsConn;
+use crate::Controller;
 
 // TODO make configurable?
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -82,14 +84,14 @@ impl StreamHandler<actix_web::Result<Message, ProtocolError>> for WsConn {
     }
 }
 
-impl Handler<WsMessage> for WsConn {
+impl Handler<SendWsMessage> for WsConn {
     type Result = ();
 
-    fn handle(&mut self, msg: WsMessage, ctx: &mut Self::Context) {
-        if let Ok(msg) = serde_json::to_string(&msg) {
+    fn handle(&mut self, msg: SendWsMessage, ctx: &mut Self::Context) {
+        if let Ok(msg) = serde_json::to_string(&msg.0) {
             ctx.text(msg);
         } else {
-            error!("Error serializing {:?}", msg)
+            error!("Error serializing {:?}", msg.0)
         }
     }
 }
@@ -137,11 +139,11 @@ impl WsConn {
         message: String,
         ctx: &mut WebsocketContext<WsConn>,
     ) {
-        let data = api_messages::WsError {
+        let data = WsError {
             code: error_code.into(),
             message,
         };
-        let response = api_messages::WsResponse::error(req_id, code, data);
+        let response = WsResponse::error(req_id, code, data);
         if let Ok(msg) = serde_json::to_string(&response) {
             ctx.text(msg);
         }
@@ -153,14 +155,14 @@ impl WsConn {
         field: &str,
         ctx: &mut WebsocketContext<WsConn>,
     ) {
-        let response = api_messages::WsResponse::missing_field(req_id, field);
+        let response = WsResponse::missing_field(req_id, field);
         if let Ok(msg) = serde_json::to_string(&response) {
             ctx.text(msg);
         }
     }
 
     fn on_text_message(&mut self, text: ByteString, ctx: &mut WebsocketContext<WsConn>) {
-        let msg: api_messages::WsMessage = match serde_json::from_slice(text.as_ref()) {
+        let msg: WsMessage = match serde_json::from_slice(text.as_ref()) {
             Ok(v) => v,
             Err(e) => {
                 warn!("[{}] Invalid JSON message: {}", self.id, e.to_string());

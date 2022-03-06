@@ -3,13 +3,14 @@
 
 //! Light entity specific HA event logic.
 
+use log::info;
+use serde_json::Value;
+
+use uc_api::{EntityChange, EntityType};
+
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
-use crate::server::{EntityChange, EntityType};
-
-use log::info;
-use serde_json::Value;
 
 pub(crate) fn light_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
     let mut attributes = serde_json::Map::with_capacity(2);

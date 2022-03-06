@@ -1,6 +1,22 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+use std::collections::{HashMap, HashSet};
+use std::io::{Error, ErrorKind};
+use std::time::{Duration, SystemTime};
+
+use actix::prelude::{Actor, Context, Handler, Recipient};
+use actix::{ActorFutureExt, Addr, AsyncContext, MessageResult, ResponseActFuture, WrapFuture};
+use futures::StreamExt;
+use log::{debug, error, info, warn};
+use serde_json::json;
+use strum::EnumMessage;
+use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
+
+use uc_api::ws::{EventCategory, WsError, WsMessage};
+use uc_api::{ApiVersion, DeviceState, EntityCommand, SubscribeEvents};
+
 use crate::client::messages::{
     AvailableEntities, CallService, Close, ConnectionEvent, ConnectionState, EntityEvent, GetStates,
 };
@@ -8,25 +24,12 @@ use crate::client::HomeAssistantClient;
 use crate::configuration::HomeAssistantSettings;
 use crate::messages::{
     Connect, Disconnect, GetDeviceState, NewR2Session, R2Event, R2EventMsg, R2Request,
-    R2RequestMsg, R2SessionDisconnect,
-};
-use crate::server::{
-    ApiVersion, DeviceState, EntityCommand, EventCategory, SubscribeEvents, WsError, WsMessage,
+    R2RequestMsg, R2SessionDisconnect, SendWsMessage,
 };
 use crate::websocket::new_websocket_client;
 
-use actix::prelude::{Actor, Context, Handler, Recipient};
-use actix::{ActorFutureExt, Addr, AsyncContext, MessageResult, ResponseActFuture, WrapFuture};
-use futures::StreamExt;
-use log::{debug, error, info, warn};
-use serde_json::json;
-use std::collections::{HashMap, HashSet};
-use std::io::{Error, ErrorKind};
-use std::time::Duration;
-use strum::EnumMessage;
-
 struct R2Session {
-    recipient: Recipient<WsMessage>,
+    recipient: Recipient<SendWsMessage>,
     standby: bool,
     subscribed_entities: HashSet<String>,
     /// HomeAssistant connection mode: true = connect (& reconnect), false = disconnect (& don't reconnect)
@@ -35,7 +38,7 @@ struct R2Session {
 }
 
 impl R2Session {
-    fn new(recipient: Recipient<WsMessage>) -> Self {
+    fn new(recipient: Recipient<SendWsMessage>) -> Self {
         Self {
             recipient,
             standby: false,
@@ -87,7 +90,7 @@ impl Controller {
             }
             // TODO use send instead?
             // TODO error handling
-            let _ = session.recipient.do_send(message);
+            let _ = session.recipient.do_send(SendWsMessage(message));
         } else {
             warn!("attempting to send message but couldn't find user id.");
         }
@@ -98,6 +101,7 @@ impl Controller {
             WsMessage::event(
                 "device_state",
                 Some(EventCategory::Device),
+                to_rfc3339(SystemTime::now()),
                 json!({ "state": self.device_state }),
             ),
             ws_id,
@@ -182,6 +186,7 @@ impl Handler<EntityEvent> for Controller {
                     WsMessage::event(
                         "entity_change",
                         Some(EventCategory::Entity),
+                        to_rfc3339(SystemTime::now()),
                         msg_data.clone(),
                     ),
                     session,
@@ -206,11 +211,13 @@ impl Handler<AvailableEntities> for Controller {
                         );
                         continue;
                     }
-                    match session.recipient.try_send(WsMessage::response(
-                        id,
-                        "available_entities",
-                        msg_data.clone(),
-                    )) {
+                    match session
+                        .recipient
+                        .try_send(SendWsMessage(WsMessage::response(
+                            id,
+                            "available_entities",
+                            msg_data.clone(),
+                        ))) {
                         Ok(_) => session.get_available_entities_id = None,
                         Err(e) => error!("[{}] Error sending available_entities: {:?}", ws_id, e),
                     }
@@ -357,6 +364,7 @@ impl Handler<R2RequestMsg> for Controller {
                     WsMessage::event(
                         resp_msg,
                         Some(EventCategory::Device),
+                        to_rfc3339(SystemTime::now()),
                         json!({ "state": self.device_state }),
                     ),
                     &msg.ws_id,
@@ -489,4 +497,11 @@ impl Handler<R2EventMsg> for Controller {
             _ => info!("Unsupported event: {:?}", msg.event),
         }
     }
+}
+
+fn to_rfc3339<T>(dt: T) -> Option<String>
+where
+    T: Into<OffsetDateTime>,
+{
+    dt.into().format(&Rfc3339).ok()
 }

@@ -1,10 +1,11 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use actix_tls::connect::rustls::webpki_roots_cert_store;
-use rustls::ClientConfig;
 use std::sync::Arc;
 use std::time::Duration;
+
+use actix_tls::connect::rustls::webpki_roots_cert_store;
+use rustls::ClientConfig;
 
 pub fn new_websocket_client(connection_timeout: Duration, tls: bool) -> awc::Client {
     if tls {

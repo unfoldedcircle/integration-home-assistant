@@ -3,11 +3,7 @@
 
 //! Home Assistant client WebSocket API implementation with Actix actors.
 
-use crate::client::messages::{ConnectionEvent, ConnectionState};
-use crate::client::model::Event;
-use crate::configuration::HeartbeatSettings;
-use crate::errors::ServiceError;
-use crate::Controller;
+use std::time::Instant;
 
 use actix::io::SinkWrite;
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context};
@@ -17,10 +13,16 @@ use awc::{ws, BoxedSocket};
 use bytes::Bytes;
 use futures::stream::{SplitSink, SplitStream};
 use log::{debug, error, info, warn};
-use messages::Close;
 use serde::de::Error;
 use serde_json::{json, Value};
-use std::time::Instant;
+
+use messages::Close;
+
+use crate::client::messages::{ConnectionEvent, ConnectionState};
+use crate::client::model::Event;
+use crate::configuration::HeartbeatSettings;
+use crate::errors::ServiceError;
+use crate::Controller;
 
 mod actor;
 mod close_handler;

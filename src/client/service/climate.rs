@@ -3,12 +3,14 @@
 
 //! Climate entity specific HA service call logic.
 
-use crate::client::messages::CallService;
-use crate::errors::ServiceError;
-use crate::server::ClimateCommand;
+use std::str::FromStr;
 
 use serde_json::Value;
-use std::str::FromStr;
+
+use uc_api::ClimateCommand;
+
+use crate::client::messages::CallService;
+use crate::errors::ServiceError;
 
 pub(crate) fn handle_climate(msg: &CallService) -> Result<(String, Option<Value>), ServiceError> {
     let _cmd = ClimateCommand::from_str(&msg.command.cmd_id)?;

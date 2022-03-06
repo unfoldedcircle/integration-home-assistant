@@ -4,14 +4,16 @@
 #![forbid(non_ascii_idents)]
 #![deny(unsafe_code)]
 
-use crate::configuration::get_configuration;
-use crate::controller::Controller;
-use crate::server::web_model::json_error_handler;
+use std::io;
+use std::net::TcpListener;
 
 use actix::Actor;
 use actix_web::{middleware, web, App, HttpServer};
-use std::io;
-use std::net::TcpListener;
+
+use server::json_error_handler;
+
+use crate::configuration::get_configuration;
+use crate::controller::Controller;
 
 mod client;
 mod configuration;

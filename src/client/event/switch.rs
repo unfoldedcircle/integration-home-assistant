@@ -3,10 +3,11 @@
 
 //! Switch entity specific HA event logic.
 
+use uc_api::{EntityChange, EntityType};
+
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
-use crate::server::{EntityChange, EntityType};
 
 pub(crate) fn switch_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
     let mut attributes = serde_json::Map::with_capacity(1);

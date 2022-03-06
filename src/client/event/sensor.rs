@@ -3,12 +3,13 @@
 
 //! Sensor entity specific HA event logic.
 
-use crate::client::model::EventData;
-use crate::errors::ServiceError;
-use crate::server::{EntityChange, EntityType};
-
 use log::info;
 use serde_json::Value;
+
+use uc_api::{EntityChange, EntityType};
+
+use crate::client::model::EventData;
+use crate::errors::ServiceError;
 
 pub(crate) fn sensor_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
     if data.entity_id.is_empty() || data.new_state.state.is_empty() {

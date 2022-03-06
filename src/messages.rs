@@ -1,11 +1,16 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::server::{DeviceState, WsMessage};
-
 use actix::prelude::{Message, Recipient};
 use serde::Deserialize;
 use strum_macros::{EnumMessage, EnumString};
+
+use uc_api::ws::WsMessage;
+use uc_api::DeviceState;
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SendWsMessage(pub WsMessage);
 
 #[derive(Message)]
 #[rtype(result = "Result<(), std::io::Error>")]
@@ -26,7 +31,7 @@ pub struct Disconnect {
 #[rtype(result = "()")]
 pub struct NewR2Session {
     /// Actor address of the WS session to send messages to
-    pub addr: Recipient<WsMessage>,
+    pub addr: Recipient<SendWsMessage>,
     /// unique identifier of WS connection
     pub id: String,
 }

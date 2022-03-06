@@ -3,11 +3,12 @@
 
 //! Cover entity specific HA event logic.
 
+use log::info;
+
+use uc_api::EntityChange;
+
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
-use crate::server::EntityChange;
-
-use log::info;
 
 pub(crate) fn cover_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
     info!(

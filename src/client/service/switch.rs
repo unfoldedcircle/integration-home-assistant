@@ -3,12 +3,14 @@
 
 //! Switch entity specific HA service call logic.
 
-use crate::client::messages::CallService;
-use crate::errors::ServiceError;
-use crate::server::SwitchCommand;
+use std::str::FromStr;
 
 use serde_json::Value;
-use std::str::FromStr;
+
+use uc_api::SwitchCommand;
+
+use crate::client::messages::CallService;
+use crate::errors::ServiceError;
 
 pub(crate) fn handle_switch(msg: &CallService) -> Result<(String, Option<Value>), ServiceError> {
     let cmd = SwitchCommand::from_str(&msg.command.cmd_id)?;

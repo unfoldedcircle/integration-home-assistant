@@ -24,7 +24,7 @@ pub(crate) struct Target {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Event {
-    pub event_type: String,
+    //pub event_type: String,
     pub data: EventData,
 }
 

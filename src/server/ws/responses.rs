@@ -1,18 +1,16 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::server::ws::{api_messages, WsConn};
-
 use actix_web_actors::ws::WebsocketContext;
 use log::{error, info, warn};
 
+use uc_api::ws::WsMessage;
+
+use crate::server::ws::WsConn;
+
 impl WsConn {
     /// Handle response messages from R2
-    pub(crate) fn on_response(
-        &mut self,
-        response: api_messages::WsMessage,
-        _ctx: &mut WebsocketContext<WsConn>,
-    ) {
+    pub(crate) fn on_response(&mut self, response: WsMessage, _ctx: &mut WebsocketContext<WsConn>) {
         let msg = match response.msg {
             None => {
                 error!(

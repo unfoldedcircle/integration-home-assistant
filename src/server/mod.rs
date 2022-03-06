@@ -1,18 +1,18 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+use actix::Addr;
+use actix_web::error::JsonPayloadError;
+use actix_web::{error, get, web, Error, HttpRequest, HttpResponse, Result};
+use log::debug;
+use uuid::Uuid;
+
+use uc_api::web::ApiResponse;
+use ws::WsConn;
+
 use crate::configuration::WebSocketSettings;
 use crate::Controller;
 
-use actix::Addr;
-use actix_web::{get, web, Error, HttpRequest, HttpResponse, Result};
-use log::debug;
-use uuid::Uuid;
-use web_model::ApiResponse;
-pub use ws::api_messages::*;
-use ws::WsConn;
-
-pub mod web_model;
 mod ws;
 
 #[get("/ws")]
@@ -52,4 +52,20 @@ pub async fn ws_index(
         &request,
         stream,
     )
+}
+
+pub fn json_error_handler(err: error::JsonPayloadError, _: &HttpRequest) -> Error {
+    let message = err.to_string();
+
+    let resp = match &err {
+        JsonPayloadError::ContentType => HttpResponse::UnsupportedMediaType()
+            .json(ApiResponse::new("UNSUPPORTED_MEDIA_TYPE", &message[..])),
+        JsonPayloadError::Deserialize(json_err) if json_err.is_data() => {
+            // alternative: HttpResponse::UnprocessableEntity 422
+            HttpResponse::BadRequest().json(ApiResponse::new("INVALID_JSON", &message[..]))
+        }
+        _ => HttpResponse::BadRequest().json(ApiResponse::new("BAD_REQUEST", &message[..])),
+    };
+
+    error::InternalError::from_response(err, resp).into()
 }

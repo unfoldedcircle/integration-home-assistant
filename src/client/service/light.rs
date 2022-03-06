@@ -3,12 +3,14 @@
 
 //! Light entity specific HA service call logic.
 
-use crate::client::messages::CallService;
-use crate::errors::ServiceError;
-use crate::server::LightCommand;
+use std::str::FromStr;
 
 use serde_json::{Map, Number, Value};
-use std::str::FromStr;
+
+use uc_api::LightCommand;
+
+use crate::client::messages::CallService;
+use crate::errors::ServiceError;
 
 pub(crate) fn handle_light(msg: &CallService) -> Result<(String, Option<Value>), ServiceError> {
     let cmd = LightCommand::from_str(&msg.command.cmd_id)?;

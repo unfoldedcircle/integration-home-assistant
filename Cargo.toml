@@ -9,6 +9,8 @@ description = "Unfolded Circle Home-Assistant integration for Remote Two"
 #documentation = "TODO"
 
 [dependencies]
+uc_api = { path = "../api-model-rs" }
+
 # WebSockets server
 actix-web = { version = "4.0.0-rc.3", features = ["rustls"] }
 actix-web-actors = "4.0.0-beta.12"
@@ -19,7 +21,7 @@ rustls = "0.20"
 rustls-pemfile = "0.3"
 # WebSockets client
 actix-codec = "0.5"
-awc = { version = "3.0.0-beta.21", features= ["rustls"] }
+awc = { version = "3.0.0-beta.21", features = ["rustls"] }
 bytes = "1.1"
 futures = "0.3"
 
@@ -34,9 +36,9 @@ env_logger = "0.9"
 log = "0.4"
 
 uuid = { version = "0.8", features = ["v4"] }
-time = {version = "0.3", default-features = false, features = ["std", "formatting"]}
+time = { version = "0.3", default-features = false, features = ["std", "formatting"] }
 
 # Helpful macros for working with enums and strings
-strum = "0.23"
-strum_macros = "0.23"
+strum = "0.24"
+strum_macros = "0.24"
 derive_more = "0.99"

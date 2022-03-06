@@ -1,12 +1,12 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::Controller;
-
-use actix::Addr;
 use std::time::Instant;
 
-pub mod api_messages;
+use actix::Addr;
+
+use crate::Controller;
+
 mod connection;
 mod events;
 mod requests;

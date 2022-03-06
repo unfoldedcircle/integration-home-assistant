@@ -3,12 +3,14 @@
 
 //! Media player entity specific HA service call logic.
 
-use crate::client::messages::CallService;
-use crate::errors::ServiceError;
-use crate::server::MediaPlayerCommand;
+use std::str::FromStr;
 
 use serde_json::Value;
-use std::str::FromStr;
+
+use uc_api::MediaPlayerCommand;
+
+use crate::client::messages::CallService;
+use crate::errors::ServiceError;
 
 pub fn handle_media_player(msg: &CallService) -> Result<(String, Option<Value>), ServiceError> {
     let _cmd = MediaPlayerCommand::from_str(&msg.command.cmd_id)?;

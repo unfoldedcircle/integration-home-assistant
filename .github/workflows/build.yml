@@ -18,14 +18,35 @@ jobs:
   rustfmt:
     runs-on: ubuntu-latest
     steps:
+      - run: pwd && ls -lah
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          path: intg-hass
+      # BEGIN temporary workaround until api-model-rs is public
+      - name: Checkout API model crate
+        uses: actions/checkout@v3
+        with:
+          repository: aitatoi/api-model-rs
+          path: api-model-rs
+          token: ${{ secrets.PAT_BUILD_USER }}
+      - name: Create Workspace
+        run: |
+          cat > Cargo.toml << ENDOFFILE
+          [workspace]
+          members = [
+          "api-model-rs",
+          "intg-hass",
+          ]  
+          ENDOFFILE
+          cp intg-hass/Cargo.lock ./
+      # END workaround
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
           components: rustfmt
-      - name: Checkout repository
+      - name: Check source formatting
         uses: actions-rs/cargo@v1
         with:
           command: fmt
@@ -35,7 +56,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          path: intg-hass
+      # BEGIN temporary workaround until api-model-rs is public
+      - name: Checkout API model crate
+        uses: actions/checkout@v3
+        with:
+          repository: aitatoi/api-model-rs
+          path: api-model-rs
+          token: ${{ secrets.PAT_BUILD_USER }}
+      - name: Create Workspace
+        run: |
+          cat > Cargo.toml << ENDOFFILE
+          [workspace]
+          members = [
+          "api-model-rs",
+          "intg-hass",
+          ]  
+          ENDOFFILE
+          cp intg-hass/Cargo.lock ./
+      # END workaround
+
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
