@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::io::{Error, ErrorKind};
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use actix::prelude::{Actor, Context, Handler, Recipient};
 use actix::{ActorFutureExt, Addr, AsyncContext, MessageResult, ResponseActFuture, WrapFuture};
@@ -11,11 +11,9 @@ use futures::StreamExt;
 use log::{debug, error, info, warn};
 use serde_json::json;
 use strum::EnumMessage;
-use time::format_description::well_known::Rfc3339;
-use time::OffsetDateTime;
-
+use uc_api::ws::intg::{R2Event, R2Request};
 use uc_api::ws::{EventCategory, WsError, WsMessage};
-use uc_api::{ApiVersion, DeviceState, EntityCommand, SubscribeEvents};
+use uc_api::{DeviceState, EntityCommand, IntegrationVersion, SubscribeEvents};
 
 use crate::client::messages::{
     AvailableEntities, CallService, Close, ConnectionEvent, ConnectionState, EntityEvent, GetStates,
@@ -23,8 +21,8 @@ use crate::client::messages::{
 use crate::client::HomeAssistantClient;
 use crate::configuration::HomeAssistantSettings;
 use crate::messages::{
-    Connect, Disconnect, GetDeviceState, NewR2Session, R2Event, R2EventMsg, R2Request,
-    R2RequestMsg, R2SessionDisconnect, SendWsMessage,
+    Connect, Disconnect, GetDeviceState, NewR2Session, R2EventMsg, R2RequestMsg,
+    R2SessionDisconnect, SendWsMessage,
 };
 use crate::websocket::new_websocket_client;
 
@@ -101,7 +99,6 @@ impl Controller {
             WsMessage::event(
                 "device_state",
                 Some(EventCategory::Device),
-                to_rfc3339(SystemTime::now()),
                 json!({ "state": self.device_state }),
             ),
             ws_id,
@@ -186,7 +183,6 @@ impl Handler<EntityEvent> for Controller {
                     WsMessage::event(
                         "entity_change",
                         Some(EventCategory::Entity),
-                        to_rfc3339(SystemTime::now()),
                         msg_data.clone(),
                     ),
                     session,
@@ -350,7 +346,7 @@ impl Handler<R2RequestMsg> for Controller {
                         resp_msg,
                         // TODO make a global var?
                         // TODO Read versions from project / during build.
-                        ApiVersion {
+                        IntegrationVersion {
                             api: "0.4.0".to_string(),
                             integration: "0.1.0".to_string(),
                         },
@@ -364,7 +360,6 @@ impl Handler<R2RequestMsg> for Controller {
                     WsMessage::event(
                         resp_msg,
                         Some(EventCategory::Device),
-                        to_rfc3339(SystemTime::now()),
                         json!({ "state": self.device_state }),
                     ),
                     &msg.ws_id,
@@ -497,11 +492,4 @@ impl Handler<R2EventMsg> for Controller {
             _ => info!("Unsupported event: {:?}", msg.event),
         }
     }
-}
-
-fn to_rfc3339<T>(dt: T) -> Option<String>
-where
-    T: Into<OffsetDateTime>,
-{
-    dt.into().format(&Rfc3339).ok()
 }

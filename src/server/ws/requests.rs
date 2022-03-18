@@ -5,10 +5,9 @@ use std::str::FromStr;
 
 use actix_web_actors::ws::WebsocketContext;
 use log::{error, warn};
-
+use uc_api::ws::intg::R2Request;
 use uc_api::ws::WsMessage;
 
-use crate::messages::R2Request;
 use crate::messages::R2RequestMsg;
 use crate::server::ws::WsConn;
 

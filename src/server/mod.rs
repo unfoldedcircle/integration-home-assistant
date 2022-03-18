@@ -4,7 +4,7 @@
 use actix::Addr;
 use actix_web::error::JsonPayloadError;
 use actix_web::{error, get, web, Error, HttpRequest, HttpResponse, Result};
-use log::debug;
+use log::{debug, info};
 use uuid::Uuid;
 
 use uc_api::web::ApiResponse;
@@ -35,6 +35,7 @@ pub async fn ws_index(
             });
 
         if auth_token != websocket_settings.token {
+            info!("Invalid token, closing client connection");
             return Ok(HttpResponse::Unauthorized()
                 .json(ApiResponse::new("ERROR", "Authentication failed")));
         }

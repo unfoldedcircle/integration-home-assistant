@@ -69,7 +69,7 @@ impl StreamHandler<actix_web::Result<Message, ProtocolError>> for WsConn {
                 }
                 Message::Pong(_) => self.hb = Instant::now(),
                 Message::Close(reason) => {
-                    ctx.close(reason);
+                    info!("Remote closed connection. Reason: {:?}", reason);
                     ctx.stop();
                 }
                 Message::Continuation(_) => {

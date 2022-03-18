@@ -5,10 +5,10 @@ use std::str::FromStr;
 
 use actix_web_actors::ws::WebsocketContext;
 use log::{error, warn};
-
+use uc_api::ws::intg::R2Event;
 use uc_api::ws::WsMessage;
 
-use crate::messages::{R2Event, R2EventMsg};
+use crate::messages::R2EventMsg;
 use crate::server::ws::WsConn;
 
 impl WsConn {
@@ -16,7 +16,7 @@ impl WsConn {
     pub(crate) fn on_event(&mut self, event: WsMessage, _ctx: &mut WebsocketContext<WsConn>) {
         let msg = match event.msg {
             None => {
-                error!("[{}] Missing msg attribute in event: {:?}", self.id, event);
+                error!("[{}] Missing property `msg` in event: {:?}", self.id, event);
                 return;
             }
             Some(ref m) => m.as_str(),

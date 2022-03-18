@@ -14,7 +14,7 @@ impl WsConn {
         let msg = match response.msg {
             None => {
                 error!(
-                    "[{}] Missing msg attribute in response: {:?}",
+                    "[{}] Missing property `msg` in response: {:?}",
                     self.id, response
                 );
                 return;
