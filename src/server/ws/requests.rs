@@ -4,7 +4,7 @@
 use std::str::FromStr;
 
 use actix_web_actors::ws::WebsocketContext;
-use log::{error, warn};
+use log::{debug, error, warn};
 use uc_api::ws::intg::R2Request;
 use uc_api::ws::WsMessage;
 
@@ -14,6 +14,7 @@ use crate::server::ws::WsConn;
 impl WsConn {
     /// Handle request messages from R2
     pub(crate) fn on_request(&mut self, request: WsMessage, ctx: &mut WebsocketContext<WsConn>) {
+        debug!("[{}] Got request: {:?}", self.id, request);
         let id = match request.id {
             None => {
                 self.send_missing_field_error(0, "id", ctx);

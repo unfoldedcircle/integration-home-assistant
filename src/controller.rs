@@ -13,7 +13,9 @@ use serde_json::json;
 use strum::EnumMessage;
 use uc_api::ws::intg::{R2Event, R2Request};
 use uc_api::ws::{EventCategory, WsError, WsMessage};
-use uc_api::{DeviceState, EntityCommand, IntegrationVersion, SubscribeEvents};
+use uc_api::{
+    AvailableEntitiesMsgData, DeviceState, EntityCommand, IntegrationVersion, SubscribeEvents,
+};
 
 use crate::client::messages::{
     AvailableEntities, CallService, Close, ConnectionEvent, ConnectionState, EntityEvent, GetStates,
@@ -197,7 +199,11 @@ impl Handler<AvailableEntities> for Controller {
 
     fn handle(&mut self, msg: AvailableEntities, _ctx: &mut Self::Context) -> Self::Result {
         // TODO just a quick implementation. Implement caching and request filter!
-        if let Ok(msg_data) = serde_json::to_value(msg.entities) {
+        let msg_data = AvailableEntitiesMsgData {
+            filter: None,
+            available_entities: msg.entities,
+        };
+        if let Ok(msg_data_json) = serde_json::to_value(msg_data) {
             for (ws_id, session) in self.sessions.iter_mut() {
                 if let Some(id) = session.get_available_entities_id {
                     if session.standby {
@@ -212,7 +218,7 @@ impl Handler<AvailableEntities> for Controller {
                         .try_send(SendWsMessage(WsMessage::response(
                             id,
                             "available_entities",
-                            msg_data.clone(),
+                            msg_data_json.clone(),
                         ))) {
                         Ok(_) => session.get_available_entities_id = None,
                         Err(e) => error!("[{}] Error sending available_entities: {:?}", ws_id, e),
@@ -332,6 +338,7 @@ impl Handler<R2RequestMsg> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: R2RequestMsg, _ctx: &mut Self::Context) -> Self::Result {
+        debug!("R2RequestMsg: {:?}", msg.request);
         // extra safety: if we get a request, the remote is certainly not in standby mode
         if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
             session.standby = false;
@@ -374,7 +381,12 @@ impl Handler<R2RequestMsg> for Controller {
 
                 // FIXME proof of concept only. TODO add caching and maybe a "force retrieve flag"
                 if let Some(addr) = self.ha_client.as_ref() {
+                    debug!("[{}] Requesting available entities from HA", msg.ws_id);
                     addr.do_send(GetStates);
+                } else {
+                    error!(
+                        "Unable to request available entities: HA client connection not available!"
+                    );
                 }
                 return;
             }
