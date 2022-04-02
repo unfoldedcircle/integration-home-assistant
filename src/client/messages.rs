@@ -6,7 +6,7 @@
 use actix::prelude::Message;
 use awc::ws::CloseCode;
 
-use uc_api::{AvailableEntity, EntityChange, EntityCommand};
+use uc_api::{AvailableIntgEntity, EntityChange, EntityCommand};
 
 use crate::errors::ServiceError;
 
@@ -39,7 +39,7 @@ pub struct GetStates;
 #[rtype(result = "()")]
 pub struct AvailableEntities {
     pub client_id: String,
-    pub entities: Vec<AvailableEntity>,
+    pub entities: Vec<AvailableIntgEntity>,
 }
 
 /// HA client connection states

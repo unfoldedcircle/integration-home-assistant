@@ -12,7 +12,7 @@ use log::{debug, error};
 use serde_json::{json, Value};
 
 use uc_api::{
-    AvailableEntity, ClimateFeature, ClimateOption, CoverFeature, EntityType, LightFeature,
+    AvailableIntgEntity, ClimateFeature, ClimateOption, CoverFeature, EntityType, LightFeature,
     MediaPlayerFeature, SensorOption,
 };
 
@@ -140,7 +140,7 @@ fn create_available_entity(
     entity_type: EntityType,
     entity_id: &str,
     entity: &Value,
-) -> Option<AvailableEntity> {
+) -> Option<AvailableIntgEntity> {
     let mut friendly_name = None;
     let mut device_class = None;
     let mut features = Vec::with_capacity(2);
@@ -360,7 +360,7 @@ fn create_available_entity(
         }
     }
 
-    Some(AvailableEntity {
+    Some(AvailableIntgEntity {
         device_id: None, // TODO prepare device_id handling
         entity_type,
         entity_id: entity_id.to_string(),
