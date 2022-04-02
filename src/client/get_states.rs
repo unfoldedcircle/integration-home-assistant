@@ -141,13 +141,13 @@ fn create_available_entity(
     entity_id: &str,
     entity: &Value,
 ) -> Option<AvailableIntgEntity> {
-    let mut friendly_name = None;
+    let mut name = None;
     let mut device_class = None;
     let mut features = Vec::with_capacity(2);
     let mut options = serde_json::Map::new();
 
     if let Some(attributes) = entity.get("attributes").and_then(|v| v.as_object()) {
-        friendly_name = attributes.get("friendly_name").and_then(|v| v.as_str());
+        name = attributes.get("name").and_then(|v| v.as_str());
         device_class = attributes.get("device_class").and_then(|v| v.as_str());
 
         let supported_features = attributes
@@ -365,10 +365,7 @@ fn create_available_entity(
         entity_type,
         entity_id: entity_id.to_string(),
         device_class: device_class.map(|v| v.to_string()),
-        friendly_name: HashMap::from([(
-            "en".to_string(),
-            friendly_name.unwrap_or(entity_id).to_string(),
-        )]),
+        name: HashMap::from([("en".to_string(), name.unwrap_or(entity_id).to_string())]),
         features: if features.is_empty() {
             None
         } else {
