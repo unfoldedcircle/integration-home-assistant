@@ -6,7 +6,10 @@ use std::io::{Error, ErrorKind};
 use std::time::Duration;
 
 use actix::prelude::{Actor, Context, Handler, Recipient};
-use actix::{ActorFutureExt, Addr, AsyncContext, MessageResult, ResponseActFuture, WrapFuture};
+use actix::{
+    fut, ActorFutureExt, Addr, AsyncContext, MessageResult, ResponseActFuture, ResponseFuture,
+    WrapFuture,
+};
 use futures::StreamExt;
 use log::{debug, error, info, warn};
 use serde_json::json;
@@ -22,6 +25,7 @@ use crate::client::messages::{
 };
 use crate::client::HomeAssistantClient;
 use crate::configuration::HomeAssistantSettings;
+use crate::errors::ServiceError;
 use crate::messages::{
     Connect, Disconnect, GetDeviceState, NewR2Session, R2EventMsg, R2RequestMsg,
     R2SessionDisconnect, SendWsMessage,
@@ -81,7 +85,8 @@ impl Controller {
         }
     }
 
-    fn send_message(&self, message: WsMessage, ws_id: &str) {
+    /// Send a WebSocket message to the remote
+    fn send_r2_msg(&self, message: WsMessage, ws_id: &str) {
         if let Some(session) = self.sessions.get(ws_id) {
             if session.standby {
                 debug!("Remote is in standby, not sending message: {:?}", message);
@@ -92,15 +97,15 @@ impl Controller {
             // TODO error handling
             let _ = session.recipient.do_send(SendWsMessage(message));
         } else {
-            warn!("attempting to send message but couldn't find user id.");
+            warn!("attempting to send message but couldn't find session.");
         }
     }
 
     fn send_device_state(&self, ws_id: &str) {
-        self.send_message(
+        self.send_r2_msg(
             WsMessage::event(
                 "device_state",
-                Some(EventCategory::Device),
+                EventCategory::Device,
                 json!({ "state": self.device_state }),
             ),
             ws_id,
@@ -181,12 +186,8 @@ impl Handler<EntityEvent> for Controller {
         // TODO keep an entity subscription per remote session and filter out non-subscribed remotes?
         if let Ok(msg_data) = serde_json::to_value(msg.entity_change) {
             for session in self.sessions.keys() {
-                self.send_message(
-                    WsMessage::event(
-                        "entity_change",
-                        Some(EventCategory::Entity),
-                        msg_data.clone(),
-                    ),
+                self.send_r2_msg(
+                    WsMessage::event("entity_change", EventCategory::Entity, msg_data.clone()),
                     session,
                 );
             }
@@ -335,19 +336,23 @@ impl Handler<GetDeviceState> for Controller {
 }
 
 impl Handler<R2RequestMsg> for Controller {
-    type Result = ();
+    type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: R2RequestMsg, _ctx: &mut Self::Context) -> Self::Result {
         debug!("R2RequestMsg: {:?}", msg.request);
         // extra safety: if we get a request, the remote is certainly not in standby mode
-        if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
+        let r2_recipient = if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
             session.standby = false;
-        }
+            session.recipient.clone()
+        } else {
+            error!("Can't handle R2RequestMsg without a session!");
+            return Box::pin(fut::ready(()));
+        };
 
         let resp_msg = msg.request.get_message().unwrap();
-        match msg.request {
+        let result = match msg.request {
             R2Request::GetDriverVersion => {
-                self.send_message(
+                self.send_r2_msg(
                     WsMessage::response(
                         msg.req_id,
                         resp_msg,
@@ -360,20 +365,20 @@ impl Handler<R2RequestMsg> for Controller {
                     ),
                     &msg.ws_id,
                 );
-                return;
+                Ok(())
             }
             R2Request::GetDeviceState => {
-                self.send_message(
+                self.send_r2_msg(
                     WsMessage::event(
                         resp_msg,
-                        Some(EventCategory::Device),
+                        EventCategory::Device,
                         json!({ "state": self.device_state }),
                     ),
                     &msg.ws_id,
                 );
-                return;
+                Ok(())
             }
-            R2Request::SetupDevice => {}
+            R2Request::SetupDevice => Err(ServiceError::NotYetImplemented),
             R2Request::GetAvailableEntities => {
                 if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
                     session.get_available_entities_id = Some(msg.req_id);
@@ -388,7 +393,7 @@ impl Handler<R2RequestMsg> for Controller {
                         "Unable to request available entities: HA client connection not available!"
                     );
                 }
-                return;
+                Ok(())
             }
             R2Request::SubscribeEvents => {
                 if let Some(msg_data) = msg.msg_data {
@@ -407,7 +412,7 @@ impl Handler<R2RequestMsg> for Controller {
                         )
                     }
                 }
-                return;
+                Ok(())
             }
             R2Request::UnsubscribeEvents => {
                 if let Some(msg_data) = msg.msg_data {
@@ -419,50 +424,67 @@ impl Handler<R2RequestMsg> for Controller {
                                 session.subscribed_entities.remove(&i);
                             }
                         }
+                        Ok(())
                     } else {
+                        // FIXME error handling
                         warn!(
                             "[{}] Invalid unsubscribe_events payload: {:?}",
                             msg.ws_id, result
-                        )
+                        );
+                        Err(ServiceError::BadRequest(
+                            "Invalid unsubscribe_events payload".into(),
+                        ))
                     }
+                } else {
+                    Ok(())
                 }
-                return;
             }
-            R2Request::GetEntityStates => {}
+            R2Request::GetEntityStates => Err(ServiceError::NotYetImplemented),
             R2Request::EntityCommand => {
-                let msg_data = match msg.msg_data {
-                    None => {
-                        warn!("Missing msg_data in entity command");
-                        return;
+                match msg.msg_data {
+                    None => Err(ServiceError::BadRequest(
+                        "Missing msg_data in entity command".into(),
+                    )),
+                    Some(msg_data) => {
+                        match serde_json::from_value::<EntityCommand>(msg_data) {
+                            Ok(command) => {
+                                if let Some(addr) = self.ha_client.clone() {
+                                    return Box::pin(async move {
+                                        // TODO error handling should be simpler. Rewrite with ResponseActFuture?
+                                        match addr.send(CallService { command }).await {
+                                            Err(e) => {
+                                                error!("Can't send HA command: {}", e);
+                                                send_r2_err_response(
+                                                    r2_recipient,
+                                                    msg.req_id,
+                                                    e.into(),
+                                                );
+                                            }
+                                            Ok(Err(e)) => {
+                                                error!("CallService failed: {:?}", e);
+                                                send_r2_err_response(r2_recipient, msg.req_id, e);
+                                            }
+                                            _ => {}
+                                        }
+                                    });
+                                }
+                                Ok(())
+                            }
+                            Err(e) => Err(ServiceError::BadRequest(format!(
+                                "Invalid entity command: {:?}",
+                                e
+                            ))),
+                        }
                     }
-                    Some(v) => v,
-                };
-                let command = match serde_json::from_value::<EntityCommand>(msg_data) {
-                    Ok(cmd) => cmd,
-                    Err(e) => {
-                        warn!("Invalid entity command: {:?}", e);
-                        return;
-                    }
-                };
-                if let Some(addr) = self.ha_client.as_ref() {
-                    addr.do_send(CallService { command });
                 }
-                return;
             }
+        };
+
+        if let Err(e) = result {
+            send_r2_err_response(r2_recipient, msg.req_id, e);
         }
-        info!("TODO implement {:?}", msg);
-        // Not yet implemented response
-        self.send_message(
-            WsMessage::error(
-                msg.req_id,
-                501,
-                WsError {
-                    code: "NOT_IMPLEMENTED".to_string(),
-                    message: "Not yet implemented".to_string(),
-                },
-            ),
-            &msg.ws_id,
-        );
+
+        Box::pin(fut::ready(()))
     }
 }
 
@@ -503,5 +525,27 @@ impl Handler<R2EventMsg> for Controller {
             }
             _ => info!("Unsupported event: {:?}", msg.event),
         }
+    }
+}
+
+fn send_r2_err_response(recipient: Recipient<SendWsMessage>, req_id: u32, error: ServiceError) {
+    debug!("Sending R2 error response for: {:?}", error);
+
+    let (code, ws_err) = match error {
+        ServiceError::InternalServerError => (500, WsError::new("ERROR", "Internal server error")),
+        ServiceError::SerializationError(e) => (400, WsError::new("BAD_REQUEST", e)),
+        ServiceError::BadRequest(e) => (400, WsError::new("BAD_REQUEST", e)),
+        ServiceError::NotConnected => (
+            503,
+            WsError::new("SERVICE_UNAVAILABLE", "HomeAssistant is not connected"),
+        ),
+        ServiceError::NotYetImplemented => {
+            (501, WsError::new("NOT_IMPLEMENTED", "Not yet implemented"))
+        }
+    };
+
+    let message = WsMessage::error(req_id, code, ws_err);
+    if let Err(e) = recipient.try_send(SendWsMessage(message)) {
+        error!("Failed to send error response: {}", e)
     }
 }
