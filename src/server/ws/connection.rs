@@ -11,7 +11,7 @@ use actix_web_actors::ws::{CloseCode, CloseReason, Message, ProtocolError, Webso
 use bytestring::ByteString;
 use log::{debug, error, info, warn};
 
-use uc_api::ws::{WsError, WsMessage, WsResponse};
+use uc_api::ws::{WsMessage, WsResponse, WsResultMsgData};
 
 use crate::messages::{NewR2Session, R2SessionDisconnect, SendWsMessage};
 use crate::server::ws::WsConn;
@@ -139,7 +139,7 @@ impl WsConn {
         message: String,
         ctx: &mut WebsocketContext<WsConn>,
     ) {
-        let data = WsError {
+        let data = WsResultMsgData {
             code: error_code.into(),
             message,
         };

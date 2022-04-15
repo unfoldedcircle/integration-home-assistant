@@ -15,7 +15,7 @@ use log::{debug, error, info, warn};
 use serde_json::json;
 use strum::EnumMessage;
 use uc_api::ws::intg::{R2Event, R2Request};
-use uc_api::ws::{EventCategory, WsError, WsMessage};
+use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
 use uc_api::{
     AvailableEntitiesMsgData, DeviceState, EntityCommand, IntegrationVersion, SubscribeEvents,
 };
@@ -464,7 +464,18 @@ impl Handler<R2RequestMsg> for Controller {
                                                 error!("CallService failed: {:?}", e);
                                                 send_r2_err_response(r2_recipient, msg.req_id, e);
                                             }
-                                            _ => {}
+                                            Ok(Ok(_)) => {
+                                                let response = WsMessage::response(
+                                                    msg.req_id,
+                                                    "result",
+                                                    WsResultMsgData::new("OK", "Service call sent"),
+                                                );
+                                                if let Err(e) =
+                                                    r2_recipient.try_send(SendWsMessage(response))
+                                                {
+                                                    error!("Can't send R2 result: {}", e);
+                                                }
+                                            }
                                         }
                                     });
                                 }
@@ -532,16 +543,19 @@ fn send_r2_err_response(recipient: Recipient<SendWsMessage>, req_id: u32, error:
     debug!("Sending R2 error response for: {:?}", error);
 
     let (code, ws_err) = match error {
-        ServiceError::InternalServerError => (500, WsError::new("ERROR", "Internal server error")),
-        ServiceError::SerializationError(e) => (400, WsError::new("BAD_REQUEST", e)),
-        ServiceError::BadRequest(e) => (400, WsError::new("BAD_REQUEST", e)),
+        ServiceError::InternalServerError => {
+            (500, WsResultMsgData::new("ERROR", "Internal server error"))
+        }
+        ServiceError::SerializationError(e) => (400, WsResultMsgData::new("BAD_REQUEST", e)),
+        ServiceError::BadRequest(e) => (400, WsResultMsgData::new("BAD_REQUEST", e)),
         ServiceError::NotConnected => (
             503,
-            WsError::new("SERVICE_UNAVAILABLE", "HomeAssistant is not connected"),
+            WsResultMsgData::new("SERVICE_UNAVAILABLE", "HomeAssistant is not connected"),
         ),
-        ServiceError::NotYetImplemented => {
-            (501, WsError::new("NOT_IMPLEMENTED", "Not yet implemented"))
-        }
+        ServiceError::NotYetImplemented => (
+            501,
+            WsResultMsgData::new("NOT_IMPLEMENTED", "Not yet implemented"),
+        ),
     };
 
     let message = WsMessage::error(req_id, code, ws_err);
