@@ -3,22 +3,20 @@
 
 //! Light entity specific HA service call logic.
 
-use std::str::FromStr;
-
 use serde_json::{Map, Number, Value};
-
 use uc_api::LightCommand;
 
 use crate::client::messages::CallService;
+use crate::client::service::cmd_from_str;
 use crate::errors::ServiceError;
 
 pub(crate) fn handle_light(msg: &CallService) -> Result<(String, Option<Value>), ServiceError> {
-    let cmd = LightCommand::from_str(&msg.command.cmd_id)?;
+    let cmd: LightCommand = cmd_from_str(&msg.command.cmd_id)?;
 
     let result = match cmd {
         LightCommand::On => {
             let mut data = Map::new();
-            if let Some(params) = msg.command.params.as_ref().and_then(|v| v.as_object()) {
+            if let Some(params) = msg.command.params.as_ref() {
                 if let Some(brightness) = params.get("brightness").and_then(|v| v.as_u64()) {
                     // FIXME brightness_pct might no longer be supported with newer HA versions!
                     data.insert(

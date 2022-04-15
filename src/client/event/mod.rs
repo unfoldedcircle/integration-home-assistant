@@ -12,6 +12,7 @@ use crate::client::event::button::button_event_to_entity_change;
 use crate::client::event::climate::climate_event_to_entity_change;
 use crate::client::event::cover::cover_event_to_entity_change;
 use crate::client::event::light::light_event_to_entity_change;
+use crate::client::event::media_player::media_player_event_to_entity_change;
 use crate::client::event::sensor::{
     binary_sensor_event_to_entity_change, sensor_event_to_entity_change,
 };
@@ -25,6 +26,7 @@ mod button;
 mod climate;
 mod cover;
 mod light;
+mod media_player;
 mod sensor;
 mod switch;
 
@@ -62,6 +64,7 @@ impl HomeAssistantClient {
             "sensor" => sensor_event_to_entity_change(event.data),
             "binary_sensor" => binary_sensor_event_to_entity_change(event.data),
             "climate" => climate_event_to_entity_change(event.data),
+            "media_player" => media_player_event_to_entity_change(event.data),
             &_ => {
                 debug!("[{}] Unsupported entity: {}", self.id, entity_type);
                 return Ok(()); // it's not really an error, so it's ok ;-)

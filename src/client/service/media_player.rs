@@ -3,17 +3,15 @@
 
 //! Media player entity specific HA service call logic.
 
-use std::str::FromStr;
-
 use serde_json::Value;
-
 use uc_api::MediaPlayerCommand;
 
 use crate::client::messages::CallService;
+use crate::client::service::cmd_from_str;
 use crate::errors::ServiceError;
 
 pub fn handle_media_player(msg: &CallService) -> Result<(String, Option<Value>), ServiceError> {
-    let _cmd = MediaPlayerCommand::from_str(&msg.command.cmd_id)?;
+    let _cmd: MediaPlayerCommand = cmd_from_str(&msg.command.cmd_id)?;
 
     Err(ServiceError::NotYetImplemented)
 }

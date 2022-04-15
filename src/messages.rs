@@ -49,6 +49,11 @@ pub struct GetDeviceState {
 // pub device_id: String,
 }
 
+/// Actor message for a Remote Two request.
+///
+/// This is a "one way" fire and forget message on purpose to simplify handling in the StreamHandler
+/// client. Any errors must be handled in the receiver! E.g. sending error response messages back to
+/// the Remote Two!
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct R2RequestMsg {

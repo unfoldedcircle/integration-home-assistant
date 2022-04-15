@@ -68,3 +68,15 @@ impl Handler<CallService> for HomeAssistantClient {
         self.send_message(msg, "call_service", ctx)
     }
 }
+
+pub fn cmd_from_str<T: std::str::FromStr + strum::VariantNames>(
+    cmd: &str,
+) -> Result<T, ServiceError> {
+    T::from_str(cmd).map_err(|_| {
+        ServiceError::BadRequest(format!(
+            "Invalid cmd_id: {}. Valid commands: {:?}",
+            cmd,
+            T::VARIANTS
+        ))
+    })
+}
