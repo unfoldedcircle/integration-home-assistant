@@ -1,10 +1,12 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+use actix::Addr;
 use std::str::FromStr;
 
-use actix_web_actors::ws::WebsocketContext;
-use log::{debug, error, warn};
+use crate::errors::ServiceError;
+use crate::Controller;
+use log::{debug, warn};
 use uc_api::ws::intg::R2Request;
 use uc_api::ws::WsMessage;
 
@@ -13,48 +15,35 @@ use crate::server::ws::WsConn;
 
 impl WsConn {
     /// Handle request messages from R2
-    pub(crate) fn on_request(&mut self, request: WsMessage, ctx: &mut WebsocketContext<WsConn>) {
-        debug!("[{}] Got request: {:?}", self.id, request);
-        let id = match request.id {
-            None => {
-                self.send_missing_field_error(0, "id", ctx);
-                return;
-            }
-            Some(id) => id,
-        };
-        let msg = match request.msg {
-            None => {
-                self.send_missing_field_error(id, "msg", ctx);
-                return;
-            }
-            Some(ref m) => m.as_str(),
-        };
+    pub(crate) async fn on_request(
+        session_id: &str,
+        request: WsMessage,
+        controller_addr: Addr<Controller>,
+    ) -> Result<(), ServiceError> {
+        debug!("[{}] Got request: {:?}", session_id, request);
+        let id = request
+            .id
+            .ok_or_else(|| ServiceError::BadRequest("Missing property: id".into()))?;
+        let msg = request
+            .msg
+            .as_deref()
+            .ok_or_else(|| ServiceError::BadRequest("Missing property: msg".into()))?;
 
         if let Ok(req_msg) = R2Request::from_str(msg) {
-            if let Err(e) = self.controller_addr.try_send(R2RequestMsg {
-                ws_id: self.id.clone(),
-                req_id: id,
-                request: req_msg,
-                msg_data: request.msg_data,
-            }) {
-                error!("[{}] Controller mailbox error: {}", self.id, e);
-                self.send_error(
-                    id,
-                    500,
-                    "INTERNAL_ERROR",
-                    "Error processing request".into(),
-                    ctx,
-                );
-            }
+            controller_addr
+                .send(R2RequestMsg {
+                    ws_id: session_id.into(),
+                    req_id: id,
+                    request: req_msg,
+                    msg_data: request.msg_data,
+                })
+                .await?
         } else {
-            warn!("[{}] Unknown message: {}", self.id, msg);
-            self.send_error(
-                id,
-                400,
-                "BAD_REQUEST",
-                format!("Unknown message: {}", msg),
-                ctx,
-            );
+            warn!("[{}] Unknown message: {}", session_id, msg);
+            Err(ServiceError::BadRequest(format!(
+                "Unknown message: {}",
+                msg
+            )))
         }
     }
 }

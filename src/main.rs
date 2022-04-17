@@ -19,6 +19,7 @@ mod client;
 mod configuration;
 mod controller;
 mod errors;
+mod from_msg_data;
 mod messages;
 mod server;
 mod websocket;

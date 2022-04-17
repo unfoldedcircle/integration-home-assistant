@@ -26,9 +26,10 @@ use crate::client::messages::{
 use crate::client::HomeAssistantClient;
 use crate::configuration::HomeAssistantSettings;
 use crate::errors::ServiceError;
+use crate::from_msg_data::DeserializeMsgData;
 use crate::messages::{
     Connect, Disconnect, GetDeviceState, NewR2Session, R2EventMsg, R2RequestMsg,
-    R2SessionDisconnect, SendWsMessage,
+    R2SessionDisconnect, SendWsMessage, SubscribeHassEvents, UnsubscribeHassEvents,
 };
 use crate::websocket::new_websocket_client;
 
@@ -336,9 +337,9 @@ impl Handler<GetDeviceState> for Controller {
 }
 
 impl Handler<R2RequestMsg> for Controller {
-    type Result = ResponseFuture<()>;
+    type Result = ResponseFuture<Result<(), ServiceError>>;
 
-    fn handle(&mut self, msg: R2RequestMsg, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: R2RequestMsg, ctx: &mut Self::Context) -> Self::Result {
         debug!("R2RequestMsg: {:?}", msg.request);
         // extra safety: if we get a request, the remote is certainly not in standby mode
         let r2_recipient = if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
@@ -346,17 +347,17 @@ impl Handler<R2RequestMsg> for Controller {
             session.recipient.clone()
         } else {
             error!("Can't handle R2RequestMsg without a session!");
-            return Box::pin(fut::ready(()));
+            return Box::pin(fut::result(Ok(())));
         };
 
         let resp_msg = msg.request.get_message().unwrap();
+
         let result = match msg.request {
             R2Request::GetDriverVersion => {
                 self.send_r2_msg(
                     WsMessage::response(
                         msg.req_id,
                         resp_msg,
-                        // TODO make a global var?
                         // TODO Read versions from project / during build.
                         IntegrationVersion {
                             api: "0.4.0".to_string(),
@@ -396,106 +397,44 @@ impl Handler<R2RequestMsg> for Controller {
                 Ok(())
             }
             R2Request::SubscribeEvents => {
-                if let Some(msg_data) = msg.msg_data {
-                    let result: serde_json::Result<SubscribeEvents> =
-                        serde_json::from_value(msg_data);
-                    if let Ok(subscribe) = result {
-                        if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
-                            session
-                                .subscribed_entities
-                                .extend(subscribe.entity_ids.into_iter());
-                        }
-                    } else {
-                        warn!(
-                            "[{}] Invalid subscribe_events payload: {:?}",
-                            msg.ws_id, result
-                        )
-                    }
-                }
-                Ok(())
+                let addr = ctx.address();
+                return Box::pin(async move { addr.send(SubscribeHassEvents(msg)).await? });
             }
             R2Request::UnsubscribeEvents => {
-                if let Some(msg_data) = msg.msg_data {
-                    let result: serde_json::Result<SubscribeEvents> =
-                        serde_json::from_value(msg_data);
-                    if let Ok(unsubscribe) = result {
-                        if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
-                            for i in unsubscribe.entity_ids {
-                                session.subscribed_entities.remove(&i);
-                            }
-                        }
-                        Ok(())
-                    } else {
-                        // FIXME error handling
-                        warn!(
-                            "[{}] Invalid unsubscribe_events payload: {:?}",
-                            msg.ws_id, result
-                        );
-                        Err(ServiceError::BadRequest(
-                            "Invalid unsubscribe_events payload".into(),
-                        ))
-                    }
-                } else {
-                    Ok(())
-                }
+                let addr = ctx.address();
+                return Box::pin(async move { addr.send(UnsubscribeHassEvents(msg)).await? });
             }
             R2Request::GetEntityStates => Err(ServiceError::NotYetImplemented),
             R2Request::EntityCommand => {
-                match msg.msg_data {
-                    None => Err(ServiceError::BadRequest(
-                        "Missing msg_data in entity command".into(),
-                    )),
-                    Some(msg_data) => {
-                        match serde_json::from_value::<EntityCommand>(msg_data) {
-                            Ok(command) => {
-                                if let Some(addr) = self.ha_client.clone() {
-                                    return Box::pin(async move {
-                                        // TODO error handling should be simpler. Rewrite with ResponseActFuture?
-                                        match addr.send(CallService { command }).await {
-                                            Err(e) => {
-                                                error!("Can't send HA command: {}", e);
-                                                send_r2_err_response(
-                                                    r2_recipient,
-                                                    msg.req_id,
-                                                    e.into(),
-                                                );
-                                            }
-                                            Ok(Err(e)) => {
-                                                error!("CallService failed: {:?}", e);
-                                                send_r2_err_response(r2_recipient, msg.req_id, e);
-                                            }
-                                            Ok(Ok(_)) => {
-                                                let response = WsMessage::response(
-                                                    msg.req_id,
-                                                    "result",
-                                                    WsResultMsgData::new("OK", "Service call sent"),
-                                                );
-                                                if let Err(e) =
-                                                    r2_recipient.try_send(SendWsMessage(response))
-                                                {
-                                                    error!("Can't send R2 result: {}", e);
-                                                }
-                                            }
-                                        }
-                                    });
+                if let Some(addr) = self.ha_client.clone() {
+                    return Box::pin(async move {
+                        let req_id = msg.req_id;
+                        let command: EntityCommand = msg.deserialize()?;
+                        match addr.send(CallService { command }).await? {
+                            Err(e) => {
+                                error!("CallService failed: {:?}", e);
+                                Err(e)
+                            }
+                            Ok(_) => {
+                                // plain and simple for now. We could (or better should) also wait for the HA response message...
+                                let response = WsMessage::response(
+                                    req_id,
+                                    "result",
+                                    WsResultMsgData::new("OK", "Service call sent"),
+                                );
+                                if let Err(e) = r2_recipient.try_send(SendWsMessage(response)) {
+                                    error!("Can't send R2 result: {}", e);
                                 }
                                 Ok(())
                             }
-                            Err(e) => Err(ServiceError::BadRequest(format!(
-                                "Invalid entity command: {:?}",
-                                e
-                            ))),
                         }
-                    }
-                }
+                    });
+                };
+                Ok(())
             }
         };
 
-        if let Err(e) = result {
-            send_r2_err_response(r2_recipient, msg.req_id, e);
-        }
-
-        Box::pin(fut::ready(()))
+        Box::pin(fut::result(result))
     }
 }
 
@@ -539,27 +478,34 @@ impl Handler<R2EventMsg> for Controller {
     }
 }
 
-fn send_r2_err_response(recipient: Recipient<SendWsMessage>, req_id: u32, error: ServiceError) {
-    debug!("Sending R2 error response for: {:?}", error);
+impl Handler<SubscribeHassEvents> for Controller {
+    type Result = Result<(), ServiceError>;
 
-    let (code, ws_err) = match error {
-        ServiceError::InternalServerError => {
-            (500, WsResultMsgData::new("ERROR", "Internal server error"))
+    fn handle(&mut self, msg: SubscribeHassEvents, _ctx: &mut Self::Context) -> Self::Result {
+        if let Some(session) = self.sessions.get_mut(&msg.0.ws_id) {
+            let subscribe: SubscribeEvents = msg.0.deserialize()?;
+            session
+                .subscribed_entities
+                .extend(subscribe.entity_ids.into_iter());
+            Ok(())
+        } else {
+            Err(ServiceError::NotConnected)
         }
-        ServiceError::SerializationError(e) => (400, WsResultMsgData::new("BAD_REQUEST", e)),
-        ServiceError::BadRequest(e) => (400, WsResultMsgData::new("BAD_REQUEST", e)),
-        ServiceError::NotConnected => (
-            503,
-            WsResultMsgData::new("SERVICE_UNAVAILABLE", "HomeAssistant is not connected"),
-        ),
-        ServiceError::NotYetImplemented => (
-            501,
-            WsResultMsgData::new("NOT_IMPLEMENTED", "Not yet implemented"),
-        ),
-    };
+    }
+}
 
-    let message = WsMessage::error(req_id, code, ws_err);
-    if let Err(e) = recipient.try_send(SendWsMessage(message)) {
-        error!("Failed to send error response: {}", e)
+impl Handler<UnsubscribeHassEvents> for Controller {
+    type Result = Result<(), ServiceError>;
+
+    fn handle(&mut self, msg: UnsubscribeHassEvents, _ctx: &mut Self::Context) -> Self::Result {
+        if let Some(session) = self.sessions.get_mut(&msg.0.ws_id) {
+            let unsubscribe: SubscribeEvents = msg.0.deserialize()?;
+            for i in unsubscribe.entity_ids {
+                session.subscribed_entities.remove(&i);
+            }
+            Ok(())
+        } else {
+            Err(ServiceError::NotConnected)
+        }
     }
 }

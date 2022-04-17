@@ -1,46 +1,51 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use actix_web_actors::ws::WebsocketContext;
-use log::{error, info, warn};
+use actix::Addr;
+use log::{info, warn};
 
+use crate::errors::ServiceError;
+use crate::Controller;
 use uc_api::ws::WsMessage;
 
 use crate::server::ws::WsConn;
 
 impl WsConn {
     /// Handle response messages from R2
-    pub(crate) fn on_response(&mut self, response: WsMessage, _ctx: &mut WebsocketContext<WsConn>) {
-        let msg = match response.msg {
-            None => {
-                error!(
-                    "[{}] Missing property `msg` in response: {:?}",
-                    self.id, response
-                );
-                return;
-            }
-            Some(ref m) => m.as_str(),
-        };
+    pub(crate) async fn on_response(
+        session_id: &str,
+        response: WsMessage,
+        _controller_addr: Addr<Controller>,
+    ) -> Result<(), ServiceError> {
+        let msg = response
+            .msg
+            .as_deref()
+            .ok_or_else(|| ServiceError::BadRequest("Missing property: msg".into()))?;
 
         match msg {
             "version" => {
-                info!("[{}] TODO Handle version response!", self.id);
+                info!("[{}] TODO Handle version response!", session_id);
             }
             "supported_entity_types" => {
-                info!("[{}] TODO Handle supported_entity_types response!", self.id);
+                info!(
+                    "[{}] TODO Handle supported_entity_types response!",
+                    session_id
+                );
             }
             "configured_entities" => {
-                info!("[{}] TODO Handle configured_entities response!", self.id);
+                info!("[{}] TODO Handle configured_entities response!", session_id);
             }
             "localization_cfg" => {
-                info!("[{}] TODO Handle localization_cfg response!", self.id);
+                info!("[{}] TODO Handle localization_cfg response!", session_id);
             }
             "setup_user_action" => {
-                info!("[{}] TODO Handle setup_user_action message!", self.id);
+                info!("[{}] TODO Handle setup_user_action message!", session_id);
             }
             _ => {
-                warn!("[{}] Unknown response: {}", self.id, msg);
+                warn!("[{}] Unknown response: {}", session_id, msg);
             }
         }
+
+        Ok(())
     }
 }

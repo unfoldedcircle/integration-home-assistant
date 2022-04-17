@@ -253,7 +253,12 @@ impl HomeAssistantClient {
         name: &str,
         ctx: &mut Context<HomeAssistantClient>,
     ) -> Result<(), ServiceError> {
-        debug!("[{}] <- {}", self.id, name);
+        // TODO add tracing flag
+        if true {
+            debug!("[{}] <- {:?}", self.id, msg);
+        } else {
+            debug!("[{}] <- {}", self.id, name);
+        }
         if self.sink.write(msg).is_err() {
             // sink is closed or closing, no chance to send a Close message
             warn!("[{}] Could not send {}, closing connection", self.id, name);

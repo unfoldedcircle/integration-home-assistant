@@ -5,14 +5,14 @@ use std::time::{Duration, Instant};
 
 use actix::{
     fut, Actor, ActorContext, ActorFutureExt, Addr, AsyncContext, ContextFutureSpawner, Handler,
-    Running, StreamHandler, WrapFuture,
+    ResponseActFuture, Running, StreamHandler, WrapFuture,
 };
 use actix_web_actors::ws::{CloseCode, CloseReason, Message, ProtocolError, WebsocketContext};
 use bytestring::ByteString;
 use log::{debug, error, info, warn};
+use uc_api::ws::{WsMessage, WsResultMsgData};
 
-use uc_api::ws::{WsMessage, WsResponse, WsResultMsgData};
-
+use crate::errors::ServiceError;
 use crate::messages::{NewR2Session, R2SessionDisconnect, SendWsMessage};
 use crate::server::ws::WsConn;
 use crate::Controller;
@@ -20,6 +20,14 @@ use crate::Controller;
 // TODO make configurable?
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Local Actix message to handle WebSocket text message.
+/// This is a "one way" fire and forget message on purpose to simplify handling in the StreamHandler.
+/// Any errors must be handled in the receiver, e.g. sending error response messages back to
+/// the Remote Two!
+#[derive(actix::prelude::Message)]
+#[rtype(result = "()")]
+struct TextMsg(pub ByteString);
 
 impl Actor for WsConn {
     type Context = WebsocketContext<Self>;
@@ -59,7 +67,7 @@ impl StreamHandler<actix_web::Result<Message, ProtocolError>> for WsConn {
     fn handle(&mut self, msg: actix_web::Result<Message, ProtocolError>, ctx: &mut Self::Context) {
         if let Ok(msg) = msg {
             match msg {
-                Message::Text(text) => self.on_text_message(text, ctx),
+                Message::Text(text) => ctx.notify(TextMsg(text)),
                 Message::Binary(_) => {
                     self.close(CloseCode::Size, "Binary messages not supported!", ctx);
                 }
@@ -81,6 +89,48 @@ impl StreamHandler<actix_web::Result<Message, ProtocolError>> for WsConn {
             info!("Closing WebSocket: {:?}", msg.unwrap_err());
             ctx.stop();
         }
+    }
+}
+
+impl Handler<TextMsg> for WsConn {
+    type Result = ResponseActFuture<Self, ()>;
+
+    fn handle(&mut self, text: TextMsg, ctx: &mut Self::Context) -> Self::Result {
+        let msg: WsMessage = match serde_json::from_slice(text.0.as_ref()) {
+            Ok(v) => v,
+            Err(e) => {
+                warn!("[{}] Invalid JSON message: {}", self.id, e.to_string());
+                self.close(CloseCode::Unsupported, "Invalid JSON message", ctx);
+                return Box::pin(fut::ready(()));
+            }
+        };
+
+        // clone required data for async context
+        let req_id = msg.id.unwrap_or_default();
+        let session_id = self.id.clone();
+        let controller_addr = self.controller_addr.clone();
+
+        Box::pin(
+            async move {
+                match msg.kind {
+                    None => Err(ServiceError::BadRequest("Missing property: kind".into())),
+                    Some(ref k) => match k.as_str() {
+                        "req" => WsConn::on_request(&session_id, msg, controller_addr).await,
+                        "resp" => WsConn::on_response(&session_id, msg, controller_addr).await,
+                        "event" => WsConn::on_event(&session_id, msg, controller_addr).await,
+                        _ => Err(ServiceError::BadRequest("Unsupported kind value".into())),
+                    },
+                }
+            }
+            .into_actor(self) // converts future to ActorFuture
+            .map(move |result: Result<(), ServiceError>, act, ctx| {
+                if let Err(e) = result {
+                    warn!("[{}] Error processing received text message: {}", act.id, e);
+                    let response = service_error_to_ws_message(req_id, e);
+                    ctx.notify(SendWsMessage(response));
+                }
+            }),
+        )
     }
 }
 
@@ -130,7 +180,7 @@ impl WsConn {
         }));
         ctx.stop();
     }
-
+    /*
     pub(crate) fn send_error(
         &self,
         req_id: u32,
@@ -160,40 +210,27 @@ impl WsConn {
             ctx.text(msg);
         }
     }
+    */
+}
 
-    fn on_text_message(&mut self, text: ByteString, ctx: &mut WebsocketContext<WsConn>) {
-        let msg: WsMessage = match serde_json::from_slice(text.as_ref()) {
-            Ok(v) => v,
-            Err(e) => {
-                warn!("[{}] Invalid JSON message: {}", self.id, e.to_string());
-                self.close(CloseCode::Unsupported, "Invalid JSON message", ctx);
-                return;
-            }
-        };
+fn service_error_to_ws_message(req_id: u32, error: ServiceError) -> WsMessage {
+    debug!("Sending R2 error response for: {:?}", error);
 
-        match msg.kind {
-            None => {
-                warn!(
-                    "[{}] Expected json object payload with 'kind' key, but got: {:?}",
-                    self.id, text
-                );
-                self.send_missing_field_error(0, "kind", ctx);
-            }
-            Some(ref k) => match k.as_str() {
-                "req" => self.on_request(msg, ctx),
-                "resp" => self.on_response(msg, ctx),
-                "event" => self.on_event(msg, ctx),
-                _ => {
-                    warn!("[{}] Unsupported client message kind: {}", self.id, k);
-                    self.send_error(
-                        0,
-                        400,
-                        "BAD_REQUEST",
-                        format!("Invalid kind value: {}", k),
-                        ctx,
-                    );
-                }
-            },
+    let (code, ws_err) = match error {
+        ServiceError::InternalServerError => {
+            (500, WsResultMsgData::new("ERROR", "Internal server error"))
         }
-    }
+        ServiceError::SerializationError(e) => (400, WsResultMsgData::new("BAD_REQUEST", e)),
+        ServiceError::BadRequest(e) => (400, WsResultMsgData::new("BAD_REQUEST", e)),
+        ServiceError::NotConnected => (
+            503,
+            WsResultMsgData::new("SERVICE_UNAVAILABLE", "HomeAssistant is not connected"),
+        ),
+        ServiceError::NotYetImplemented => (
+            501,
+            WsResultMsgData::new("NOT_IMPLEMENTED", "Not yet implemented"),
+        ),
+    };
+
+    WsMessage::error(req_id, code, ws_err)
 }

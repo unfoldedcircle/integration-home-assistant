@@ -74,9 +74,9 @@ pub fn cmd_from_str<T: std::str::FromStr + strum::VariantNames>(
 ) -> Result<T, ServiceError> {
     T::from_str(cmd).map_err(|_| {
         ServiceError::BadRequest(format!(
-            "Invalid cmd_id: {}. Valid commands: {:?}",
+            "Invalid cmd_id: {}. Valid commands: {}",
             cmd,
-            T::VARIANTS
+            T::VARIANTS.to_vec().join(",")
         ))
     })
 }

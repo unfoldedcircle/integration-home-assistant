@@ -1,9 +1,11 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+use actix::Addr;
 use std::str::FromStr;
 
-use actix_web_actors::ws::WebsocketContext;
+use crate::errors::ServiceError;
+use crate::Controller;
 use log::{error, warn};
 use uc_api::ws::intg::R2Event;
 use uc_api::ws::WsMessage;
@@ -13,25 +15,28 @@ use crate::server::ws::WsConn;
 
 impl WsConn {
     /// Handle events from R2
-    pub(crate) fn on_event(&mut self, event: WsMessage, _ctx: &mut WebsocketContext<WsConn>) {
-        let msg = match event.msg {
-            None => {
-                error!("[{}] Missing property `msg` in event: {:?}", self.id, event);
-                return;
-            }
-            Some(ref m) => m.as_str(),
-        };
+    pub(crate) async fn on_event(
+        session_id: &str,
+        event: WsMessage,
+        controller_addr: Addr<Controller>,
+    ) -> Result<(), ServiceError> {
+        let msg = event
+            .msg
+            .as_deref()
+            .ok_or_else(|| ServiceError::BadRequest("Missing property: msg".into()))?;
 
         if let Ok(req_msg) = R2Event::from_str(msg) {
-            if let Err(e) = self.controller_addr.try_send(R2EventMsg {
-                ws_id: self.id.clone(),
+            if let Err(e) = controller_addr.try_send(R2EventMsg {
+                ws_id: session_id.into(),
                 event: req_msg,
                 msg_data: event.msg_data,
             }) {
-                error!("[{}] Controller mailbox error: {}", self.id, e);
+                error!("[{}] Controller mailbox error: {}", session_id, e);
             }
         } else {
-            warn!("[{}] Unknown event: {}", self.id, msg);
+            warn!("[{}] Unknown event: {}", session_id, msg);
         }
+
+        Ok(())
     }
 }
