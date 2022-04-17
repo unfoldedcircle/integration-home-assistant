@@ -248,6 +248,8 @@ impl Handler<Connect> for Controller {
         // TODO check if already connected
 
         let ws_request = self.ws_client.ws(&self.settings.url);
+        // align frame size to Home Assistant
+        let ws_request = ws_request.max_frame_size(self.settings.max_frame_size_kb * 1024);
         let url = self.settings.url.clone();
         let token = self.settings.token.clone();
         let client_address = ctx.address();

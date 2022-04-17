@@ -42,6 +42,7 @@ pub struct HomeAssistantSettings {
     pub token: String,
     /// WebSocket connection timeout in seconds
     pub connection_timeout: u8,
+    pub max_frame_size_kb: usize,
     pub reconnect: ReconnectSettings,
     pub heartbeat: HeartbeatSettings,
 }
@@ -108,6 +109,7 @@ impl Default for Settings {
                 url: "ws://hassio.local:8123/api/websocket".to_string(),
                 token: "".to_string(),
                 connection_timeout: DEF_CONNECTION_TIMEOUT,
+                max_frame_size_kb: 1024,
                 reconnect: Default::default(),
                 heartbeat: Default::default(),
             },
