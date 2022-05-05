@@ -12,8 +12,8 @@ use log::{debug, error};
 use serde_json::{json, Value};
 
 use uc_api::{
-    AvailableIntgEntity, ClimateFeature, ClimateOption, CoverFeature, EntityType, LightFeature,
-    MediaPlayerFeature, SensorOption,
+    intg::AvailableIntgEntity, ClimateFeature, ClimateOption, CoverFeature, EntityType,
+    LightFeature, MediaPlayerFeature, SensorOption,
 };
 
 use crate::client::messages::{AvailableEntities, GetStates};

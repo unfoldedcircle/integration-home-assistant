@@ -3,7 +3,7 @@
 
 //! Switch entity specific HA event logic.
 
-use uc_api::{EntityChange, EntityType};
+use uc_api::{intg::EntityChange, EntityType};
 
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;

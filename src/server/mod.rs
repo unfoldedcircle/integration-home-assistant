@@ -7,7 +7,7 @@ use actix_web::{error, get, web, Error, HttpRequest, HttpResponse, Result};
 use log::{debug, info};
 use uuid::Uuid;
 
-use uc_api::web::ApiResponse;
+use uc_api::core::web::ApiResponse;
 use ws::WsConn;
 
 use crate::configuration::WebSocketSettings;

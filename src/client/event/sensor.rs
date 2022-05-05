@@ -6,7 +6,7 @@
 use log::info;
 use serde_json::Value;
 
-use uc_api::{EntityChange, EntityType};
+use uc_api::{intg::EntityChange, EntityType};
 
 use crate::client::model::EventData;
 use crate::errors::ServiceError;

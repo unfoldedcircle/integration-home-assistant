@@ -5,7 +5,7 @@
 
 use log::info;
 
-use uc_api::EntityChange;
+use uc_api::intg::EntityChange;
 
 use crate::client::model::EventData;
 use crate::errors::ServiceError;

@@ -7,9 +7,9 @@
 use crate::errors::ServiceError;
 use crate::from_msg_data::DeserializeMsgData;
 use actix::prelude::{Message, Recipient};
-use uc_api::ws::intg::{R2Event, R2Request};
+use uc_api::intg::ws::{R2Event, R2Request};
+use uc_api::intg::DeviceState;
 use uc_api::ws::WsMessage;
-use uc_api::DeviceState;
 
 #[derive(Message)]
 #[rtype(result = "()")]

@@ -6,7 +6,7 @@
 use actix::prelude::Message;
 use awc::ws::CloseCode;
 
-use uc_api::{AvailableIntgEntity, EntityChange, EntityCommand};
+use uc_api::intg::{AvailableIntgEntity, EntityChange, EntityCommand};
 
 use crate::errors::ServiceError;
 

@@ -7,7 +7,7 @@ use std::str::FromStr;
 use crate::errors::ServiceError;
 use crate::Controller;
 use log::{debug, warn};
-use uc_api::ws::intg::R2Request;
+use uc_api::intg::ws::R2Request;
 use uc_api::ws::WsMessage;
 
 use crate::messages::R2RequestMsg;

@@ -14,11 +14,11 @@ use futures::StreamExt;
 use log::{debug, error, info, warn};
 use serde_json::json;
 use strum::EnumMessage;
-use uc_api::ws::intg::{R2Event, R2Request};
-use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
-use uc_api::{
-    AvailableEntitiesMsgData, DeviceState, EntityCommand, IntegrationVersion, SubscribeEvents,
+use uc_api::intg::ws::{R2Event, R2Request};
+use uc_api::intg::{
+    ws::AvailableEntitiesMsgData, DeviceState, EntityCommand, IntegrationVersion, SubscribeEvents,
 };
+use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
 
 use crate::client::messages::{
     AvailableEntities, CallService, Close, ConnectionEvent, ConnectionState, EntityEvent, GetStates,
