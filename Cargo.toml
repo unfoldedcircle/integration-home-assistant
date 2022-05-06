@@ -9,7 +9,7 @@ description = "Unfolded Circle Home-Assistant integration for Remote Two"
 #documentation = "TODO"
 
 [dependencies]
-uc_api = { path = "../api-model-rs" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs" }
 
 # WebSockets server
 actix-web = { version = "4.0.0-rc.3", features = ["rustls"] }
