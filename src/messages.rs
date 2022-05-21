@@ -20,7 +20,7 @@ pub struct SendWsMessage(pub WsMessage);
 #[rtype(result = "Result<(), std::io::Error>")]
 pub struct Connect {
     // TODO device identifier for multi-HA connections: not yet implemented
-// pub device_id: String,
+    // pub device_id: String,
 }
 
 /// Disconnect from Home Assistant
@@ -28,7 +28,7 @@ pub struct Connect {
 #[rtype(result = "()")]
 pub struct Disconnect {
     // TODO device identifier for multi-HA connections: not yet implemented
-// pub device_id: String,
+    // pub device_id: String,
 }
 
 /// Internal message to delegate R2Request::SubscribeEvents request
@@ -63,7 +63,7 @@ pub struct R2SessionDisconnect {
 #[rtype(result = "DeviceState")]
 pub struct GetDeviceState {
     // device identifier not required: only single HA connection supported
-// pub device_id: String,
+    // pub device_id: String,
 }
 
 /// Actor message for a Remote Two request.
