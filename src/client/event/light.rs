@@ -3,7 +3,7 @@
 
 //! Light entity specific HA event logic.
 
-use log::info;
+use log::{info, warn};
 use serde_json::Value;
 
 use uc_api::{intg::EntityChange, EntityType};
@@ -16,7 +16,7 @@ pub(crate) fn light_event_to_entity_change(data: EventData) -> Result<EntityChan
     let mut attributes = serde_json::Map::with_capacity(2);
     let state = convert_ha_onoff_state(&data.new_state.state)?;
 
-    attributes.insert("state".to_string(), state);
+    attributes.insert("state".into(), state);
 
     if let Some(mut ha_attr) = data.new_state.attributes {
         // FIXME brightness adjustment for RGB## modes. https://developers.home-assistant.io/docs/core/entity/light
@@ -43,11 +43,14 @@ pub(crate) fn light_event_to_entity_change(data: EventData) -> Result<EntityChan
                         .get("max_mireds")
                         .and_then(|v| v.as_u64())
                         .unwrap_or_default() as u16;
-                    let mireds = max_mireds - min_mireds;
-                    if mireds > 0 {
-                        // TODO
-                        info!("TODO implement mired color temperature conversion for value: {} [{}..{}]", color_temp, min_mireds, max_mireds );
-                    }
+
+                    let color_temp_pct =
+                        color_temp_mired_to_percent(color_temp, min_mireds, max_mireds)?;
+
+                    attributes.insert(
+                        "color_temperature".into(),
+                        Value::Number(color_temp_pct.into()),
+                    );
                 }
             }
             Some("hs") => {
@@ -61,14 +64,17 @@ pub(crate) fn light_event_to_entity_change(data: EventData) -> Result<EntityChan
                     let hue = hs.get(0).unwrap().as_f64().unwrap_or_default() as u16;
                     let saturation =
                         (hs.get(1).unwrap().as_f64().unwrap_or_default() as f32 * 2.55_f32) as u16;
-                    if hue > 255 || saturation > 360 {
+                    if hue > 360 || saturation > 100 {
                         return Err(ServiceError::BadRequest(format!(
                             "Invalid hs_color values ({}, {})",
                             hue, saturation
                         )));
                     }
-                    attributes.insert("hue".to_string(), Value::Number(hue.into()));
-                    attributes.insert("saturation".to_string(), Value::Number(saturation.into()));
+                    attributes.insert("hue".into(), Value::Number(hue.into()));
+                    attributes.insert(
+                        "saturation".into(),
+                        Value::Number((saturation * 255 / 100).into()),
+                    );
                 }
             }
             None => {}
@@ -87,4 +93,85 @@ pub(crate) fn light_event_to_entity_change(data: EventData) -> Result<EntityChan
         entity_id: data.entity_id,
         attributes,
     })
+}
+
+fn color_temp_mired_to_percent(
+    mut value: u64,
+    min_mireds: u16,
+    max_mireds: u16,
+) -> Result<u16, ServiceError> {
+    if max_mireds <= min_mireds {
+        return Err(ServiceError::BadRequest(format!(
+            "Invalid min_mireds or max_mireds value! min_mireds={}, max_mireds={}",
+            min_mireds, max_mireds
+        )));
+    }
+    if (value as u16) < min_mireds {
+        warn!(
+            "Adjusted invalid color_temp value {} to: {}",
+            value, min_mireds
+        );
+        value = min_mireds as u64;
+    }
+    if (value as u16) > max_mireds {
+        warn!(
+            "Adjusted invalid color_temp value {} to: {}",
+            value, max_mireds
+        );
+        value = max_mireds as u64;
+    }
+
+    Ok(((value as u16) - min_mireds) * 100 / (max_mireds - min_mireds))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::client::event::light::color_temp_mired_to_percent;
+    use crate::errors::ServiceError;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(0, 0)]
+    #[case(50, 0)]
+    #[case(149, 0)]
+    #[case(501, 100)]
+    #[case(1000, 100)]
+    fn color_temp_mired_to_percent_with_invalid_input_adjusts_value(
+        #[case] input: u64,
+        #[case] expected: u16,
+    ) {
+        let result = color_temp_mired_to_percent(input, 150, 500);
+        assert_eq!(Ok(expected), result);
+    }
+
+    #[rstest]
+    #[case(150, 150)]
+    #[case(200, 150)]
+    fn color_temp_mired_to_percent_with_invalid_min_max_mireds_returns_err(
+        #[case] min_mireds: u16,
+        #[case] max_mireds: u16,
+    ) {
+        let result = color_temp_mired_to_percent(150, min_mireds, max_mireds);
+        assert!(
+            matches!(result, Err(ServiceError::BadRequest(_))),
+            "Invalid min_ / max_mireds value must return BadRequest"
+        );
+    }
+
+    #[rstest]
+    #[case(0, 150)]
+    #[case(1, 154)]
+    #[case(50, 325)]
+    #[case(99, 497)]
+    #[case(100, 500)]
+    fn color_temp_mired_to_percent_returns_scaled_values(
+        #[case] expected: u16,
+        #[case] input: u64,
+    ) {
+        let min_mireds = 150;
+        let max_mireds = 500;
+        let result = color_temp_mired_to_percent(input, min_mireds, max_mireds);
+
+        assert_eq!(Ok(expected), result);
+    }
 }
