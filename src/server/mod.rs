@@ -46,7 +46,7 @@ pub async fn ws_index(
     let client_id = request
         .peer_addr()
         .map(|addr| format!("{}:{}", addr.ip(), addr.port()))
-        .unwrap_or_else(|| Uuid::new_v4().to_hyphenated().to_string());
+        .unwrap_or_else(|| Uuid::new_v4().as_hyphenated().to_string());
 
     actix_web_actors::ws::start(
         WsConn::new(client_id, controller.get_ref().clone()),

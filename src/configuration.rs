@@ -1,6 +1,7 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+use config::Config;
 use std::time::Duration;
 
 use log::warn;
@@ -118,10 +119,14 @@ impl Default for Settings {
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
-    let mut cfg = config::Config::default();
-    cfg.merge(config::File::with_name("configuration"))?;
-    let mut settings: Settings = cfg.try_into()?;
+    let config = Config::builder()
+        .add_source(config::File::with_name("configuration"))
+        // Add in settings from the environment (with a prefix of UC_HASS)
+        // Eg.. `UC_HASS_DEBUG=1 ./target/app` would set the `debug` key
+        .add_source(config::Environment::with_prefix("UC_HASS"))
+        .build()?;
 
+    let mut settings: Settings = config.try_deserialize()?;
     if settings.home_assistant.reconnect.backoff_factor < 1.0
         || settings.home_assistant.reconnect.duration.as_millis() < 100
         || settings.home_assistant.reconnect.duration_max.as_millis() < 1000

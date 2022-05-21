@@ -12,17 +12,17 @@ description = "Unfolded Circle Home-Assistant integration for Remote Two"
 uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs" }
 
 # WebSockets server
-actix-web = { version = "4.0.0-rc.3", features = ["rustls"] }
-actix-web-actors = "4.0.0-beta.12"
+actix-web = { version = "4.0.1", features = ["rustls"] }
+actix-web-actors = "4.1.0"
 actix = "0.12"
 actix-tls = { version = "3.0.3", features = ["rustls"] }
 bytestring = "1"
 rustls = "0.20"
-rustls-pemfile = "0.3"
+rustls-pemfile = "1.0.0"
 # WebSockets client
 actix-codec = "0.5"
-awc = { version = "3.0.0-beta.21", features = ["rustls"] }
-bytes = "1.1"
+awc = { version = "3.0.0", features = ["rustls"] }
+bytes = "1"
 futures = "0.3"
 
 # JSON (de)serialization
@@ -30,15 +30,18 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_with = "1"
 
-config = { version = "0.11", default-features = false, features = ["yaml"] }
+config = { version = "0.13", default-features = false, features = ["yaml"] }
 
 env_logger = "0.9"
 log = "0.4"
 
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1.0.0", features = ["v4"] }
 time = { version = "0.3", default-features = false, features = ["std", "formatting"] }
 
 # Helpful macros for working with enums and strings
 strum = "0.24"
 strum_macros = "0.24"
 derive_more = "0.99"
+
+[dev-dependencies]
+rstest = "0.13"
