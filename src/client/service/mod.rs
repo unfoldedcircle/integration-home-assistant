@@ -7,16 +7,16 @@
 //! See <https://developers.home-assistant.io/docs/api/websocket/#calling-a-service> for further
 //! information.
 
-use actix::Handler;
-use actix_web_actors::ws;
-use log::info;
-
-use uc_api::EntityType;
-
 use crate::client::messages::CallService;
 use crate::client::model::{CallServiceMsg, Target};
 use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
+use actix::Handler;
+use actix_web_actors::ws;
+use log::info;
+use serde_json::{Map, Value};
+use uc_api::intg::EntityCommand;
+use uc_api::EntityType;
 
 mod climate;
 mod cover;
@@ -47,7 +47,7 @@ impl Handler<CallService> for HomeAssistantClient {
             EntityType::Climate => climate::handle_climate(&msg),
             EntityType::Cover => cover::handle_cover(&msg),
             EntityType::Light => light::handle_light(&msg),
-            EntityType::MediaPlayer => media_player::handle_media_player(&msg),
+            EntityType::MediaPlayer => media_player::handle_media_player(&msg.command),
             EntityType::Sensor => Err(ServiceError::BadRequest(
                 "Sensor doesn't support sending commands to! Ignoring call".to_string(),
             )),
@@ -82,4 +82,15 @@ pub fn cmd_from_str<T: std::str::FromStr + strum::VariantNames>(
             T::VARIANTS.to_vec().join(",")
         ))
     })
+}
+
+/// Get a serde_json::Map reference of the params attribute of the provided EntityCommand.
+///
+/// A BadRequest error is returned if `params` is not set.
+fn get_required_params(cmd: &EntityCommand) -> Result<&Map<String, Value>, ServiceError> {
+    if let Some(params) = cmd.params.as_ref() {
+        Ok(params)
+    } else {
+        Err(ServiceError::BadRequest("Missing params object".into()))
+    }
 }

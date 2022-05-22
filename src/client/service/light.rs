@@ -3,12 +3,11 @@
 
 //! Light entity specific HA service call logic.
 
-use serde_json::{json, Map, Value};
-use uc_api::LightCommand;
-
 use crate::client::messages::CallService;
 use crate::client::service::cmd_from_str;
 use crate::errors::ServiceError;
+use serde_json::{json, Map, Value};
+use uc_api::LightCommand;
 
 pub(crate) fn handle_light(msg: &CallService) -> Result<(String, Option<Value>), ServiceError> {
     let cmd: LightCommand = cmd_from_str(&msg.command.cmd_id)?;
@@ -81,7 +80,8 @@ mod tests {
         let result = color_temp_percent_to_mired(101, 150, 500);
         assert!(
             matches!(result, Err(ServiceError::BadRequest(_))),
-            "Invalid value must return BadRequest"
+            "Invalid value must return BadRequest, but got: {:?}",
+            result
         );
     }
 
