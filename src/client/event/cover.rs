@@ -3,18 +3,37 @@
 
 //! Cover entity specific HA event logic.
 
-use log::info;
-
-use uc_api::intg::EntityChange;
-
+use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
+use uc_api::intg::EntityChange;
+use uc_api::EntityType;
 
 pub(crate) fn cover_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
-    info!(
-        "TODO handle cover change event for {}: {:?}",
-        data.entity_id, data.new_state.attributes
-    );
+    let mut attributes = serde_json::Map::with_capacity(8);
 
-    Err(ServiceError::NotYetImplemented)
+    let state = match data.new_state.state.as_str() {
+        "open" | "opening" | "closed" | "closing" => data.new_state.state.to_uppercase().into(),
+        _ => convert_ha_onoff_state(&data.new_state.state)?,
+    };
+    attributes.insert("state".into(), state);
+
+    if let Some(ha_attr) = data.new_state.attributes {
+        if let Some(value @ 0..=100) = ha_attr.get("current_position").and_then(|v| v.as_u64()) {
+            attributes.insert("position".into(), value.into());
+        }
+        if let Some(value @ 0..=100) = ha_attr
+            .get("current_tilt_position")
+            .and_then(|v| v.as_u64())
+        {
+            attributes.insert("tilt_position".into(), value.into());
+        }
+    }
+
+    Ok(EntityChange {
+        device_id: None,
+        entity_type: EntityType::Cover,
+        entity_id: data.entity_id,
+        attributes,
+    })
 }
