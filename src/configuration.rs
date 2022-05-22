@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use log::warn;
 use serde_with::{serde_as, DurationMilliSeconds, DurationSeconds};
+use url::Url;
 
 const DEF_CONNECTION_TIMEOUT: u8 = 3;
 
@@ -39,7 +40,7 @@ pub struct WebSocketSettings {
 
 #[derive(serde::Deserialize)]
 pub struct HomeAssistantSettings {
-    pub url: String,
+    pub url: Url,
     pub token: String,
     /// WebSocket connection timeout in seconds
     pub connection_timeout: u8,
@@ -107,7 +108,7 @@ impl Default for Settings {
                 websocket: None,
             },
             home_assistant: HomeAssistantSettings {
-                url: "ws://hassio.local:8123/api/websocket".to_string(),
+                url: Url::parse("ws://hassio.local:8123/api/websocket").unwrap(),
                 token: "".to_string(),
                 connection_timeout: DEF_CONNECTION_TIMEOUT,
                 max_frame_size_kb: 1024,
@@ -142,6 +143,18 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     {
         warn!("Invalid HA heartbeat settings, using defaults.");
         settings.home_assistant.heartbeat = Default::default();
+    }
+
+    match settings.home_assistant.url.scheme() {
+        "ws" | "wss" => {}
+        "http" => settings.home_assistant.url.set_scheme("ws").unwrap(),
+        "https" => settings.home_assistant.url.set_scheme("wss").unwrap(),
+        scheme => {
+            return Err(config::ConfigError::Message(format!(
+                "invalid scheme in home_assistant.url: {}. Valid: [ws, wss]",
+                scheme
+            )))
+        }
     }
 
     Ok(settings)

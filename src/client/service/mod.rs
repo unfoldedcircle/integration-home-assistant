@@ -66,6 +66,9 @@ impl Handler<CallService> for HomeAssistantClient {
 
         let msg = serde_json::to_string(&call_srv_msg).map(|v| ws::Message::Text(v.into()))?;
         self.send_message(msg, "call_service", ctx)
+
+        // TODO wait for HA response message? If the service call fails we'll get a result back with "success: false"
+        // However, some services take a long time to respond! E.g. Sonos might take 10 seconds if there's an issue with the network.
     }
 }
 

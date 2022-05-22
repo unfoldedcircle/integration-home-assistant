@@ -77,7 +77,7 @@ impl Controller {
             device_state: DeviceState::Disconnected,
             ws_client: new_websocket_client(
                 Duration::from_secs(settings.connection_timeout as u64),
-                settings.url.to_lowercase().starts_with("wss"),
+                settings.url.scheme() == "wss",
             ),
             ha_reconnect_duration: settings.reconnect.duration,
             settings,
@@ -247,7 +247,7 @@ impl Handler<Connect> for Controller {
     fn handle(&mut self, _msg: Connect, ctx: &mut Self::Context) -> Self::Result {
         // TODO check if already connected
 
-        let ws_request = self.ws_client.ws(&self.settings.url);
+        let ws_request = self.ws_client.ws(self.settings.url.as_str());
         // align frame size to Home Assistant
         let ws_request = ws_request.max_frame_size(self.settings.max_frame_size_kb * 1024);
         let url = self.settings.url.clone();
@@ -268,10 +268,9 @@ impl Handler<Connect> for Controller {
                 };
                 info!("Connected to: {} - {:?}", url, response);
 
-                let id = url.replace("/api/websocket", "");
                 let (sink, stream) = framed.split();
                 let addr =
-                    HomeAssistantClient::start(id, client_address, token, sink, stream, heartbeat);
+                    HomeAssistantClient::start(url, client_address, token, sink, stream, heartbeat);
 
                 Ok(addr)
             }

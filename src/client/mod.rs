@@ -15,6 +15,7 @@ use futures::stream::{SplitSink, SplitStream};
 use log::{debug, error, info, warn};
 use serde::de::Error;
 use serde_json::{json, Value};
+use url::Url;
 
 use messages::Close;
 
@@ -36,6 +37,8 @@ mod streamhandler;
 pub struct HomeAssistantClient {
     /// Unique HA client id
     id: String,
+    /// Base server address for media image access (e.g. http://hassio.local:8123)
+    server: Url,
     /// HA request message id
     ws_id: u32,
     access_token: String,
@@ -54,7 +57,7 @@ pub struct HomeAssistantClient {
 
 impl HomeAssistantClient {
     pub fn start(
-        id: String,
+        url: Url,
         controller_actor: Addr<Controller>,
         access_token: String,
         sink: SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>,
@@ -63,8 +66,19 @@ impl HomeAssistantClient {
     ) -> Addr<Self> {
         HomeAssistantClient::create(|ctx| {
             ctx.add_stream(stream);
+            let scheme = url.scheme();
+            let host = url.host_str().unwrap_or(url.as_str());
+            let port = url.port_or_known_default().unwrap_or_default();
             HomeAssistantClient {
-                id,
+                id: format!("{}:{}", host, port),
+                server: {
+                    let mut server = url.clone();
+                    server
+                        .set_scheme(if scheme == "wss" { "https" } else { "http" })
+                        .expect("invalid scheme");
+                    server.set_path("");
+                    server
+                },
                 ws_id: 0,
                 access_token,
                 subscribed_events: false,

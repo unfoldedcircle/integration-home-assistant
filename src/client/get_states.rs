@@ -295,7 +295,9 @@ fn create_available_entity(
                     media_feats.push(MediaPlayerFeature::VolumeUpDown);
                 }
                 if supported_features & SUPPORT_VOLUME_MUTE > 0 {
-                    media_feats.push(MediaPlayerFeature::MuteToggle);
+                    // HASS media player doesn't support mute toggle!
+                    media_feats.push(MediaPlayerFeature::Mute);
+                    media_feats.push(MediaPlayerFeature::Unmute);
                 }
                 if supported_features & (SUPPORT_PAUSE | SUPPORT_PLAY) > 0 {
                     media_feats.push(MediaPlayerFeature::PlayPause);

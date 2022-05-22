@@ -6,8 +6,6 @@
 //! See <https://developers.home-assistant.io/docs/api/websocket/#subscribe-to-events> for further
 //! information.
 
-use log::debug;
-
 use crate::client::event::button::button_event_to_entity_change;
 use crate::client::event::climate::climate_event_to_entity_change;
 use crate::client::event::cover::cover_event_to_entity_change;
@@ -21,6 +19,8 @@ use crate::client::messages::EntityEvent;
 use crate::client::model::Event;
 use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
+use log::debug;
+use serde_json::{Map, Value};
 
 mod button;
 mod climate;
@@ -64,7 +64,7 @@ impl HomeAssistantClient {
             "sensor" => sensor_event_to_entity_change(event.data),
             "binary_sensor" => binary_sensor_event_to_entity_change(event.data),
             "climate" => climate_event_to_entity_change(event.data),
-            "media_player" => media_player_event_to_entity_change(event.data),
+            "media_player" => media_player_event_to_entity_change(&self.server, event.data),
             &_ => {
                 debug!("[{}] Unsupported entity: {}", self.id, entity_type);
                 return Ok(()); // it's not really an error, so it's ok ;-)
@@ -90,4 +90,21 @@ pub(crate) fn convert_ha_onoff_state(state: &str) -> Result<serde_json::Value, S
             state
         ))),
     }
+}
+
+/// Move a json attribute from one object to another without any conversions
+fn move_json_attribute(source: &mut Map<String, Value>, dest: &mut Map<String, Value>, key: &str) {
+    source.remove_entry(key).map(|(k, v)| dest.insert(k, v));
+}
+
+/// Move a json value from one object to another while renaming the key
+fn move_json_value(
+    source: &mut Map<String, Value>,
+    dest: &mut Map<String, Value>,
+    key: &str,
+    dest_key: impl Into<String>,
+) {
+    source
+        .remove_entry(key)
+        .map(|(_, value)| dest.insert(dest_key.into(), value));
 }

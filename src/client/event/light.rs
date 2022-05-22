@@ -3,14 +3,12 @@
 
 //! Light entity specific HA event logic.
 
-use log::{info, warn};
-use serde_json::Value;
-
-use uc_api::{intg::EntityChange, EntityType};
-
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
+use log::{error, warn};
+use serde_json::Value;
+use uc_api::{intg::EntityChange, EntityType};
 
 pub(crate) fn light_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
     let mut attributes = serde_json::Map::with_capacity(2);
@@ -79,7 +77,7 @@ pub(crate) fn light_event_to_entity_change(data: EventData) -> Result<EntityChan
             }
             None => {}
             v => {
-                info!(
+                error!(
                     "TODO implement color mode conversion for color_mode: {}",
                     v.unwrap()
                 );

@@ -1904,6 +1904,7 @@ dependencies = [
  "strum_macros",
  "time 0.3.9",
  "uc_api",
+ "url",
  "uuid",
 ]
 
@@ -1962,6 +1963,7 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

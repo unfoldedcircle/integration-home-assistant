@@ -36,6 +36,7 @@ env_logger = "0.9"
 log = "0.4"
 
 uuid = { version = "1.0.0", features = ["v4"] }
+url = { version = "2", features = ["serde"] }
 time = { version = "0.3", default-features = false, features = ["std", "formatting"] }
 
 # Helpful macros for working with enums and strings
