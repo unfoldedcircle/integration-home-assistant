@@ -3,14 +3,14 @@
 
 //! Cover entity specific HA service call logic.
 
-use crate::client::messages::CallService;
 use crate::client::service::cmd_from_str;
 use crate::errors::ServiceError;
 use serde_json::{Map, Value};
+use uc_api::intg::EntityCommand;
 use uc_api::CoverCommand;
 
-pub(crate) fn handle_cover(msg: &CallService) -> Result<(String, Option<Value>), ServiceError> {
-    let cmd: CoverCommand = cmd_from_str(&msg.command.cmd_id)?;
+pub(crate) fn handle_cover(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
+    let cmd: CoverCommand = cmd_from_str(&msg.cmd_id)?;
 
     let result = match cmd {
         CoverCommand::Open => ("open_cover".into(), None),
@@ -18,7 +18,7 @@ pub(crate) fn handle_cover(msg: &CallService) -> Result<(String, Option<Value>),
         CoverCommand::Stop => ("stop_cover".into(), None),
         CoverCommand::Position => {
             let mut data = Map::new();
-            if let Some(params) = msg.command.params.as_ref() {
+            if let Some(params) = msg.params.as_ref() {
                 if let Some(pos @ 0..=100) = params.get("position").and_then(|v| v.as_u64()) {
                     data.insert("position".into(), Value::Number(pos.into()));
                 }

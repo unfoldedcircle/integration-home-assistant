@@ -3,19 +3,19 @@
 
 //! Light entity specific HA service call logic.
 
-use crate::client::messages::CallService;
 use crate::client::service::cmd_from_str;
 use crate::errors::ServiceError;
 use serde_json::{json, Map, Value};
+use uc_api::intg::EntityCommand;
 use uc_api::LightCommand;
 
-pub(crate) fn handle_light(msg: &CallService) -> Result<(String, Option<Value>), ServiceError> {
-    let cmd: LightCommand = cmd_from_str(&msg.command.cmd_id)?;
+pub(crate) fn handle_light(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
+    let cmd: LightCommand = cmd_from_str(&msg.cmd_id)?;
 
     let result = match cmd {
         LightCommand::On => {
             let mut data = Map::new();
-            if let Some(params) = msg.command.params.as_ref() {
+            if let Some(params) = msg.params.as_ref() {
                 if let Some(brightness @ 0..=255) =
                     params.get("brightness").and_then(|v| v.as_u64())
                 {

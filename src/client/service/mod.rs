@@ -43,10 +43,10 @@ impl Handler<CallService> for HomeAssistantClient {
         // map Remote Two command name & parameters to HA service name and service_data payload
         let ha = match msg.command.entity_type {
             EntityType::Button => Ok(("press".to_string(), None)),
-            EntityType::Switch => switch::handle_switch(&msg),
-            EntityType::Climate => climate::handle_climate(&msg),
-            EntityType::Cover => cover::handle_cover(&msg),
-            EntityType::Light => light::handle_light(&msg),
+            EntityType::Switch => switch::handle_switch(&msg.command),
+            EntityType::Climate => climate::handle_climate(&msg.command),
+            EntityType::Cover => cover::handle_cover(&msg.command),
+            EntityType::Light => light::handle_light(&msg.command),
             EntityType::MediaPlayer => media_player::handle_media_player(&msg.command),
             EntityType::Sensor => Err(ServiceError::BadRequest(
                 "Sensor doesn't support sending commands to! Ignoring call".to_string(),
