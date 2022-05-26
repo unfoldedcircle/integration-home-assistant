@@ -36,8 +36,9 @@ pub(crate) fn climate_event_to_entity_change(
             "fan_only" => {
                 attributes.insert("state".into(), "FAN".into());
             }
+            "" => {} // attribute not present
             _ => {
-                warn!("Not supported hvac_mode: {}", mode);
+                warn!("Not supported hvac_mode: '{}'", mode);
             }
         }
         json::move_entry(&mut ha_attr, &mut attributes, "current_temperature");
