@@ -149,7 +149,7 @@ fn create_available_entity(
     let mut options = serde_json::Map::new();
 
     if let Some(attributes) = entity.get("attributes").and_then(|v| v.as_object()) {
-        name = attributes.get("name").and_then(|v| v.as_str());
+        name = attributes.get("friendly_name").and_then(|v| v.as_str());
         device_class = attributes.get("device_class").and_then(|v| v.as_str());
 
         let supported_features = attributes
