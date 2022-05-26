@@ -41,7 +41,7 @@ impl Handler<CallService> for HomeAssistantClient {
         info!("[{}] Calling service in HomeAssistant", self.id);
 
         // map Remote Two command name & parameters to HA service name and service_data payload
-        let ha = match msg.command.entity_type {
+        let (service, service_data) = match msg.command.entity_type {
             EntityType::Button => Ok(("press".to_string(), None)),
             EntityType::Switch => switch::handle_switch(&msg.command),
             EntityType::Climate => climate::handle_climate(&msg.command),
@@ -52,13 +52,17 @@ impl Handler<CallService> for HomeAssistantClient {
                 "Sensor doesn't support sending commands to! Ignoring call".to_string(),
             )),
         }?;
+        let domain = match msg.command.entity_id.split_once('.') {
+            None => return Err(ServiceError::BadRequest("Invalid entity_id format".into())),
+            Some((l, _)) => l.to_string(),
+        };
 
         let call_srv_msg = CallServiceMsg {
             id: self.new_msg_id(),
             msg_type: "call_service".to_string(),
-            domain: msg.command.entity_type.to_string(), // only works since we use the same name as Home Assistant :-)
-            service: ha.0,
-            service_data: ha.1,
+            domain,
+            service,
+            service_data,
             target: Target {
                 entity_id: msg.command.entity_id,
             },

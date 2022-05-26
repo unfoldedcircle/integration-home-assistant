@@ -3,13 +3,11 @@
 
 //! Sensor entity specific HA event logic.
 
-use log::info;
-use serde_json::Value;
-
-use uc_api::{intg::EntityChange, EntityType};
-
+use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
+use serde_json::Value;
+use uc_api::{intg::EntityChange, EntityType};
 
 pub(crate) fn sensor_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
     if data.entity_id.is_empty() || data.new_state.state.is_empty() {
@@ -41,10 +39,18 @@ pub(crate) fn sensor_event_to_entity_change(data: EventData) -> Result<EntityCha
 pub(crate) fn binary_sensor_event_to_entity_change(
     data: EventData,
 ) -> Result<EntityChange, ServiceError> {
-    info!(
-        "TODO handle binary sensor change event for {}: {:?}",
-        data.entity_id, data.new_state.attributes
-    );
+    let mut attributes = serde_json::Map::with_capacity(1);
+    let state = convert_ha_onoff_state(&data.new_state.state)?;
 
-    Err(ServiceError::NotYetImplemented)
+    // TODO decide on how to handle the special binary sensor:
+    // - provide state in `value` attribute?
+    // - add binary type in entity options when querying available entities?
+    attributes.insert("state".to_string(), state);
+
+    Ok(EntityChange {
+        device_id: None,
+        entity_type: EntityType::Sensor,
+        entity_id: data.entity_id,
+        attributes,
+    })
 }

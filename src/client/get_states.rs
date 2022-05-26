@@ -65,6 +65,8 @@ impl HomeAssistantClient {
                 // map different entity type names
                 Some((domain, _)) => match domain {
                     "input_boolean" => "switch", // TODO verify
+                    "binary_sensor" => "sensor",
+                    "input_button" => "button",
                     v => v,
                 },
             };

@@ -6,7 +6,6 @@
 //! See <https://developers.home-assistant.io/docs/api/websocket/#subscribe-to-events> for further
 //! information.
 
-use crate::client::event::button::button_event_to_entity_change;
 use crate::client::event::climate::climate_event_to_entity_change;
 use crate::client::event::cover::cover_event_to_entity_change;
 use crate::client::event::light::light_event_to_entity_change;
@@ -21,7 +20,6 @@ use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
 use log::debug;
 
-mod button;
 mod climate;
 mod cover;
 mod light;
@@ -57,8 +55,11 @@ impl HomeAssistantClient {
 
         let entity_change = match entity_type {
             "light" => light_event_to_entity_change(event.data),
-            "switch" => switch_event_to_entity_change(event.data),
-            "button" => button_event_to_entity_change(event.data),
+            "switch" | "input_boolean" => switch_event_to_entity_change(event.data),
+            "button" | "input_button" => {
+                // the button entity is stateless and the remote doesn't need to be notified when the button was pressed externally
+                return Ok(());
+            }
             "cover" => cover_event_to_entity_change(event.data),
             "sensor" => sensor_event_to_entity_change(event.data),
             "binary_sensor" => binary_sensor_event_to_entity_change(event.data),
