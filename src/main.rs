@@ -22,6 +22,7 @@ mod errors;
 mod from_msg_data;
 mod messages;
 mod server;
+mod util;
 mod websocket;
 
 #[actix_web::main]

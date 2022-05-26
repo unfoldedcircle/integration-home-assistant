@@ -10,7 +10,7 @@ use uc_api::intg::EntityChange;
 use uc_api::EntityType;
 
 pub(crate) fn cover_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
-    let mut attributes = serde_json::Map::with_capacity(8);
+    let mut attributes = serde_json::Map::with_capacity(3);
 
     let state = match data.new_state.state.as_str() {
         "open" | "opening" | "closed" | "closing" => data.new_state.state.to_uppercase().into(),
