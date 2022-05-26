@@ -3,10 +3,10 @@
 
 //! Media player entity specific HA event logic.
 
-use crate::client::event;
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
+use crate::util::json;
 use log::error;
 use uc_api::intg::EntityChange;
 use uc_api::EntityType;
@@ -28,29 +28,29 @@ pub(crate) fn media_player_event_to_entity_change(
         if let Some(value) = ha_attr.get("volume_level").and_then(|v| v.as_f64()) {
             attributes.insert("volume".into(), ((value * 100.0).round() as u64).into());
         }
-        event::move_json_value(&mut ha_attr, &mut attributes, "is_volume_muted", "muted");
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "media_position");
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "media_duration");
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "media_title");
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "media_artist");
-        event::move_json_value(
+        json::move_value(&mut ha_attr, &mut attributes, "is_volume_muted", "muted");
+        json::move_entry(&mut ha_attr, &mut attributes, "media_position");
+        json::move_entry(&mut ha_attr, &mut attributes, "media_duration");
+        json::move_entry(&mut ha_attr, &mut attributes, "media_title");
+        json::move_entry(&mut ha_attr, &mut attributes, "media_artist");
+        json::move_value(
             &mut ha_attr,
             &mut attributes,
             "media_album_name",
             "media_album",
         );
-        event::move_json_value(
+        json::move_value(
             &mut ha_attr,
             &mut attributes,
             "media_content_type",
             "media_type",
         );
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "shuffle");
+        json::move_entry(&mut ha_attr, &mut attributes, "shuffle");
         if let Some(value) = ha_attr.get("repeat").and_then(|v| v.as_str()) {
             attributes.insert("repeat".into(), value.to_uppercase().into());
         }
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "source");
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "sound_mode");
+        json::move_entry(&mut ha_attr, &mut attributes, "source");
+        json::move_entry(&mut ha_attr, &mut attributes, "sound_mode");
 
         if let Some(value) = ha_attr.get("entity_picture").and_then(|v| v.as_str()) {
             // let's hope it's only http, https or a local path :-)

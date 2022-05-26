@@ -3,9 +3,9 @@
 
 //! Climate entity specific HA event logic.
 
-use crate::client::event;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
+use crate::util::json;
 use log::{debug, warn};
 use uc_api::intg::EntityChange;
 use uc_api::EntityType;
@@ -40,15 +40,15 @@ pub(crate) fn climate_event_to_entity_change(
                 warn!("Not supported hvac_mode: {}", mode);
             }
         }
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "current_temperature");
-        event::move_json_value(
+        json::move_entry(&mut ha_attr, &mut attributes, "current_temperature");
+        json::move_value(
             &mut ha_attr,
             &mut attributes,
             "temperature",
             "target_temperature",
         );
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "target_temperature_high");
-        event::move_json_attribute(&mut ha_attr, &mut attributes, "target_temperature_low");
+        json::move_entry(&mut ha_attr, &mut attributes, "target_temperature_high");
+        json::move_entry(&mut ha_attr, &mut attributes, "target_temperature_low");
         if let Some(value) = ha_attr.get("fan_mode").and_then(|v| v.as_str()) {
             // TODO test and filter fan modes?
             attributes.insert("fan_mode".into(), value.to_uppercase().into());

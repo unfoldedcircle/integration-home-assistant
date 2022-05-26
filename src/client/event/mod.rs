@@ -20,7 +20,6 @@ use crate::client::model::Event;
 use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
 use log::debug;
-use serde_json::{Map, Value};
 
 mod button;
 mod climate;
@@ -90,21 +89,4 @@ pub(crate) fn convert_ha_onoff_state(state: &str) -> Result<serde_json::Value, S
             state
         ))),
     }
-}
-
-/// Move a json attribute from one object to another without any conversions
-fn move_json_attribute(source: &mut Map<String, Value>, dest: &mut Map<String, Value>, key: &str) {
-    source.remove_entry(key).map(|(k, v)| dest.insert(k, v));
-}
-
-/// Move a json value from one object to another while renaming the key
-fn move_json_value(
-    source: &mut Map<String, Value>,
-    dest: &mut Map<String, Value>,
-    key: &str,
-    dest_key: impl Into<String>,
-) {
-    source
-        .remove_entry(key)
-        .map(|(_, value)| dest.insert(dest_key.into(), value));
 }
