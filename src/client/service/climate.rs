@@ -25,10 +25,10 @@ pub(crate) fn handle_climate(msg: &EntityCommand) -> Result<(String, Option<Valu
                 .unwrap_or_default();
             match mode {
                 "OFF" | "HEAT" | "COOL" | "HEAT_COOL" | "AUTO" => {
-                    data.insert("state".into(), mode.to_lowercase().into());
+                    data.insert("hvac_mode".into(), mode.to_lowercase().into());
                 }
                 "FAN" => {
-                    data.insert("state".into(), "fan_only".into());
+                    data.insert("hvac_mode".into(), "fan_only".into());
                 }
                 _ => {
                     return Err(ServiceError::BadRequest(format!(
@@ -60,4 +60,87 @@ pub(crate) fn handle_climate(msg: &EntityCommand) -> Result<(String, Option<Valu
     };
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::client::service::climate::handle_climate;
+    use rstest::rstest;
+    use serde_json::{json, Value};
+    use uc_api::intg::EntityCommand;
+
+    #[test]
+    fn turn_on() {
+        let msg_data = json!({
+            "cmd_id": "on",
+            "entity_id": "climate.bathroom_floor_heating_mode",
+            "entity_type": "climate"
+        });
+        let (cmd, data) = map_msg_data(msg_data);
+        assert_eq!("turn_on", cmd);
+        assert!(data.is_none(), "no cmd data allowed");
+    }
+
+    #[test]
+    fn turn_off() {
+        let msg_data = json!({
+            "cmd_id": "off",
+            "entity_id": "climate.bathroom_floor_heating_mode",
+            "entity_type": "climate"
+        });
+        let (cmd, data) = map_msg_data(msg_data);
+        assert_eq!("turn_off", cmd);
+        assert!(data.is_none(), "no cmd data allowed");
+    }
+
+    #[rstest]
+    #[case("OFF", "off")]
+    #[case("HEAT", "heat")]
+    #[case("COOL", "cool")]
+    #[case("HEAT_COOL", "heat_cool")]
+    #[case("AUTO", "auto")]
+    #[case("FAN", "fan_only")]
+    fn hvac_mode(#[case] uc_cmd: &str, #[case] ha_cmd: &str) {
+        let msg_data = json!({
+            "cmd_id": "hvac_mode",
+            "entity_id": "climate.bathroom_floor_heating_mode",
+            "entity_type": "climate",
+            "params": {
+                "hvac_mode": uc_cmd
+            }
+        });
+        let (cmd, data) = map_msg_data(msg_data);
+        assert_eq!("set_hvac_mode", cmd);
+        assert!(data.is_some(), "cmd data expected");
+        let data = data.unwrap();
+        assert_eq!(Some(&json!(ha_cmd)), data.get("hvac_mode"));
+    }
+
+    #[test]
+    fn set_temperature() {
+        let msg_data = json!({
+            "cmd_id": "target_temperature",
+            "entity_id": "climate.bathroom_floor_heating_mode",
+            "entity_type": "climate",
+            "params": {
+              "temperature": 22.5
+            }
+        });
+        let (cmd, data) = map_msg_data(msg_data);
+        assert_eq!("set_temperature", cmd);
+        assert!(data.is_some(), "cmd data expected");
+        let data = data.unwrap();
+        assert_eq!(Some(&json!(22.5)), data.get("temperature"));
+    }
+
+    fn map_msg_data(msg_data: Value) -> (String, Option<Value>) {
+        let cmd: EntityCommand = serde_json::from_value(msg_data).expect("invalid test data");
+        let result = handle_climate(&cmd);
+        assert!(
+            result.is_ok(),
+            "Expected successful cmd mapping but got: {:?}",
+            result.unwrap_err()
+        );
+        result.unwrap()
+    }
 }
