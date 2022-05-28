@@ -6,7 +6,6 @@
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
-use serde_json::Value;
 use uc_api::{intg::EntityChange, EntityType};
 
 pub(crate) fn sensor_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
@@ -18,11 +17,11 @@ pub(crate) fn sensor_event_to_entity_change(data: EventData) -> Result<EntityCha
     }
 
     let mut attributes = serde_json::Map::with_capacity(2);
-    attributes.insert("value".to_string(), Value::String(data.new_state.state));
+    attributes.insert("value".into(), data.new_state.state.into());
 
     if let Some(mut ha_attr) = data.new_state.attributes {
         if let Some(uom) = ha_attr.remove("unit_of_measurement") {
-            attributes.insert("unit".to_string(), uom);
+            attributes.insert("unit".into(), uom);
         }
         // TODO check and handle attributes.device_class? E.g. checking for supported sensors.
         // Currently supported: "battery" | "current" | "energy" | "humidity" | "power" | "temperature" | "voltage"
@@ -39,13 +38,13 @@ pub(crate) fn sensor_event_to_entity_change(data: EventData) -> Result<EntityCha
 pub(crate) fn binary_sensor_event_to_entity_change(
     data: EventData,
 ) -> Result<EntityChange, ServiceError> {
-    let mut attributes = serde_json::Map::with_capacity(1);
+    let mut attributes = serde_json::Map::with_capacity(3);
     let state = convert_ha_onoff_state(&data.new_state.state)?;
 
-    // TODO decide on how to handle the special binary sensor:
-    // - provide state in `value` attribute?
-    // - add binary type in entity options when querying available entities?
+    // TODO decide on how to handle the special binary sensor
+    attributes.insert("value".into(), (Some("ON") == state.as_str()).into());
     attributes.insert("state".to_string(), state);
+    attributes.insert("unit".into(), "boolean".into());
 
     Ok(EntityChange {
         device_id: None,
