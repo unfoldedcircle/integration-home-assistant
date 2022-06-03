@@ -48,6 +48,17 @@ pub fn move_value(
         .is_some()
 }
 
+pub fn is_float_value(json: &serde_json::Map<String, Value>, key: &str) -> bool {
+    json.get(key).and_then(|v| v.as_f64()).is_some()
+}
+
+pub fn number_value(json: &serde_json::Map<String, Value>, key: &str) -> Option<Value> {
+    match json.get(key) {
+        Some(v) if v.is_number() => Some(v.clone()),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::util::json::{copy_entry, move_entry, move_value};

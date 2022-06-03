@@ -9,7 +9,11 @@ description = "Unfolded Circle Home-Assistant integration for Remote Two"
 #documentation = "TODO"
 
 [dependencies]
+# Attention: New commits will not be pulled down automatically once the lock is in place.
+# Update to latest snapshot: `cargo update -p uc_api`
 uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs" }
+# for local development:
+#uc_api = { path = "../api-model-rs" }
 
 # WebSockets server
 actix-web = { version = "4.0.1", features = ["rustls"] }

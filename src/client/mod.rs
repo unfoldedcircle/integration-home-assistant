@@ -13,11 +13,10 @@ use awc::{ws, BoxedSocket};
 use bytes::Bytes;
 use futures::stream::{SplitSink, SplitStream};
 use log::{debug, error, info, warn};
+use messages::Close;
 use serde::de::Error;
 use serde_json::{json, Value};
 use url::Url;
-
-use messages::Close;
 
 use crate::client::messages::{ConnectionEvent, ConnectionState};
 use crate::client::model::Event;
@@ -27,6 +26,7 @@ use crate::Controller;
 
 mod actor;
 mod close_handler;
+mod entity;
 mod event;
 mod get_states;
 pub mod messages;
@@ -186,7 +186,11 @@ impl HomeAssistantClient {
                         ctx.notify(Close::invalid());
                     }
 
-                    if let Some(entities) = object_msg.get("result").and_then(|v| v.as_array()) {
+                    if let Some(entities) =
+                        object_msg.get_mut("result").and_then(|v| v.as_array_mut())
+                    {
+                        // this looks ugly! Is there a better way to get ownership of the array?
+                        let entities: Vec<Value> = entities.iter_mut().map(|v| v.take()).collect();
                         if let Err(e) = self.handle_get_states_result(entities) {
                             error!("[{}] Error handling HA get_states result: {:?}", self.id, e);
                         }

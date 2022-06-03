@@ -6,26 +6,12 @@
 //! See <https://developers.home-assistant.io/docs/api/websocket/#subscribe-to-events> for further
 //! information.
 
-use crate::client::event::climate::climate_event_to_entity_change;
-use crate::client::event::cover::cover_event_to_entity_change;
-use crate::client::event::light::light_event_to_entity_change;
-use crate::client::event::media_player::media_player_event_to_entity_change;
-use crate::client::event::sensor::{
-    binary_sensor_event_to_entity_change, sensor_event_to_entity_change,
-};
-use crate::client::event::switch::switch_event_to_entity_change;
+use crate::client::entity::*;
 use crate::client::messages::EntityEvent;
 use crate::client::model::Event;
 use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
 use log::debug;
-
-mod climate;
-mod cover;
-mod light;
-mod media_player;
-mod sensor;
-mod switch;
 
 impl HomeAssistantClient {
     /// Whenever an `event` message is received from HA, this method is called to handle it.  

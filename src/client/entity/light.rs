@@ -1,22 +1,28 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-//! Light entity specific HA event logic.
+//! Light entity specific logic.
 
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
 use log::{error, warn};
-use serde_json::Value;
-use uc_api::{intg::EntityChange, EntityType};
+use serde_json::{Map, Value};
+use std::collections::HashMap;
+use uc_api::intg::AvailableIntgEntity;
+use uc_api::{intg::EntityChange, EntityType, LightFeature};
 
-pub(crate) fn light_event_to_entity_change(data: EventData) -> Result<EntityChange, ServiceError> {
+pub(crate) fn map_light_attributes(
+    entity_id: &str,
+    state: &str,
+    ha_attr: Option<&mut Map<String, Value>>,
+) -> Result<Map<String, Value>, ServiceError> {
     let mut attributes = serde_json::Map::with_capacity(2);
-    let state = convert_ha_onoff_state(&data.new_state.state)?;
+    let state = convert_ha_onoff_state(state)?;
 
     attributes.insert("state".into(), state);
 
-    if let Some(mut ha_attr) = data.new_state.attributes {
+    if let Some(ha_attr) = ha_attr {
         // FIXME brightness adjustment for RGB## modes. https://developers.home-assistant.io/docs/core/entity/light
         // Note that in color modes COLOR_MODE_RGB, COLOR_MODE_RGBW and COLOR_MODE_RGBWW there is
         // brightness information both in the light's brightness property and in the color. As an
@@ -78,12 +84,25 @@ pub(crate) fn light_event_to_entity_change(data: EventData) -> Result<EntityChan
             None => {}
             v => {
                 error!(
-                    "TODO implement color mode conversion for color_mode: {}",
+                    "TODO {} implement color mode conversion for color_mode: {}",
+                    entity_id,
                     v.unwrap()
                 );
             }
         }
     }
+
+    Ok(attributes)
+}
+
+pub(crate) fn light_event_to_entity_change(
+    mut data: EventData,
+) -> Result<EntityChange, ServiceError> {
+    let attributes = map_light_attributes(
+        &data.entity_id,
+        &data.new_state.state,
+        data.new_state.attributes.as_mut(),
+    )?;
 
     Ok(EntityChange {
         device_id: None,
@@ -122,9 +141,72 @@ fn color_temp_mired_to_percent(
     Ok(((value as u16) - min_mireds) * 100 / (max_mireds - min_mireds))
 }
 
+pub(crate) fn convert_light_entity(
+    entity_id: String,
+    state: String,
+    ha_attr: &mut Map<String, Value>,
+) -> Result<AvailableIntgEntity, ServiceError> {
+    let friendly_name = ha_attr.get("friendly_name").and_then(|v| v.as_str());
+    let name = HashMap::from([("en".into(), friendly_name.unwrap_or(&entity_id).into())]);
+
+    // handle features
+    let mut light_feats = Vec::with_capacity(2);
+    // OnOff is default
+    light_feats.push(LightFeature::Toggle);
+
+    if let Some(color_modes) = ha_attr
+        .get("supported_color_modes")
+        .and_then(|v| v.as_array())
+    {
+        let mut dim = false;
+        let mut color = false;
+        let mut color_temp = false;
+        for color_mode in color_modes {
+            match color_mode.as_str().unwrap_or_default() {
+                "brightness" => dim = true,
+                "color_temp" => {
+                    dim = true;
+                    color_temp = true;
+                }
+                "hs" | "rgb" | "rgbw" | "rgbww" | "xy" => {
+                    dim = true;
+                    color = true;
+                }
+                &_ => continue,
+            };
+        }
+        if dim {
+            light_feats.push(LightFeature::Dim);
+        }
+        if color {
+            light_feats.push(LightFeature::Color);
+        }
+        if color_temp {
+            light_feats.push(LightFeature::ColorTemperature);
+        }
+    }
+
+    // TODO color entity options: color_temperature_steps - do we get that from HASS?
+
+    // convert attributes
+    let attributes = Some(map_light_attributes(&entity_id, &state, Some(ha_attr))?);
+
+    Ok(AvailableIntgEntity {
+        entity_id,
+        device_id: None, // TODO prepare device_id handling
+        entity_type: EntityType::Light,
+        device_class: None,
+        name,
+        features: Some(light_feats.into_iter().map(|v| v.to_string()).collect()),
+        area: None,
+        options: None,
+        attributes,
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::client::event::light::color_temp_mired_to_percent;
+    use crate::client::entity::light::color_temp_mired_to_percent;
     use crate::errors::ServiceError;
     use rstest::rstest;
 
