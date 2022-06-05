@@ -16,7 +16,8 @@ use serde_json::json;
 use strum::EnumMessage;
 use uc_api::intg::ws::{R2Event, R2Request};
 use uc_api::intg::{
-    ws::AvailableEntitiesMsgData, DeviceState, EntityCommand, IntegrationVersion, SubscribeEvents,
+    ws::AvailableEntitiesMsgData, DeviceState, EntityChange, EntityCommand, IntegrationVersion,
+    SubscribeEvents,
 };
 use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
 
@@ -39,7 +40,11 @@ struct R2Session {
     subscribed_entities: HashSet<String>,
     /// HomeAssistant connection mode: true = connect (& reconnect), false = disconnect (& don't reconnect)
     ha_connect: bool,
+    // TODO replace with request id map & oneshot notification
+    /// quick and dirty request id mapping for get_available_entities request.
     get_available_entities_id: Option<u32>,
+    /// quick and dirty request id mapping for get_entity_states request.
+    get_entity_states_id: Option<u32>,
 }
 
 impl R2Session {
@@ -50,6 +55,7 @@ impl R2Session {
             subscribed_entities: Default::default(),
             ha_connect: false,
             get_available_entities_id: None,
+            get_entity_states_id: None,
         }
     }
 }
@@ -200,21 +206,21 @@ impl Handler<AvailableEntities> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: AvailableEntities, _ctx: &mut Self::Context) -> Self::Result {
-        // TODO just a quick implementation. Implement caching and request filter!
-        let msg_data = AvailableEntitiesMsgData {
-            filter: None,
-            available_entities: msg.entities,
-        };
-        if let Ok(msg_data_json) = serde_json::to_value(msg_data) {
-            for (ws_id, session) in self.sessions.iter_mut() {
-                if let Some(id) = session.get_available_entities_id {
-                    if session.standby {
-                        debug!(
-                            "[{}] Remote is in standby, not sending message: available_entities",
-                            ws_id
-                        );
-                        continue;
-                    }
+        // TODO just a quick implementation. Implement request filter! (also caching?)
+        for (ws_id, session) in self.sessions.iter_mut() {
+            if session.standby {
+                debug!(
+                    "[{}] Remote is in standby, not handling available_entities from HASS",
+                    ws_id
+                );
+                continue;
+            }
+            if let Some(id) = session.get_available_entities_id {
+                let msg_data = AvailableEntitiesMsgData {
+                    filter: None,
+                    available_entities: msg.entities.clone(),
+                };
+                if let Ok(msg_data_json) = serde_json::to_value(msg_data) {
                     match session
                         .recipient
                         .try_send(SendWsMessage(WsMessage::response(
@@ -224,6 +230,29 @@ impl Handler<AvailableEntities> for Controller {
                         ))) {
                         Ok(_) => session.get_available_entities_id = None,
                         Err(e) => error!("[{}] Error sending available_entities: {:?}", ws_id, e),
+                    }
+                }
+            } else if let Some(id) = session.get_entity_states_id {
+                let mut msg_data = Vec::with_capacity(msg.entities.len());
+                for entity in &msg.entities {
+                    msg_data.push(EntityChange {
+                        device_id: entity.device_id.clone(),
+                        entity_type: entity.entity_type.clone(),
+                        entity_id: entity.entity_id.clone(),
+                        attributes: entity.attributes.clone().unwrap_or_default(),
+                    });
+                }
+
+                if let Ok(msg_data_json) = serde_json::to_value(msg_data) {
+                    match session
+                        .recipient
+                        .try_send(SendWsMessage(WsMessage::response(
+                            id,
+                            "entity_states",
+                            msg_data_json.clone(),
+                        ))) {
+                        Ok(_) => session.get_entity_states_id = None,
+                        Err(e) => error!("[{}] Error sending entity_states: {:?}", ws_id, e),
                     }
                 }
             }
@@ -381,21 +410,30 @@ impl Handler<R2RequestMsg> for Controller {
                 Ok(())
             }
             R2Request::SetupDevice => Err(ServiceError::NotYetImplemented),
-            R2Request::GetAvailableEntities => {
+            R2Request::GetEntityStates | R2Request::GetAvailableEntities => {
+                // We don't cache entities in this integration so we have to request them from HASS.
+                // I'm not aware of a different way to just retrieve the attributes. The get_states
+                // call returns everything, so we have to filter our response to UCR2.
+                // TODO quick & dirty request id "mapping"
                 if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
-                    session.get_available_entities_id = Some(msg.req_id);
+                    if msg.request == R2Request::GetAvailableEntities {
+                        session.get_available_entities_id = Some(msg.req_id);
+                    } else {
+                        session.get_entity_states_id = Some(msg.req_id);
+                    }
                 }
 
-                // FIXME proof of concept only. TODO add caching and maybe a "force retrieve flag"
+                // get states from HASS. Response will call AvailableEntities handler
                 if let Some(addr) = self.ha_client.as_ref() {
                     debug!("[{}] Requesting available entities from HA", msg.ws_id);
                     addr.do_send(GetStates);
+                    Ok(())
                 } else {
                     error!(
                         "Unable to request available entities: HA client connection not available!"
                     );
+                    Err(ServiceError::NotConnected)
                 }
-                Ok(())
             }
             R2Request::SubscribeEvents => {
                 let addr = ctx.address();
@@ -405,7 +443,6 @@ impl Handler<R2RequestMsg> for Controller {
                 let addr = ctx.address();
                 return Box::pin(async move { addr.send(UnsubscribeHassEvents(msg)).await? });
             }
-            R2Request::GetEntityStates => Err(ServiceError::NotYetImplemented),
             R2Request::EntityCommand => {
                 if let Some(addr) = self.ha_client.clone() {
                     return Box::pin(async move {
