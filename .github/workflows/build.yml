@@ -6,19 +6,26 @@ on:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
       - 'src/**'
+      - 'build.rs'
       - '.github/**/*.yml'
   pull_request:
     branches: [ main ]
     types: [ opened, synchronize, reopened ]
 
 env:
+  DEBUG_OUTPUT: "true"
+  CONTAINER_IMAGE_NAME: unfoldedcircle/integration-hass
+  APP_NAME: uc-intg-hass
+  BIN_OUTPUT_PATH: binaries
+  HASH_FILENAME: uc-intg-hass.hash
+  LINUX_ARTIFACT_SUFFIX: Linux-x64
   CARGO_TERM_COLOR: always
 
 jobs:
-  rustfmt:
+  fmt:
+    name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - run: pwd && ls -lah
       - name: Checkout repository
         uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -26,13 +33,39 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt
-      - name: Check source formatting
-        uses: actions-rs/cargo@v1
+      - uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
 
+  test:
+    # run tests & clippy in same job for improved caching & faster builds
+    name: Test and clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - id: setup
+        uses: ./.github/actions/rust-setup
+        with:
+          target: debug
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+      - name: Run clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: -- -D warnings
+
   build:
+    # run tests, clippy & build in same job for improved caching & faster builds
+    name: Build release
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -40,19 +73,200 @@ jobs:
         with:
           # History of 200 should be more than enough to calculate commit count since last release tag.
           fetch-depth: 200
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          components: rustfmt
-      - name: Clippy
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: -- -D warnings
-      - name: Build
+      - name: Fetch all tags to determine version
         run: |
-          cargo --version
-          cargo build
-      - name: Run tests
-        run: cargo test --verbose
+          git fetch origin +refs/tags/*:refs/tags/*
+          APP_VERSION=$(git describe --match "v[0-9]*" --tags HEAD --always)
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=${{ env.APP_NAME }}-$APP_VERSION-${{ env.LINUX_ARTIFACT_SUFFIX }}" >> $GITHUB_ENV
+
+      - id: setup
+        uses: ./.github/actions/rust-setup
+        with:
+          target: release
+
+      - name: Release build
+        shell: bash
+        run: cargo build --release
+
+      # Archive is required to preserve file permissions and re-used for release uploads
+      - name: Create upload artifact
+        shell: bash
+        run: |
+          ls -la target/release
+          mkdir ${GITHUB_WORKSPACE}/${{env.BIN_OUTPUT_PATH }}
+          cp target/release/${{ env.APP_NAME }} ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}
+          cp configuration.yaml ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}
+          echo "VERSION=${{ env.APP_VERSION }}" > ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/version.txt
+          echo "TIMESTAMP=$(date +"%Y%m%d_%H%M%S")" >> ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/version.txt
+          tar czvf ${{ env.ARTIFACT_NAME }}.tar.gz -C ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }} .
+
+      - uses: actions/upload-artifact@v3
+        id: upload_artifact
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.ARTIFACT_NAME }}.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+
+  release:
+    name: GitHub release
+    if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Log
+        if: env.DEBUG_OUTPUT == 'true'
+        shell: bash
+        run: |
+          echo "--- Structure of downloaded artifacts ---"
+          ls -R
+          echo "--- Environment ---"
+          printenv
+
+      # Use a common timestamp for all matrix build artifacts
+      - name: Set build timestamp
+        run: |
+          echo "TIMESTAMP=$(date +"%Y%m%d_%H%M%S")" >> $GITHUB_ENV
+
+      # Add timestamp to development builds
+      - name: Create GitHub development build archives
+        if: "!contains(github.ref, 'tags/v')"
+        run: |
+          # extract tar.gz build archives from downloaded artifacts
+          # (wrapped in tar from actions/upload-artifact, then extracted into a directory by actions/download-artifact)
+          ls -lah
+          for D in * 
+            do if [ -d "${D}" ]; then
+              echo "Archive directory: $D"
+              ls -lah $D/*
+              mv $D/* ./
+            fi
+          done;
+          ls -lah
+          echo "append timestamp for development builds"
+          for filename in *.tar.gz; do mv $filename "$(basename $filename .tar.gz)-${{ env.TIMESTAMP }}.tar.gz"; done;
+          echo "create hashes"
+          for filename in *.tar.gz; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
+          ls -lah
+
+      - name: Create Pre-Release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        if: "!contains(github.ref, 'tags/v')"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: true
+          title: "Development Build"
+          files: |
+            *.tar.gz
+            ${{ env.HASH_FILENAME }}
+
+      - name: Create GitHub release archives
+        if: "contains(github.ref, 'tags/v')"
+        run: |
+          for filename in *.tar.gz; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
+
+      - name: Create Release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        if: "contains(github.ref, 'tags/v')"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: |
+            *.tar.gz
+            ${{ env.HASH_FILENAME }}
+
+  container:
+    name: Create Docker image
+    runs-on: ubuntu-latest
+    needs: release
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Log
+        if: env.DEBUG_OUTPUT == 'true'
+        shell: bash
+        run: |
+          echo "--- Structure of downloaded artifacts ---"
+          ls -R
+          echo "--- Environment ---"
+          printenv
+
+      - name: Check out repo for Docker build
+        uses: actions/checkout@v3
+        with:
+          # needs to be a subdirectory, otherwise the workspace gets erased
+          path: src
+
+      - name: Extract release for Docker build
+        shell: bash
+        run: |
+          mkdir -p ./src/docker/app
+          ls -lah
+          cd *${{ env.LINUX_ARTIFACT_SUFFIX }}
+          for filename in *${{ env.LINUX_ARTIFACT_SUFFIX }}*.tar.gz; do
+            echo "Extracting release file for Docker build: $filename"
+            tar xvzf $filename -C ../src/docker/app
+            # there should only be one Linux release :-)
+            break
+          done;
+
+      - name: Set image labels
+        shell: bash
+        run: |
+          echo "Sourcing version information from packaged version file:"
+          cat src/docker/app/version.txt
+          source src/docker/app/version.txt
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          echo "GITHUB_SHA=$GITHUB_SHA" >> $GITHUB_ENV
+
+      - name: Set development image tag
+        if: "!contains(github.ref, 'tags/v')"
+        run: |
+          echo "IMAGE_TAGS=${CONTAINER_IMAGE_NAME}:latest" >> $GITHUB_ENV          
+
+      - name: Set release image tag
+        if: "contains(github.ref, 'tags/v')"
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#*tags/v}"
+          echo "IMAGE_TAGS=${CONTAINER_IMAGE_NAME}:latest,${CONTAINER_IMAGE_NAME}:$TAG" >> $GITHUB_ENV          
+
+      - name: Log
+        if: env.DEBUG_OUTPUT == 'true'
+        shell: bash
+        run: |
+          ls -lah
+          ls -lah ./src/docker/app
+          echo "--- Environment ---"
+          printenv
+          echo "-------------------"
+          echo "BUILD_DATE: ${{ env.BUILD_DATE }}"
+          echo "VERSION   : ${{ env.APP_VERSION }}"
+          echo "REVISION  : ${{ env.GITHUB_SHA }}"
+          echo "IMAGE_TAGS: ${{ env.IMAGE_TAGS }}"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: src/docker
+          push: true
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            VERSION=${{ env.APP_VERSION }}
+            REVISION=${{ env.GITHUB_SHA }}
+          tags: ${{ env.IMAGE_TAGS }}
