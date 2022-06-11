@@ -1,14 +1,18 @@
-webserver:
+integration:
   interface: 0.0.0.0
-  http: true
-  http_port: 8000
-  https: false
-  https_port: 8443
-home_assistant:
+  http:
+    enabled: true
+    port: 8000
+  https:
+    enabled: false # not yet implemented
+    port: 8443
+#  websocket:
+#    token: 1-2-3
+hass:
   url: ws://hassio.local:8123/api/websocket
   token: YOUR_HA_TOKEN
   connection_timeout: 3
-  #disable_cert_validation: no
+  #disable_cert_validation: no # not yet implemented
   max_frame_size_kb: 5120
   reconnect:
     attempts: 10

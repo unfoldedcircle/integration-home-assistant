@@ -5,8 +5,10 @@ edition = "2021"
 authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
 license = "MPL-2.0"
 description = "Unfolded Circle Home-Assistant integration for Remote Two"
-#repository = "https://github.com/TODO"
-#documentation = "TODO"
+#repository = "https://github.com/unfoldedcircle/integration-home-assistant"
+
+[profile.release]
+strip = true  # Automatically strip symbols from the binary.
 
 [dependencies]
 # Attention: New commits will not be pulled down automatically once the lock is in place.
@@ -34,9 +36,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_with = "1"
 
+clap = "3"
 config = { version = "0.13", default-features = false, features = ["yaml"] }
-
+const_format = "0.2"
 env_logger = "0.9"
+lazy_static = "1.4"
 log = "0.4"
 
 uuid = { version = "1.0.0", features = ["v4"] }
@@ -47,6 +51,9 @@ time = { version = "0.3", default-features = false, features = ["std", "formatti
 strum = "0.24"
 strum_macros = "0.24"
 derive_more = "0.99"
+
+[build-dependencies]
+built = { version = "0.5", features = ["git2", "chrono", "semver"] }
 
 [dev-dependencies]
 rstest = "0.13"
