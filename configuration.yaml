@@ -1,12 +1,49 @@
-webserver:
+integration:
   interface: 0.0.0.0
-  http: true
-  http_port: 8000
-  https: false
-  https_port: 8443
-home_assistant:
+  http:
+    enabled: true
+    port: 8000
+  https:
+    enabled: false # not yet implemented
+    port: 8443
+#  websocket:
+#    token: 1-2-3
+hass:
   url: ws://hassio.local:8123/api/websocket
   token: YOUR_HA_TOKEN
+  connection_timeout: 3
+  #disable_cert_validation: no # not yet implemented
+  max_frame_size_kb: 5120
+  reconnect:
+    attempts: 10
+    duration_ms: 1000
+    duration_max_ms: 20000
+    backoff_factor: 1.5
+  heartbeat:
+    interval_sec: 30
+    timeout_sec: 40
+
+
+
+
+hass-test:
+  url: ws://localhost:8123/api/websocket
+  token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIwZTFiMGRmNTZlZWU0NmU3OWM0MWFjNGU2ZDBlMGYyOCIsImlhdCI6MTY1MzA3ODE3OCwiZXhwIjoxOTY4NDM4MTc4fQ.hCb1-qTf1Z0TPhEq_KZkmy1QJ02-_lGoT686Q4lZGNw
+  connection_timeout: 3
+  #disable_cert_validation: no # not yet implemented
+  max_frame_size_kb: 5120
+  reconnect:
+    attempts: 10
+    duration_ms: 1000
+    duration_max_ms: 20000
+    backoff_factor: 1.5
+  heartbeat:
+    interval_sec: 30
+    timeout_sec: 40
+
+hass-prod:
+  url: ws://hassio.local:8123/api/websocket
+  token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiI1N2IzMThiNDljMTg0OTM4YjYyYzEyY2FkOGQ4Yzg0NSIsImlhdCI6MTU3MzYyODcxNCwiZXhwIjoxODg4OTg4NzE0fQ.s1yZZB6YMStxH7zdDTn9z_MLwKJD5_KMS5Ee6gep0gQ
   connection_timeout: 3
   #disable_cert_validation: no
   max_frame_size_kb: 5120

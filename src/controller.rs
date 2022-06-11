@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::{Error, ErrorKind};
 use std::time::Duration;
 
+use crate::{API_VERSION, APP_VERSION};
 use actix::prelude::{Actor, Context, Handler, Recipient};
 use actix::{
     fut, ActorFutureExt, Addr, AsyncContext, MessageResult, ResponseActFuture, ResponseFuture,
@@ -388,10 +389,9 @@ impl Handler<R2RequestMsg> for Controller {
                     WsMessage::response(
                         msg.req_id,
                         resp_msg,
-                        // TODO Read versions from project / during build.
                         IntegrationVersion {
-                            api: "0.4.0".to_string(),
-                            integration: "0.1.0".to_string(),
+                            api: API_VERSION.to_string(),
+                            integration: APP_VERSION.to_string(),
                         },
                     ),
                     &msg.ws_id,
