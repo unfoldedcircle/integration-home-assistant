@@ -1,0 +1,29 @@
+name: 'Rust setup'
+description: 'Install all required tools to build uc-intg-hass'
+inputs:
+  target:
+    description: 'Target build (release or debug). Only used for caching key.'
+    required: true
+    default: 'default'
+runs:
+  using: "composite"
+  steps:
+    - name: Cache dependencies
+      id: cache-dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache target
+      id: cache-target
+      uses: actions/cache@v3
+      with:
+        path: |
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ inputs.target }}
+
+    # add any cargo tools, toolchains and system libs required for the build
+    # --> not yet used

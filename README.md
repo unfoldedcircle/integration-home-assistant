@@ -1,3 +1,5 @@
+[![Rust](https://github.com/aitatoi/integration-home-assistant/actions/workflows/build.yml/badge.svg)](https://github.com/aitatoi/integration-home-assistant/actions/workflows/build.yml)
+
 # Home-Assistant Integration for Remote Two
 
 TODO
@@ -5,6 +7,10 @@ TODO
 - developer setup
 - build
 - how to use
+
+## Container Image
+
+See [Docker image](./docker/README.md) for more information.
 
 ## Contributing
 
