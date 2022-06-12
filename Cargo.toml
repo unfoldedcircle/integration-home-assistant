@@ -11,9 +11,11 @@ description = "Unfolded Circle Home-Assistant integration for Remote Two"
 strip = true  # Automatically strip symbols from the binary.
 
 [dependencies]
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.6.1-alpha" }
+# Using default GitHub branch:
 # Attention: New commits will not be pulled down automatically once the lock is in place.
 # Update to latest snapshot: `cargo update -p uc_api`
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs" }
+#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs" }
 # for local development:
 #uc_api = { path = "../api-model-rs" }
 
@@ -24,7 +26,7 @@ actix = "0.12"
 actix-tls = { version = "3.0.3", features = ["rustls"] }
 bytestring = "1"
 rustls = "0.20"
-rustls-pemfile = "1.0.0"
+rustls-pemfile = "1"
 # WebSockets client
 actix-codec = "0.5"
 awc = { version = "3.0.0", features = ["rustls"] }
