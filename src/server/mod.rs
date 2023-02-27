@@ -22,7 +22,13 @@ pub async fn ws_index(
     websocket_settings: web::Data<WebSocketSettings>,
     controller: web::Data<Addr<Controller>>,
 ) -> Result<HttpResponse, Error> {
-    debug!("New WebSocket connection: {:?}", request);
+    let client_addr = request.peer_addr().map(|p| p.to_string());
+
+    // Note: don't print full request, it may contain an auth-token header!
+    debug!(
+        "New WebSocket connection from: {}",
+        client_addr.as_deref().unwrap_or("?")
+    );
 
     // Authenticate connection if a token is configured
     if websocket_settings.token.is_some() {
@@ -55,7 +61,7 @@ pub async fn ws_index(
     )
 }
 
-pub fn json_error_handler(err: error::JsonPayloadError, _: &HttpRequest) -> Error {
+pub fn json_error_handler(err: JsonPayloadError, _: &HttpRequest) -> Error {
     let message = err.to_string();
 
     let resp = match &err {

@@ -103,7 +103,7 @@ impl Controller {
             }
             // TODO use send instead?
             // TODO error handling
-            let _ = session.recipient.do_send(SendWsMessage(message));
+            session.recipient.do_send(SendWsMessage(message));
         } else {
             warn!("attempting to send message but couldn't find session.");
         }
@@ -210,10 +210,7 @@ impl Handler<AvailableEntities> for Controller {
         // TODO just a quick implementation. Implement request filter! (also caching?)
         for (ws_id, session) in self.sessions.iter_mut() {
             if session.standby {
-                debug!(
-                    "[{}] Remote is in standby, not handling available_entities from HASS",
-                    ws_id
-                );
+                debug!("[{ws_id}] Remote is in standby, not handling available_entities from HASS");
                 continue;
             }
             if let Some(id) = session.get_available_entities_id {
@@ -230,7 +227,7 @@ impl Handler<AvailableEntities> for Controller {
                             msg_data_json.clone(),
                         ))) {
                         Ok(_) => session.get_available_entities_id = None,
-                        Err(e) => error!("[{}] Error sending available_entities: {:?}", ws_id, e),
+                        Err(e) => error!("[{ws_id}] Error sending available_entities: {e:?}"),
                     }
                 }
             } else if let Some(id) = session.get_entity_states_id {
@@ -253,7 +250,7 @@ impl Handler<AvailableEntities> for Controller {
                             msg_data_json.clone(),
                         ))) {
                         Ok(_) => session.get_entity_states_id = None,
-                        Err(e) => error!("[{}] Error sending entity_states: {:?}", ws_id, e),
+                        Err(e) => error!("[{ws_id}] Error sending entity_states: {e:?}"),
                     }
                 }
             }
@@ -287,16 +284,16 @@ impl Handler<Connect> for Controller {
 
         Box::pin(
             async move {
-                debug!("Connecting to: {}", url);
+                debug!("Connecting to: {url}");
 
-                let (response, framed) = match ws_request.connect().await {
+                let (_, framed) = match ws_request.connect().await {
                     Ok((r, f)) => (r, f),
                     Err(e) => {
-                        warn!("Could not connect to {}: {:?}", url, e);
+                        warn!("Could not connect to {url}: {e:?}");
                         return Err(Error::new(ErrorKind::Other, e.to_string()));
                     }
                 };
-                info!("Connected to: {} - {:?}", url, response);
+                info!("Connected to: {url}");
 
                 let (sink, stream) = framed.split();
                 let addr =
@@ -461,7 +458,7 @@ impl Handler<R2RequestMsg> for Controller {
                                     WsResultMsgData::new("OK", "Service call sent"),
                                 );
                                 if let Err(e) = r2_recipient.try_send(SendWsMessage(response)) {
-                                    error!("Can't send R2 result: {}", e);
+                                    error!("Can't send R2 result: {e}");
                                 }
                                 Ok(())
                             }

@@ -53,6 +53,7 @@ pub struct HomeAssistantClient {
     /// Last heart beat timestamp.
     last_hb: Instant,
     heartbeat: HeartbeatSettings,
+    msg_tracing: bool,
 }
 
 impl HomeAssistantClient {
@@ -60,8 +61,8 @@ impl HomeAssistantClient {
         url: Url,
         controller_actor: Addr<Controller>,
         access_token: String,
-        sink: SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>,
-        stream: SplitStream<Framed<BoxedSocket, ws::Codec>>,
+        sink: SplitSink<Framed<BoxedSocket, Codec>, ws::Message>,
+        stream: SplitStream<Framed<BoxedSocket, Codec>>,
         heartbeat: HeartbeatSettings,
     ) -> Addr<Self> {
         HomeAssistantClient::create(|ctx| {
@@ -88,6 +89,7 @@ impl HomeAssistantClient {
                 controller_actor,
                 last_hb: Instant::now(),
                 heartbeat,
+                msg_tracing: true,
             }
         })
     }
@@ -198,13 +200,8 @@ impl HomeAssistantClient {
                 }
             }
             "auth_required" => {
-                if let Err(e) = self.send_message(
-                    ws::Message::Text(
-                        json!({ "type": "auth", "access_token": self.access_token})
-                            .to_string()
-                            .into(),
-                    ),
-                    "auth",
+                if let Err(e) = self.send_json(
+                    json!({ "type": "auth", "access_token": self.access_token}),
                     ctx,
                 ) {
                     error!("[{}] Error sending auth to HA: {:?}", self.id, e);
@@ -223,17 +220,12 @@ impl HomeAssistantClient {
 
                 if !self.subscribed_events {
                     self.subscribe_events_id = Some(self.new_msg_id());
-                    if let Err(e) = self.send_message(
-                        ws::Message::Text(
-                            json!({
-                              "id": self.subscribe_events_id.unwrap(),
-                              "type": "subscribe_events",
-                              "event_type": "state_changed"
-                            })
-                            .to_string()
-                            .into(),
-                        ),
-                        "subscribe_events",
+                    if let Err(e) = self.send_json(
+                        json!({
+                          "id": self.subscribe_events_id.unwrap(),
+                          "type": "subscribe_events",
+                          "event_type": "state_changed"
+                        }),
                         ctx,
                     ) {
                         error!(
@@ -265,14 +257,41 @@ impl HomeAssistantClient {
         self.last_hb = Instant::now();
     }
 
+    fn send_json(
+        &mut self,
+        msg: Value,
+        ctx: &mut Context<HomeAssistantClient>,
+    ) -> Result<(), ServiceError> {
+        let obj = msg.as_object().ok_or(ServiceError::BadRequest(
+            "json message must be an object".into(),
+        ))?;
+        let name = obj.get("type").and_then(|v| v.as_str()).unwrap_or("?");
+        // hide access token in tracing mode
+        if self.msg_tracing && !obj.contains_key("access_token") {
+            debug!("[{}] <- {msg:?}", self.id);
+        } else {
+            debug!("[{}] <- {name}", self.id);
+        }
+        if self
+            .sink
+            .write(ws::Message::Text(msg.to_string().into()))
+            .is_err()
+        {
+            // sink is closed or closing, no chance to send a Close message
+            warn!("[{}] Could not send {name}, closing connection", self.id);
+            ctx.stop();
+            return Err(ServiceError::NotConnected);
+        }
+        Ok(())
+    }
+
     fn send_message(
         &mut self,
         msg: ws::Message,
         name: &str,
         ctx: &mut Context<HomeAssistantClient>,
     ) -> Result<(), ServiceError> {
-        // TODO add tracing flag
-        if true {
+        if self.msg_tracing {
             debug!("[{}] <- {:?}", self.id, msg);
         } else {
             debug!("[{}] <- {}", self.id, name);
@@ -287,11 +306,8 @@ impl HomeAssistantClient {
     }
 }
 
-pub fn json_object_from_text_msg(
-    id: &str,
-    txt: &[u8],
-) -> Result<serde_json::Value, serde_json::Error> {
-    let msg: serde_json::Value = match serde_json::from_slice(txt) {
+pub fn json_object_from_text_msg(id: &str, txt: &[u8]) -> Result<Value, serde_json::Error> {
+    let msg: Value = match serde_json::from_slice(txt) {
         Ok(v) => v,
         Err(e) => {
             warn!("[{}] Error parsing json message: {:?}", id, e);

@@ -12,7 +12,6 @@ use crate::client::model::{CallServiceMsg, Target};
 use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
 use actix::Handler;
-use actix_web_actors::ws;
 use log::info;
 use serde_json::{Map, Value};
 use uc_api::intg::EntityCommand;
@@ -68,8 +67,8 @@ impl Handler<CallService> for HomeAssistantClient {
             },
         };
 
-        let msg = serde_json::to_string(&call_srv_msg).map(|v| ws::Message::Text(v.into()))?;
-        self.send_message(msg, "call_service", ctx)
+        let msg = serde_json::to_value(call_srv_msg)?;
+        self.send_json(msg, ctx)
 
         // TODO wait for HA response message? If the service call fails we'll get a result back with "success: false"
         // However, some services take a long time to respond! E.g. Sonos might take 10 seconds if there's an issue with the network.
@@ -81,8 +80,7 @@ pub fn cmd_from_str<T: std::str::FromStr + strum::VariantNames>(
 ) -> Result<T, ServiceError> {
     T::from_str(cmd).map_err(|_| {
         ServiceError::BadRequest(format!(
-            "Invalid cmd_id: {}. Valid commands: {}",
-            cmd,
+            "Invalid cmd_id: {cmd}. Valid commands: {}",
             T::VARIANTS.to_vec().join(",")
         ))
     })

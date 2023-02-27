@@ -6,7 +6,6 @@
 use std::str::FromStr;
 
 use actix::Handler;
-use awc::ws;
 use log::{debug, error, warn};
 use serde_json::{json, Value};
 use uc_api::EntityType;
@@ -24,15 +23,10 @@ impl Handler<GetStates> for HomeAssistantClient {
 
         let id = self.new_msg_id();
         self.entity_states_id = Some(id);
-        self.send_message(
-            ws::Message::Text(
-                json!(
-                    {"id": id, "type": "get_states"}
-                )
-                .to_string()
-                .into(),
+        self.send_json(
+            json!(
+                {"id": id, "type": "get_states"}
             ),
-            "get_states",
             ctx,
         )
     }
@@ -55,8 +49,8 @@ impl HomeAssistantClient {
             let entity_type = match entity_id.split_once('.') {
                 None => {
                     error!(
-                        "[{}] Invalid entity_id format, missing dot to extract domain: {}",
-                        self.id, entity_id
+                        "[{}] Invalid entity_id format, missing dot to extract domain: {entity_id}",
+                        self.id
                     );
                     continue; // best effort
                 }
@@ -71,10 +65,7 @@ impl HomeAssistantClient {
 
             let entity_type = match EntityType::from_str(entity_type) {
                 Err(_) => {
-                    debug!(
-                        "[{}] Filtering non-supported entity: {}",
-                        self.id, entity_id
-                    );
+                    debug!("[{}] Filtering non-supported entity: {entity_id}", self.id);
                     continue;
                 }
                 Ok(v) => v,
@@ -88,8 +79,8 @@ impl HomeAssistantClient {
             let attr = match entity.get_mut("attributes").and_then(|v| v.as_object_mut()) {
                 None => {
                     warn!(
-                        "[{}] Could not convert HASS entity {}: missing attributes",
-                        self.id, error_id
+                        "[{}] Could not convert HASS entity {error_id}: missing attributes",
+                        self.id
                     );
                     continue;
                 }
@@ -111,8 +102,8 @@ impl HomeAssistantClient {
             match avail_entity {
                 Ok(entity) => available.push(entity),
                 Err(e) => warn!(
-                    "[{}] Could not convert HASS entity {}: {:?}",
-                    self.id, error_id, e
+                    "[{}] Could not convert HASS entity {error_id}: {e:?}",
+                    self.id
                 ),
             }
         }
