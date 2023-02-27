@@ -22,7 +22,7 @@ uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.6.1
 # WebSockets server
 actix-web = { version = "4.0.1", features = ["rustls"] }
 actix-web-actors = "4.1.0"
-actix = "0.12"
+actix = "0.13"
 actix-tls = { version = "3.0.3", features = ["rustls"] }
 bytestring = "1"
 rustls = "0.20"
@@ -36,12 +36,12 @@ futures = "0.3"
 # JSON (de)serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_with = "1"
+serde_with = "2"
 
 clap = "3"
 config = { version = "0.13", default-features = false, features = ["yaml"] }
 const_format = "0.2"
-env_logger = "0.9"
+env_logger = "0.10"
 lazy_static = "1.4"
 log = "0.4"
 
@@ -55,7 +55,7 @@ strum_macros = "0.24"
 derive_more = "0.99"
 
 [build-dependencies]
-built = { version = "0.5", features = ["git2", "chrono", "semver"] }
+built = { version = "0.6", features = ["git2", "chrono", "semver"] }
 
 [dev-dependencies]
-rstest = "0.13"
+rstest = "0.16"
