@@ -56,10 +56,10 @@ lazy_static! {
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> io::Result<()> {
     let args = Command::new(built_info::PKG_NAME)
         .author("Unfolded Circle Aps")
-        .version(&*APP_VERSION)
+        .version(APP_VERSION)
         .about("Home Assistant integration for Remote Two")
         .arg(arg!(-c --config <FILE> ... "Configuration file").required(false))
         .get_matches();

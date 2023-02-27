@@ -48,11 +48,28 @@ pub fn move_value(
         .is_some()
 }
 
-pub fn is_float_value(json: &serde_json::Map<String, Value>, key: &str) -> bool {
+#[allow(dead_code)]
+pub fn map_str_value<F: FnOnce(&str) -> Value>(
+    source: &Map<String, Value>,
+    dest: &mut Map<String, Value>,
+    key: &str,
+    f: F,
+) -> bool {
+    source
+        .get(key)
+        .and_then(|v| v.as_str())
+        .map(|v| {
+            let v = f(v);
+            dest.insert(key.to_string(), v);
+        })
+        .is_some()
+}
+
+pub fn is_float_value(json: &Map<String, Value>, key: &str) -> bool {
     json.get(key).and_then(|v| v.as_f64()).is_some()
 }
 
-pub fn number_value(json: &serde_json::Map<String, Value>, key: &str) -> Option<Value> {
+pub fn number_value(json: &Map<String, Value>, key: &str) -> Option<Value> {
     match json.get(key) {
         Some(v) if v.is_number() => Some(v.clone()),
         _ => None,
