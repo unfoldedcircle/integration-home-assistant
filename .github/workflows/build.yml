@@ -122,12 +122,9 @@ jobs:
         run: |
           echo "TIMESTAMP=$(date +"%Y%m%d_%H%M%S")" >> $GITHUB_ENV
 
-      # Add timestamp to development builds
-      - name: Create GitHub development build archives
-        if: "!contains(github.ref, 'tags/v')"
+      - name: Extract tar.gz build archives from downloaded artifacts
         run: |
-          # extract tar.gz build archives from downloaded artifacts
-          # (wrapped in tar from actions/upload-artifact, then extracted into a directory by actions/download-artifact)
+          # Files are wrapped in tar from actions/upload-artifact, then extracted into a directory by actions/download-artifact
           ls -lah
           for D in * 
             do if [ -d "${D}" ]; then
@@ -137,6 +134,11 @@ jobs:
             fi
           done;
           ls -lah
+
+      # Add timestamp to development builds
+      - name: Create GitHub development build archives
+        if: "!contains(github.ref, 'tags/v')"
+        run: |
           echo "append timestamp for development builds"
           for filename in *.tar.gz; do mv $filename "$(basename $filename .tar.gz)-${{ env.TIMESTAMP }}.tar.gz"; done;
           echo "create hashes"
@@ -158,7 +160,9 @@ jobs:
       - name: Create GitHub release archives
         if: "contains(github.ref, 'tags/v')"
         run: |
+          echo "create hashes"
           for filename in *.tar.gz; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
+          ls -lah
 
       - name: Create Release
         uses: "marvinpinto/action-automatic-releases@latest"
@@ -172,6 +176,7 @@ jobs:
 
   container:
     name: Create Docker image
+    if: "contains(github.ref, 'tags/v')" # only publish releases!
     runs-on: ubuntu-latest
     needs: release
 
