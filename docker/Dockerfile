@@ -1,4 +1,4 @@
-FROM gcr.io/distroless/cc
+FROM debian:bookworm-slim
 
 EXPOSE 8000
 EXPOSE 8443
