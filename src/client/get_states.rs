@@ -97,6 +97,11 @@ impl HomeAssistantClient {
                     convert_media_player_entity(&self.server, entity_id, state, attr)
                 }
                 EntityType::Sensor => convert_sensor_entity(entity_id, state, attr),
+                // internal core entities for the moment
+                EntityType::Activity | EntityType::Macro | EntityType::Remote => {
+                    warn!("[{}] skipping internal entity {entity_type}", self.id);
+                    continue;
+                }
             };
 
             match avail_entity {

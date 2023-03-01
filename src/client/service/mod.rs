@@ -50,6 +50,12 @@ impl Handler<CallService> for HomeAssistantClient {
             EntityType::Sensor => Err(ServiceError::BadRequest(
                 "Sensor doesn't support sending commands to! Ignoring call".to_string(),
             )),
+            EntityType::Activity | EntityType::Macro | EntityType::Remote => {
+                Err(ServiceError::BadRequest(format!(
+                    "{} is an internal remote-core entity",
+                    msg.command.entity_type
+                )))
+            }
         }?;
         let domain = match msg.command.entity_id.split_once('.') {
             None => return Err(ServiceError::BadRequest("Invalid entity_id format".into())),

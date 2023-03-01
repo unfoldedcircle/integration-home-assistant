@@ -11,7 +11,7 @@ description = "Unfolded Circle Home-Assistant integration for Remote Two"
 strip = true  # Automatically strip symbols from the binary.
 
 [dependencies]
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.6.1-alpha" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.7.0-alpha" }
 # Using default GitHub branch:
 # Attention: New commits will not be pulled down automatically once the lock is in place.
 # Update to latest snapshot: `cargo update -p uc_api`
