@@ -17,9 +17,9 @@ use crate::messages::{NewR2Session, R2SessionDisconnect, SendWsMessage};
 use crate::server::ws::WsConn;
 use crate::Controller;
 
-// TODO make configurable?
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
+// TODO make configurable!
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Local Actix message to handle WebSocket text message.
 /// This is a "one way" fire and forget message on purpose to simplify handling in the StreamHandler.
@@ -34,6 +34,17 @@ impl Actor for WsConn {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.start_heartbeat(ctx);
+
+        // since we only implemented the header based authentication in server::ws_index we can send
+        // the authentication event right after startup
+        let json = serde_json::json!({
+            "kind": "resp",
+            "req_id": 0,
+            "code": 200,
+            "msg": "authentication"
+        });
+        ctx.text(json.to_string());
+
         // register new WebSocket connection to our handler
         self.controller_addr
             .send(NewR2Session {
@@ -42,9 +53,9 @@ impl Actor for WsConn {
             })
             .into_actor(self)
             .then(|res, _, ctx| {
-                match res {
-                    Ok(_res) => (),
-                    _ => ctx.stop(),
+                if let Err(e) = res {
+                    error!("Error registering new WebSocket connection: {e}");
+                    ctx.stop();
                 }
                 fut::ready(())
             })
@@ -180,37 +191,6 @@ impl WsConn {
         }));
         ctx.stop();
     }
-    /*
-    pub(crate) fn send_error(
-        &self,
-        req_id: u32,
-        code: u16,
-        error_code: &str,
-        message: String,
-        ctx: &mut WebsocketContext<WsConn>,
-    ) {
-        let data = WsResultMsgData {
-            code: error_code.into(),
-            message,
-        };
-        let response = WsResponse::error(req_id, code, data);
-        if let Ok(msg) = serde_json::to_string(&response) {
-            ctx.text(msg);
-        }
-    }
-
-    pub(crate) fn send_missing_field_error(
-        &self,
-        req_id: u32,
-        field: &str,
-        ctx: &mut WebsocketContext<WsConn>,
-    ) {
-        let response = WsResponse::missing_field(req_id, field);
-        if let Ok(msg) = serde_json::to_string(&response) {
-            ctx.text(msg);
-        }
-    }
-    */
 }
 
 fn service_error_to_ws_message(req_id: u32, error: ServiceError) -> WsMessage {
