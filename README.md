@@ -41,3 +41,13 @@ We use [SemVer](http://semver.org/) for versioning. For the versions available, 
 
 This project is licensed under the [**Mozilla Public License 2.0**](https://choosealicense.com/licenses/mpl-2.0/).
 See the [LICENSE](LICENSE) file for details.
+
+### Project dependencies
+
+A license report of the projects dependencies can be generated with the
+[cargo-about](https://crates.io/crates/cargo-about) tool:
+
+```shell
+cargo install cargo-about
+cargo about generate about-markdown.hbs > integration-hass_licenses.md
+```

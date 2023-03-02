@@ -78,12 +78,22 @@ jobs:
         shell: bash
         run: cargo build --release
 
+# This takes over 5 min! Do it manually...
+#      - name: Create license report for releases
+#        if: "contains(github.ref, 'tags/v')"
+#        shell: bash
+#        run: |
+#          mkdir -p ${GITHUB_WORKSPACE}/${{env.BIN_OUTPUT_PATH }}
+#          cargo install cargo-about
+#          cargo about generate about.hbs > ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/integration-hass_licenses.html
+#          cargo about generate about-markdown.hbs > ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/integration-hass_licenses.md
+
       # Archive is required to preserve file permissions and re-used for release uploads
       - name: Create upload artifact
         shell: bash
         run: |
           ls -la target/release
-          mkdir ${GITHUB_WORKSPACE}/${{env.BIN_OUTPUT_PATH }}
+          mkdir -p ${GITHUB_WORKSPACE}/${{env.BIN_OUTPUT_PATH }}
           cp target/release/${{ env.APP_NAME }} ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}
           cp configuration.yaml ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}
           echo "VERSION=${{ env.APP_VERSION }}" > ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/version.txt
