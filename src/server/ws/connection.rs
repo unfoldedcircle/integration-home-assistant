@@ -197,7 +197,7 @@ fn service_error_to_ws_message(req_id: u32, error: ServiceError) -> WsMessage {
     debug!("Sending R2 error response for: {:?}", error);
 
     let (code, ws_err) = match error {
-        ServiceError::InternalServerError => {
+        ServiceError::InternalServerError(_) => {
             (500, WsResultMsgData::new("ERROR", "Internal server error"))
         }
         ServiceError::SerializationError(e) => (400, WsResultMsgData::new("BAD_REQUEST", e)),
@@ -210,6 +210,9 @@ fn service_error_to_ws_message(req_id: u32, error: ServiceError) -> WsMessage {
             501,
             WsResultMsgData::new("NOT_IMPLEMENTED", "Not yet implemented"),
         ),
+        ServiceError::ServiceUnavailable(e) => {
+            (503, WsResultMsgData::new("SERVICE_UNAVAILABLE", e))
+        }
     };
 
     WsMessage::error(req_id, code, ws_err)

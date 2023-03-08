@@ -37,7 +37,7 @@ pub struct CertificateSettings {
     pub private: String,
 }
 
-#[derive(Default, serde::Deserialize, serde::Serialize)]
+#[derive(Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct WebSocketSettings {
     pub token: Option<String>,
 }

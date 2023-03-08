@@ -1,20 +1,24 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+//! WebSocket server for the Remote Two integration API
+
+mod mdns;
+mod ws;
+
+pub use mdns::publish_service;
+
+use crate::configuration::WebSocketSettings;
+use crate::Controller;
 use actix::Addr;
 use actix_web::error::JsonPayloadError;
 use actix_web::{error, get, web, Error, HttpRequest, HttpResponse, Result};
 use log::{debug, info};
-use uuid::Uuid;
-
 use uc_api::core::web::ApiResponse;
+use uuid::Uuid;
 use ws::WsConn;
 
-use crate::configuration::WebSocketSettings;
-use crate::Controller;
-
-mod ws;
-
+/// HTTP endpoint for the WebSocket upgrade
 #[get("/ws")]
 pub async fn ws_index(
     request: HttpRequest,
@@ -61,6 +65,7 @@ pub async fn ws_index(
     )
 }
 
+// TODO still required? We only use WS and no other rest endpoints
 pub fn json_error_handler(err: JsonPayloadError, _: &HttpRequest) -> Error {
     let message = err.to_string();
 

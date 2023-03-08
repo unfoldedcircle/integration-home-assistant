@@ -4,6 +4,7 @@
 #![forbid(non_ascii_idents)]
 #![deny(unsafe_code)]
 
+use std::collections::HashMap;
 use std::io;
 use std::net::TcpListener;
 use std::path::Path;
@@ -15,9 +16,12 @@ use const_format::formatcp;
 use lazy_static::lazy_static;
 use log::{error, info};
 use server::json_error_handler;
+use uc_api::intg::IntegrationDriverUpdate;
+use uc_api::util::text_from_language_map;
 
 use crate::configuration::get_configuration;
 use crate::controller::Controller;
+use crate::server::publish_service;
 
 mod client;
 mod configuration;
@@ -29,7 +33,8 @@ mod server;
 mod util;
 mod websocket;
 
-pub const DEF_CONFIG_FILE: &str = "configuration.yaml";
+const DEF_CONFIG_FILE: &str = "configuration.yaml";
+const DRIVER_METADATA: &str = include_str!("../resources/driver.json");
 
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -79,6 +84,8 @@ async fn main() -> io::Result<()> {
     };
     let cfg = get_configuration(cfg_file).expect("Failed to read configuration");
 
+    let driver_metadata = get_driver_metadata()?;
+
     let listener = if cfg.integration.http.enabled {
         let address = format!(
             "{}:{}",
@@ -107,8 +114,9 @@ async fn main() -> io::Result<()> {
         ));
     }
 
-    let websocket_settings = web::Data::new(cfg.integration.websocket.unwrap_or_default());
-    let controller = web::Data::new(Controller::new(cfg.hass).start());
+    let api_port = cfg.integration.http.port;
+    let websocket_settings = web::Data::new(cfg.integration.websocket.clone().unwrap_or_default());
+    let controller = web::Data::new(Controller::new(cfg, driver_metadata.clone()).start());
 
     let mut http_server = HttpServer::new(move || {
         App::new()
@@ -136,7 +144,67 @@ async fn main() -> io::Result<()> {
         http_server = http_server.listen(listener.unwrap())?;
     }
 
+    publish_mdns(api_port, driver_metadata);
+
     http_server.run().await?;
 
     Ok(())
+}
+
+fn get_driver_metadata() -> Result<IntegrationDriverUpdate, io::Error> {
+    let mut driver: IntegrationDriverUpdate =
+        serde_json::from_str(DRIVER_METADATA).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Invalid driver.json format: {e}"),
+            )
+        })?;
+
+    if driver.driver_id.is_none() {
+        driver.driver_id = Some("home-assistant".into())
+    }
+    if !driver
+        .name
+        .as_ref()
+        .map(|v| !v.is_empty())
+        .unwrap_or_default()
+    {
+        driver.name = Some(HashMap::from([("en".into(), "Home Assistant".into())]))
+    }
+    driver.token = None; // don't expose sensitive information
+    driver.version = Some(APP_VERSION.to_string());
+
+    Ok(driver)
+}
+
+fn publish_mdns(api_port: u16, drv_metadata: IntegrationDriverUpdate) {
+    if let Err(e) = publish_service(
+        drv_metadata
+            .driver_id
+            .expect("driver_id must be set in driver metadata"),
+        "_uc-integration._tcp",
+        api_port,
+        vec![
+            format!(
+                "name={}",
+                text_from_language_map(drv_metadata.name.as_ref(), "en")
+                    .unwrap_or("Home Assistant")
+            ),
+            format!(
+                "developer={}",
+                drv_metadata
+                    .developer
+                    .and_then(|d| d.name)
+                    .unwrap_or("Unfolded Circle Aps".into())
+            ),
+            // "ws_url=wss://localhost:8008".into(), // to override the complete WS url. Ignores ws_path, wss, wss_port!
+            "ws_path=/ws".into(), // otherwise `/` is used and the remote can't connect
+            //"wss=false".into(), // if wss is required
+            //format!("wss_port={}", cfg.integration.https.port), // if https port if different from the published service port above
+            format!("pwd={}", drv_metadata.pwd_protected.unwrap_or_default()),
+            format!("ver={APP_VERSION}"),
+        ],
+    ) {
+        error!("Error publishing mDNS service: {e}");
+    }
 }

@@ -17,8 +17,8 @@ use serde_json::json;
 use strum::EnumMessage;
 use uc_api::intg::ws::{R2Event, R2Request};
 use uc_api::intg::{
-    ws::AvailableEntitiesMsgData, DeviceState, EntityChange, EntityCommand, IntegrationVersion,
-    SubscribeEvents,
+    ws::AvailableEntitiesMsgData, DeviceState, EntityChange, EntityCommand,
+    IntegrationDriverUpdate, IntegrationVersion, SubscribeEvents,
 };
 use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
 
@@ -26,7 +26,7 @@ use crate::client::messages::{
     AvailableEntities, CallService, Close, ConnectionEvent, ConnectionState, EntityEvent, GetStates,
 };
 use crate::client::HomeAssistantClient;
-use crate::configuration::HomeAssistantSettings;
+use crate::configuration::Settings;
 use crate::errors::ServiceError;
 use crate::from_msg_data::DeserializeMsgData;
 use crate::messages::{
@@ -67,7 +67,7 @@ pub struct Controller {
     sessions: HashMap<String, R2Session>,
     /// Home Assistant connection state
     device_state: DeviceState,
-    settings: HomeAssistantSettings,
+    settings: Settings,
     /// WebSocket client
     // creating an expensive client is sufficient once per process and can be used to create multiple connections
     ws_client: awc::Client,
@@ -75,21 +75,23 @@ pub struct Controller {
     ha_client: Option<Addr<HomeAssistantClient>>,
     ha_reconnect_duration: Duration,
     ha_reconnect_attempt: u16,
+    drv_metadata: IntegrationDriverUpdate,
 }
 
 impl Controller {
-    pub fn new(settings: HomeAssistantSettings) -> Self {
+    pub fn new(settings: Settings, drv_metadata: IntegrationDriverUpdate) -> Self {
         Self {
             sessions: Default::default(),
             device_state: DeviceState::Disconnected,
             ws_client: new_websocket_client(
-                Duration::from_secs(settings.connection_timeout as u64),
-                settings.url.scheme() == "wss",
+                Duration::from_secs(settings.hass.connection_timeout as u64),
+                settings.hass.url.scheme() == "wss",
             ),
-            ha_reconnect_duration: settings.reconnect.duration,
+            ha_reconnect_duration: settings.hass.reconnect.duration,
             settings,
             ha_client: None,
             ha_reconnect_attempt: 0,
+            drv_metadata,
         }
     }
 
@@ -134,12 +136,12 @@ impl Controller {
 
     fn increment_reconnect_timeout(&mut self) {
         let new_timeout = Duration::from_millis(
-            (self.ha_reconnect_duration.as_millis() as f32 * self.settings.reconnect.backoff_factor)
-                as u64,
+            (self.ha_reconnect_duration.as_millis() as f32
+                * self.settings.hass.reconnect.backoff_factor) as u64,
         );
 
-        self.ha_reconnect_duration = if new_timeout.gt(&self.settings.reconnect.duration_max) {
-            self.settings.reconnect.duration_max
+        self.ha_reconnect_duration = if new_timeout.gt(&self.settings.hass.reconnect.duration_max) {
+            self.settings.hass.reconnect.duration_max
         } else {
             new_timeout
         };
@@ -274,13 +276,13 @@ impl Handler<Connect> for Controller {
     fn handle(&mut self, _msg: Connect, ctx: &mut Self::Context) -> Self::Result {
         // TODO check if already connected
 
-        let ws_request = self.ws_client.ws(self.settings.url.as_str());
+        let ws_request = self.ws_client.ws(self.settings.hass.url.as_str());
         // align frame size to Home Assistant
-        let ws_request = ws_request.max_frame_size(self.settings.max_frame_size_kb * 1024);
-        let url = self.settings.url.clone();
-        let token = self.settings.token.clone();
+        let ws_request = ws_request.max_frame_size(self.settings.hass.max_frame_size_kb * 1024);
+        let url = self.settings.hass.url.clone();
+        let token = self.settings.hass.token.clone();
         let client_address = ctx.address();
-        let heartbeat = self.settings.heartbeat.clone();
+        let heartbeat = self.settings.hass.heartbeat.clone();
 
         Box::pin(
             async move {
@@ -305,9 +307,9 @@ impl Handler<Connect> for Controller {
             .map(move |result, act, ctx| {
                 match result {
                     Ok(addr) => {
-                        debug!("Successfully connected to: {}", act.settings.url);
+                        debug!("Successfully connected to: {}", act.settings.hass.url);
                         act.ha_client = Some(addr);
-                        act.ha_reconnect_duration = act.settings.reconnect.duration;
+                        act.ha_reconnect_duration = act.settings.hass.reconnect.duration;
                         act.ha_reconnect_attempt = 0;
                         Ok(())
                     }
@@ -315,10 +317,10 @@ impl Handler<Connect> for Controller {
                         // TODO quick and dirty: simply send Connect message as simple reconnect mechanism. Needs to be refined!
                         if act.device_state != DeviceState::Disconnected {
                             act.ha_reconnect_attempt += 1;
-                            if act.ha_reconnect_attempt > act.settings.reconnect.attempts {
+                            if act.ha_reconnect_attempt > act.settings.hass.reconnect.attempts {
                                 info!(
                                     "Max reconnect attempts reached ({}). Giving up!",
-                                    act.settings.reconnect.attempts
+                                    act.settings.hass.reconnect.attempts
                                 );
                                 act.device_state = DeviceState::Error;
                                 act.broadcast_device_state();
@@ -378,7 +380,10 @@ impl Handler<R2RequestMsg> for Controller {
             return Box::pin(fut::result(Ok(())));
         };
 
-        let resp_msg = msg.request.get_message().unwrap();
+        let resp_msg = msg
+            .request
+            .get_message()
+            .expect("R2Request variants must have an associated message");
 
         let result = match msg.request {
             R2Request::GetDriverVersion => {
@@ -465,6 +470,13 @@ impl Handler<R2RequestMsg> for Controller {
                         }
                     });
                 };
+                Ok(())
+            }
+            R2Request::GetDriverMetadata => {
+                self.send_r2_msg(
+                    WsMessage::response(msg.req_id, resp_msg, &self.drv_metadata),
+                    &msg.ws_id,
+                );
                 Ok(())
             }
         };
