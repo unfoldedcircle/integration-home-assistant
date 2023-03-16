@@ -1304,9 +1304,9 @@ checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
 
 [[package]]
 name = "mdns-sd"
-version = "0.6.1"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2654de111809d3593653cdfde4d05b6f189ce18cec8cf0660908d93f746a43a"
+checksum = "9215d25e69cac80b18fdaec4e2ce9995dfcec6bd5191e162bd711bbc5c96151e"
 dependencies = [
  "flume",
  "if-addrs 0.7.0",
@@ -2084,8 +2084,8 @@ dependencies = [
 
 [[package]]
 name = "uc_api"
-version = "0.7.0-alpha"
-source = "git+https://github.com/unfoldedcircle/api-model-rs?rev=b92dbde77ea7ff800aab4505547e0792d985430f#b92dbde77ea7ff800aab4505547e0792d985430f"
+version = "0.7.1-alpha"
+source = "git+https://github.com/unfoldedcircle/api-model-rs?tag=v0.7.1-alpha#9a0ab587aab63589e134f0460071c58140ec2b43"
 dependencies = [
  "chrono",
  "derive_more",

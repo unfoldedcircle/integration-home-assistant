@@ -1,17 +1,17 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use actix::Addr;
-use std::str::FromStr;
+//! Handle request messages from Remote Two
 
 use crate::errors::ServiceError;
-use crate::Controller;
-use log::{debug, warn};
-use uc_api::intg::ws::R2Request;
-use uc_api::ws::WsMessage;
-
 use crate::messages::R2RequestMsg;
 use crate::server::ws::WsConn;
+use crate::Controller;
+use actix::Addr;
+use log::{debug, warn};
+use std::str::FromStr;
+use uc_api::intg::ws::R2Request;
+use uc_api::ws::WsMessage;
 
 impl WsConn {
     /// Handle request messages from R2
@@ -20,7 +20,7 @@ impl WsConn {
         request: WsMessage,
         controller_addr: Addr<Controller>,
     ) -> Result<(), ServiceError> {
-        debug!("[{}] Got request: {:?}", session_id, request);
+        debug!("[{session_id}] Got request: {request:?}");
         let id = request
             .id
             .ok_or_else(|| ServiceError::BadRequest("Missing property: id".into()))?;
@@ -39,11 +39,8 @@ impl WsConn {
                 })
                 .await?
         } else {
-            warn!("[{}] Unknown message: {}", session_id, msg);
-            Err(ServiceError::BadRequest(format!(
-                "Unknown message: {}",
-                msg
-            )))
+            warn!("[{session_id}] Unknown message: {msg}");
+            Err(ServiceError::BadRequest(format!("Unknown message: {msg}")))
         }
     }
 }

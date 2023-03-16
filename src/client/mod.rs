@@ -37,7 +37,7 @@ mod streamhandler;
 pub struct HomeAssistantClient {
     /// Unique HA client id
     id: String,
-    /// Base server address for media image access (e.g. http://hassio.local:8123)
+    /// Base server address for media image access (e.g. <http://hassio.local:8123>)
     server: Url,
     /// HA request message id
     ws_id: u32,

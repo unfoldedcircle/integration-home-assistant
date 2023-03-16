@@ -1,27 +1,27 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use std::time::{Duration, Instant};
+//! Actix WebSocket actor for an established Remote Two client connection.
 
+use crate::errors::ServiceError;
+use crate::messages::{NewR2Session, R2SessionDisconnect, SendWsMessage};
+use crate::server::ws::WsConn;
 use actix::{
-    fut, Actor, ActorContext, ActorFutureExt, Addr, AsyncContext, ContextFutureSpawner, Handler,
+    fut, Actor, ActorContext, ActorFutureExt, AsyncContext, ContextFutureSpawner, Handler,
     ResponseActFuture, Running, StreamHandler, WrapFuture,
 };
 use actix_web_actors::ws::{CloseCode, CloseReason, Message, ProtocolError, WebsocketContext};
 use bytestring::ByteString;
 use log::{debug, error, info, warn};
+use std::time::{Duration, Instant};
 use uc_api::ws::{WsMessage, WsResultMsgData};
-
-use crate::errors::ServiceError;
-use crate::messages::{NewR2Session, R2SessionDisconnect, SendWsMessage};
-use crate::server::ws::WsConn;
-use crate::Controller;
 
 // TODO make configurable!
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Local Actix message to handle WebSocket text message.
+///
 /// This is a "one way" fire and forget message on purpose to simplify handling in the StreamHandler.
 /// Any errors must be handled in the receiver, e.g. sending error response messages back to
 /// the Remote Two!
@@ -61,7 +61,7 @@ impl Actor for WsConn {
             })
             .wait(ctx);
 
-        debug!("started");
+        debug!("[{}] started", self.id);
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
@@ -69,7 +69,7 @@ impl Actor for WsConn {
         self.controller_addr.do_send(R2SessionDisconnect {
             id: self.id.clone(),
         });
-        info!("stopped");
+        debug!("[{}] stopped", self.id);
         Running::Stop
     }
 }
@@ -88,7 +88,7 @@ impl StreamHandler<actix_web::Result<Message, ProtocolError>> for WsConn {
                 }
                 Message::Pong(_) => self.hb = Instant::now(),
                 Message::Close(reason) => {
-                    info!("Remote closed connection. Reason: {:?}", reason);
+                    info!("[{}] Remote closed connection. Reason: {reason:?}", self.id);
                     ctx.stop();
                 }
                 Message::Continuation(_) => {
@@ -97,7 +97,7 @@ impl StreamHandler<actix_web::Result<Message, ProtocolError>> for WsConn {
                 Message::Nop => {}
             }
         } else {
-            info!("Closing WebSocket: {:?}", msg.unwrap_err());
+            info!("[{}] Closing WebSocket: {:?}", self.id, msg.unwrap_err());
             ctx.stop();
         }
     }
@@ -110,7 +110,7 @@ impl Handler<TextMsg> for WsConn {
         let msg: WsMessage = match serde_json::from_slice(text.0.as_ref()) {
             Ok(v) => v,
             Err(e) => {
-                warn!("[{}] Invalid JSON message: {}", self.id, e.to_string());
+                warn!("[{}] Invalid JSON message: {e}", self.id);
                 self.close(CloseCode::Unsupported, "Invalid JSON message", ctx);
                 return Box::pin(fut::ready(()));
             }
@@ -136,8 +136,8 @@ impl Handler<TextMsg> for WsConn {
             .into_actor(self) // converts future to ActorFuture
             .map(move |result: Result<(), ServiceError>, act, ctx| {
                 if let Err(e) = result {
-                    warn!("[{}] Error processing received text message: {}", act.id, e);
-                    let response = service_error_to_ws_message(req_id, e);
+                    warn!("[{}] Error processing received text message: {e}", act.id);
+                    let response = service_error_to_ws_message(&act.id, req_id, e);
                     ctx.notify(SendWsMessage(response));
                 }
             }),
@@ -152,20 +152,12 @@ impl Handler<SendWsMessage> for WsConn {
         if let Ok(msg) = serde_json::to_string(&msg.0) {
             ctx.text(msg);
         } else {
-            error!("Error serializing {:?}", msg.0)
+            error!("[{}] Error serializing {:?}", self.id, msg.0)
         }
     }
 }
 
 impl WsConn {
-    pub(crate) fn new(client_id: String, controller_addr: Addr<Controller>) -> Self {
-        Self {
-            id: client_id,
-            hb: Instant::now(),
-            controller_addr,
-        }
-    }
-
     fn start_heartbeat(&self, ctx: &mut WebsocketContext<Self>) {
         ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
             // TODO check if we got standby event from remote: suspend until out of standby and then test connection
@@ -184,7 +176,10 @@ impl WsConn {
     }
 
     fn close(&mut self, code: CloseCode, description: &str, ctx: &mut WebsocketContext<WsConn>) {
-        info!("Closing connection with code {:?}: {}", code, description);
+        info!(
+            "[{}] Closing connection with code {code:?}: {description}",
+            self.id
+        );
         ctx.close(Some(CloseReason {
             code,
             description: Some(description.into()),
@@ -193,8 +188,8 @@ impl WsConn {
     }
 }
 
-fn service_error_to_ws_message(req_id: u32, error: ServiceError) -> WsMessage {
-    debug!("Sending R2 error response for: {:?}", error);
+fn service_error_to_ws_message(id: &str, req_id: u32, error: ServiceError) -> WsMessage {
+    debug!("[{id}] Sending R2 error response for: {error:?}");
 
     let (code, ws_err) = match error {
         ServiceError::InternalServerError(_) => {

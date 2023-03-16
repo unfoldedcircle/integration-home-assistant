@@ -1,45 +1,55 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+//! Home-Assistant Integration for Remote Two
+//!
+//! This service application connects [`Home Assistant`](https://www.home-assistant.io/) with the
+//! [`Remote Two`](https://www.unfoldedcircle.com/) and allows to interact with most entities on
+//! the remote.  
+//! It implements the Remote Two [`Integration-API`](https://github.com/unfoldedcircle/core-api)
+//! which communicates with JSON messages over WebSocket.
+//!
+//! The WebSocket server and client uses [`Actix Web`](https://actix.rs/) with the Actix actor
+//! system for internal service communication.
+
 #![forbid(non_ascii_idents)]
 #![deny(unsafe_code)]
 
-use std::collections::HashMap;
-use std::io;
-use std::net::TcpListener;
-use std::path::Path;
-
+use crate::configuration::get_configuration;
+use crate::controller::Controller;
+use crate::server::publish_service;
 use actix::Actor;
 use actix_web::{middleware, web, App, HttpServer};
 use clap::{arg, Command};
 use const_format::formatcp;
 use lazy_static::lazy_static;
 use log::{error, info};
-use server::json_error_handler;
+use std::collections::HashMap;
+use std::io;
+use std::net::TcpListener;
+use std::path::Path;
 use uc_api::intg::IntegrationDriverUpdate;
 use uc_api::util::text_from_language_map;
-
-use crate::configuration::get_configuration;
-use crate::controller::Controller;
-use crate::server::publish_service;
 
 mod client;
 mod configuration;
 mod controller;
 mod errors;
-mod from_msg_data;
 mod messages;
 mod server;
 mod util;
-mod websocket;
 
+/// Default configuration file.
 const DEF_CONFIG_FILE: &str = "configuration.yaml";
+/// Compiled-in driver metadata in json format.
 const DRIVER_METADATA: &str = include_str!("../resources/driver.json");
 
+/// Build information like timestamp, git hash, etc.
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
+/// Application version built from git version information.
 pub const APP_VERSION: &str = formatcp!(
     "{}{}",
     match built_info::GIT_VERSION {
@@ -53,6 +63,7 @@ pub const APP_VERSION: &str = formatcp!(
 );
 
 lazy_static! {
+    /// Integration-API version.
     pub static ref API_VERSION: &'static str = built_info::DEPENDENCIES
         .iter()
         .find(|p| p.0 == "uc_api")
@@ -91,7 +102,7 @@ async fn main() -> io::Result<()> {
             "{}:{}",
             cfg.integration.interface, cfg.integration.http.port
         );
-        println!("{} listening on: {}", built_info::PKG_NAME, address);
+        println!("{} listening on: {address}", built_info::PKG_NAME);
         Some(TcpListener::bind(address)?)
     } else {
         None
@@ -101,7 +112,7 @@ async fn main() -> io::Result<()> {
             "{}:{}",
             cfg.integration.interface, cfg.integration.https.port
         );
-        println!("{} listening on: {}", built_info::PKG_NAME, address);
+        println!("{} listening on: {address}", built_info::PKG_NAME);
         Some(TcpListener::bind(address)?)
     } else {
         None
@@ -124,7 +135,7 @@ async fn main() -> io::Result<()> {
             .app_data(
                 web::JsonConfig::default()
                     .limit(16 * 1024) // limit size of the payload (global configuration)
-                    .error_handler(json_error_handler),
+                    .error_handler(server::json_error_handler),
             )
             .app_data(websocket_settings.clone())
             .app_data(controller.clone()) //register the lobby
@@ -151,6 +162,7 @@ async fn main() -> io::Result<()> {
     Ok(())
 }
 
+/// Deserialize and enhance driver information from compiled-in json data.
 fn get_driver_metadata() -> Result<IntegrationDriverUpdate, io::Error> {
     let mut driver: IntegrationDriverUpdate =
         serde_json::from_str(DRIVER_METADATA).map_err(|e| {
@@ -177,6 +189,7 @@ fn get_driver_metadata() -> Result<IntegrationDriverUpdate, io::Error> {
     Ok(driver)
 }
 
+/// Advertise integration driver with mDNS.
 fn publish_mdns(api_port: u16, drv_metadata: IntegrationDriverUpdate) {
     if let Err(e) = publish_service(
         drv_metadata

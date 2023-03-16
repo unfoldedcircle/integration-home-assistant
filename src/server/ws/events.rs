@@ -1,17 +1,17 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use actix::Addr;
-use std::str::FromStr;
+//! Handle events from Remote Two
 
 use crate::errors::ServiceError;
-use crate::Controller;
-use log::{error, warn};
-use uc_api::intg::ws::R2Event;
-use uc_api::ws::WsMessage;
-
 use crate::messages::R2EventMsg;
 use crate::server::ws::WsConn;
+use crate::Controller;
+use actix::Addr;
+use log::{error, warn};
+use std::str::FromStr;
+use uc_api::intg::ws::R2Event;
+use uc_api::ws::WsMessage;
 
 impl WsConn {
     /// Handle events from R2
@@ -31,10 +31,10 @@ impl WsConn {
                 event: req_msg,
                 msg_data: event.msg_data,
             }) {
-                error!("[{}] Controller mailbox error: {}", session_id, e);
+                error!("[{session_id}] Controller mailbox error: {e}");
             }
         } else {
-            warn!("[{}] Unknown event: {}", session_id, msg);
+            warn!("[{session_id}] Unknown event: {msg}");
         }
 
         Ok(())

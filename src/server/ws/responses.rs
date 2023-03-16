@@ -1,14 +1,14 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use actix::Addr;
-use log::{info, warn};
+//! Handle response messages from Remote Two
 
 use crate::errors::ServiceError;
-use crate::Controller;
-use uc_api::ws::WsMessage;
-
 use crate::server::ws::WsConn;
+use crate::Controller;
+use actix::Addr;
+use log::{info, warn};
+use uc_api::ws::WsMessage;
 
 impl WsConn {
     /// Handle response messages from R2
@@ -24,25 +24,22 @@ impl WsConn {
 
         match msg {
             "version" => {
-                info!("[{}] TODO Handle version response!", session_id);
+                info!("[{session_id}] TODO Handle version response!");
             }
             "supported_entity_types" => {
-                info!(
-                    "[{}] TODO Handle supported_entity_types response!",
-                    session_id
-                );
+                info!("[{session_id}] TODO Handle supported_entity_types response!");
             }
             "configured_entities" => {
-                info!("[{}] TODO Handle configured_entities response!", session_id);
+                info!("[{session_id}] TODO Handle configured_entities response!");
             }
             "localization_cfg" => {
-                info!("[{}] TODO Handle localization_cfg response!", session_id);
+                info!("[{session_id}] TODO Handle localization_cfg response!");
             }
             "setup_user_action" => {
-                info!("[{}] TODO Handle setup_user_action message!", session_id);
+                info!("[{session_id}] TODO Handle setup_user_action message!");
             }
             _ => {
-                warn!("[{}] Unknown response: {}", session_id, msg);
+                warn!("[{session_id}] Unknown response: {msg}");
             }
         }
 

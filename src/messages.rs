@@ -1,47 +1,54 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-//! Actix actor message definitions used to communicate with the Controller from the R2 server
-//! connections and the Home Assistant client connections.
+//! Actix actor message definitions used to communicate with the [`Controller`].
+//!
+//! These are the Actix messages used for the Remote Two WebSocket server connections and the
+//! Home Assistant client connections to interact with the Controller.
 
+#[allow(unused_imports)] // used for doc links
+use crate::controller::Controller;
 use crate::errors::ServiceError;
-use crate::from_msg_data::DeserializeMsgData;
+use crate::util::DeserializeMsgData;
 use actix::prelude::{Message, Recipient};
 use uc_api::intg::ws::{R2Event, R2Request};
 use uc_api::intg::DeviceState;
 use uc_api::ws::WsMessage;
 
+/// Send a WebSocket message to Remote Two.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct SendWsMessage(pub WsMessage);
 
-/// Connect to Home Assistant
+/// Connect to Home Assistant.
 #[derive(Message)]
 #[rtype(result = "Result<(), std::io::Error>")]
 pub struct Connect {
-    // TODO device identifier for multi-HA connections: not yet implemented
+    // TODO device identifier for multi-HA connections: feature not yet available
     // pub device_id: String,
 }
 
-/// Disconnect from Home Assistant
+/// Disconnect from Home Assistant.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct Disconnect {
-    // TODO device identifier for multi-HA connections: not yet implemented
+    // TODO device identifier for multi-HA connections: feature not yet available
     // pub device_id: String,
 }
 
-/// Internal message to delegate R2Request::SubscribeEvents request
+/// Internal message to delegate [`R2Request::SubscribeEvents`] requests.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ServiceError>")]
 pub struct SubscribeHassEvents(pub R2RequestMsg);
 
-/// Internal message to delegate R2Request::UnsubscribeEvents request
+/// Internal message to delegate [`R2Request::UnsubscribeEvents`] requests.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ServiceError>")]
 pub struct UnsubscribeHassEvents(pub R2RequestMsg);
 
-/// New WebSocket connection from R2 established
+/// New WebSocket connection from Remote Two established.
+///
+/// Event to notify the [`Controller`] that a new WS integration client connected.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct NewR2Session {
@@ -51,7 +58,9 @@ pub struct NewR2Session {
     pub id: String,
 }
 
-/// R2 WebSocket disconnected
+/// Remote Two WebSocket connection disconnected.
+///
+/// Event to notify the [`Controller`] that a WS client connection disconnected.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct R2SessionDisconnect {
@@ -59,6 +68,9 @@ pub struct R2SessionDisconnect {
     pub id: String,
 }
 
+/// Get the Home Assistant connection device states.
+///
+/// Returns [`DeviceState`] enum.
 #[derive(Message)]
 #[rtype(result = "DeviceState")]
 pub struct GetDeviceState {
@@ -67,6 +79,8 @@ pub struct GetDeviceState {
 }
 
 /// Actor message for a Remote Two request.
+///
+/// Pass an integration API request message fom a connected integration client to the [`Controller`].
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ServiceError>")]
 pub struct R2RequestMsg {
@@ -78,7 +92,7 @@ pub struct R2RequestMsg {
 
 /// Convert the full request message to only the message data payload.
 ///
-/// Required for DeserializeMsgData trait.
+/// Required for [`DeserializeMsgData`] trait.
 #[allow(clippy::from_over_into)] // we only need into
 impl Into<Option<serde_json::Value>> for R2RequestMsg {
     fn into(self) -> Option<serde_json::Value> {
@@ -89,6 +103,8 @@ impl Into<Option<serde_json::Value>> for R2RequestMsg {
 impl DeserializeMsgData for R2RequestMsg {}
 
 /// Actor message for a Remote Two event.
+///
+/// Pass an integration API event message fom a connected integration client to the [`Controller`].
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct R2EventMsg {

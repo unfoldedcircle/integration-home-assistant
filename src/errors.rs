@@ -1,6 +1,8 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+//! Custom application error with conversions from common Rust and 3rd-party errors.
+
 use actix::dev::SendError;
 use actix::MailboxError;
 use derive_more::Display;

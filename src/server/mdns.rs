@@ -1,5 +1,7 @@
-// Copyright (c) 2023 {person OR org} <{email}>
+// Copyright (c) 2023 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
+
+//! mDNS advertisement
 
 use crate::errors::ServiceError;
 use crate::util::my_ipv4_interfaces;

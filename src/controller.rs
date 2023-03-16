@@ -1,6 +1,8 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+//! Central controller handling integration WS requests and HA client connection.
+
 use std::collections::{HashMap, HashSet};
 use std::io::{Error, ErrorKind};
 use std::time::Duration;
@@ -28,12 +30,12 @@ use crate::client::messages::{
 use crate::client::HomeAssistantClient;
 use crate::configuration::Settings;
 use crate::errors::ServiceError;
-use crate::from_msg_data::DeserializeMsgData;
 use crate::messages::{
     Connect, Disconnect, GetDeviceState, NewR2Session, R2EventMsg, R2RequestMsg,
     R2SessionDisconnect, SendWsMessage, SubscribeHassEvents, UnsubscribeHassEvents,
 };
-use crate::websocket::new_websocket_client;
+use crate::util::new_websocket_client;
+use crate::util::DeserializeMsgData;
 
 struct R2Session {
     recipient: Recipient<SendWsMessage>,
@@ -411,7 +413,6 @@ impl Handler<R2RequestMsg> for Controller {
                 );
                 Ok(())
             }
-            R2Request::SetupDevice => Err(ServiceError::NotYetImplemented),
             R2Request::GetEntityStates | R2Request::GetAvailableEntities => {
                 // We don't cache entities in this integration so we have to request them from HASS.
                 // I'm not aware of a different way to just retrieve the attributes. The get_states
@@ -479,6 +480,8 @@ impl Handler<R2RequestMsg> for Controller {
                 );
                 Ok(())
             }
+            R2Request::SetupDriver => Err(ServiceError::NotYetImplemented), // TODO implement me
+            R2Request::SetDriverUserData => Err(ServiceError::NotYetImplemented), // TODO implement me
         };
 
         Box::pin(fut::result(result))
