@@ -1,6 +1,7 @@
 // Copyright (c) 2023 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::util::bool_from_env;
 use actix_tls::connect::rustls::webpki_roots_cert_store;
 use if_addrs::{IfAddr, Ifv4Addr};
 use rustls::ClientConfig;
@@ -36,12 +37,13 @@ pub fn new_websocket_client(connection_timeout: Duration, tls: bool) -> awc::Cli
         // http2 has (or at least had) issues with wss. Needs further investigation.
         config.alpn_protocols = vec![b"http/1.1".to_vec()];
 
-        // TODO configuration option to disable TLS verification
-        // Requires: tls-rustls = { ... optional = true, features = ["dangerous_configuration"] }
-        /*
-        config.dangerous()
-            .set_certificate_verifier(Arc::new(danger::NoCertificateVerification));
-        */
+        // Disable TLS verification
+        // Requires: rustls = { ... optional = true, features = ["dangerous_configuration"] }
+        if bool_from_env("UC_INTEGRATION_DISABLE_CERT_VERIFICATION") {
+            config
+                .dangerous()
+                .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
+        }
 
         let connector = awc::Connector::new().rustls(Arc::new(config));
         awc::ClientBuilder::new()
@@ -52,5 +54,26 @@ pub fn new_websocket_client(connection_timeout: Duration, tls: bool) -> awc::Cli
         awc::ClientBuilder::new()
             .timeout(connection_timeout)
             .finish()
+    }
+}
+
+mod danger {
+    use rustls::client::{ServerCertVerified, ServerCertVerifier};
+    use std::time::SystemTime;
+
+    pub struct NoCertificateVerification {}
+
+    impl ServerCertVerifier for NoCertificateVerification {
+        fn verify_server_cert(
+            &self,
+            _end_entity: &rustls::Certificate,
+            _intermediates: &[rustls::Certificate],
+            _server_name: &rustls::ServerName,
+            _scts: &mut dyn Iterator<Item = &[u8]>,
+            _ocsp_response: &[u8],
+            _now: SystemTime,
+        ) -> Result<ServerCertVerified, rustls::Error> {
+            Ok(ServerCertVerified::assertion())
+        }
     }
 }

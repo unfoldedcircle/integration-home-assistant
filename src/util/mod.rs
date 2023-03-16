@@ -4,10 +4,12 @@
 //! Common utility functions.
 
 mod certificates;
+mod env;
 mod from_msg_data;
 pub mod json;
 mod network;
 
 pub use certificates::create_single_cert_server_config;
+pub use env::*;
 pub use from_msg_data::DeserializeMsgData;
 pub use network::*;

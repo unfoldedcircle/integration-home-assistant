@@ -22,7 +22,7 @@ actix-web-actors = "4.1.0"
 actix = "0.13"
 actix-tls = { version = "3.0.3", features = ["rustls"] }
 bytestring = "1"
-rustls = "0.20"
+rustls = { version = "0.20", features = ["dangerous_configuration"] }
 rustls-pemfile = "1"
 # WebSockets client
 actix-codec = "0.5"
