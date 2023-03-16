@@ -33,7 +33,7 @@ pub struct WebServerSettings {
     pub port: u16,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct CertificateSettings {
     pub public: String,
     pub private: String,

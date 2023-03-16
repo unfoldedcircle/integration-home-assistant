@@ -4,8 +4,11 @@ integration:
     enabled: true
     port: 8000
   https:
-    enabled: false # not yet implemented
+    enabled: false
     port: 8443
+  certs:
+    public: certs/local-cert.pem
+    private: certs/local-key.pem
 #  websocket:
 #    token: 1-2-3
 hass:

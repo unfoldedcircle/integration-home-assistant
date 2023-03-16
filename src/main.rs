@@ -18,6 +18,7 @@
 use crate::configuration::get_configuration;
 use crate::controller::Controller;
 use crate::server::publish_service;
+use crate::util::create_single_cert_server_config;
 use actix::Actor;
 use actix_web::{middleware, web, App, HttpServer};
 use clap::{arg, Command};
@@ -107,15 +108,23 @@ async fn main() -> io::Result<()> {
     } else {
         None
     };
-    let listener_tls = if cfg.integration.https.enabled {
+    let (listener_tls, certs) = if cfg.integration.https.enabled {
         let address = format!(
             "{}:{}",
             cfg.integration.interface, cfg.integration.https.port
         );
+        let certs = match cfg.integration.certs.as_ref() {
+            None => {
+                error!("https requires integration.certs settings");
+                std::process::exit(1);
+            }
+            Some(c) => c.clone(),
+        };
+
         println!("{} listening on: {address}", built_info::PKG_NAME);
-        Some(TcpListener::bind(address)?)
+        (Some(TcpListener::bind(address)?), certs)
     } else {
-        None
+        (None, Default::default())
     };
 
     if listener.is_none() && listener_tls.is_none() {
@@ -145,10 +154,8 @@ async fn main() -> io::Result<()> {
     .workers(1);
 
     if listener_tls.is_some() {
-        // let server_cfg = load_ssl(&settings.webserver.certs)?;
-        //http_server = http_server.listen_rustls(listener_tls.unwrap(), server_cfg)?;
-        error!("TODO certificate handling not yet implemented. Please use http only. Sorry.");
-        std::process::exit(1);
+        let server_cfg = create_single_cert_server_config(&certs.public, &certs.private)?;
+        http_server = http_server.listen_rustls(listener_tls.unwrap(), server_cfg)?;
     }
 
     if listener.is_some() {
