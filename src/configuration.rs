@@ -4,6 +4,7 @@
 //! Configuration settings read from the configuration file.
 
 use config::Config;
+use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
 use log::warn;
@@ -103,6 +104,16 @@ impl Default for HeartbeatSettings {
     }
 }
 
+impl Display for HeartbeatSettings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Heartbeat interval={:?}, timeout={:?}",
+            self.interval, self.timeout
+        )
+    }
+}
+
 impl Default for Settings {
     fn default() -> Settings {
         Settings {
@@ -113,7 +124,7 @@ impl Default for Settings {
                     port: 8000,
                 },
                 https: WebServerSettings {
-                    enabled: false, // TODO https should be the default, but not yet implemented
+                    enabled: false, // requires user provided certificate
                     port: 8443,
                 },
                 certs: None,

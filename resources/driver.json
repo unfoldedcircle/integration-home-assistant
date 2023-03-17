@@ -18,5 +18,25 @@
     "url": "https://www.unfoldedcircle.com"
   },
   "home_page": "https://www.unfoldedcircle.com",
+  "setup_data_schema": {
+    "title": {
+      "en": "Integration setup test"
+    },
+    "settings": [
+      {
+        "id": "action",
+        "label": {
+          "en": "User action needed"
+        },
+        "field": {
+          "label": {
+            "value": {
+              "en": "This is some [Markdown](https://en.wikipedia.org/wiki/Markdown) text just for testing.\n\n## Header\n\nMore formatted text, e.g. in _italic_ or **bold**\n\n### Sub header\n\nThe quick brown fox jumps over the lazy dog."
+            }
+          }
+        }
+      }
+    ]
+  },
   "release_date": "2023-03-08"
 }

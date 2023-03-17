@@ -163,7 +163,7 @@ impl Handler<SendWsMessage> for WsConn {
 impl WsConn {
     fn start_heartbeat(&self, ctx: &mut WebsocketContext<Self>) {
         ctx.run_interval(self.heartbeat.interval, |act, ctx| {
-            // TODO check if we got standby event from remote: suspend until out of standby and then test connection
+            // TODO check if we got standby event from remote: suspend until out of standby and then test connection #5
             if Instant::now().duration_since(act.hb) > act.heartbeat.timeout {
                 info!("[{}] Closing connection due to failed heartbeat", act.id);
                 // remove WebSocket connection from our handler
@@ -211,6 +211,7 @@ fn service_error_to_ws_message(id: &str, req_id: u32, error: ServiceError) -> Ws
         ServiceError::ServiceUnavailable(e) => {
             (503, WsResultMsgData::new("SERVICE_UNAVAILABLE", e))
         }
+        ServiceError::NotFound(e) => (404, WsResultMsgData::new("NOT_FOUND", e)),
     };
 
     WsMessage::error(req_id, code, ws_err)

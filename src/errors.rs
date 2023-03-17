@@ -7,6 +7,7 @@ use actix::dev::SendError;
 use actix::MailboxError;
 use derive_more::Display;
 use log::error;
+use std::io::ErrorKind;
 
 #[derive(Debug, Display, PartialEq)]
 pub enum ServiceError {
@@ -19,26 +20,51 @@ pub enum ServiceError {
     #[display(fmt = "BadRequest: {}", _0)]
     BadRequest(String),
 
-    // #[display(fmt = "Validation error: {}", _0)]
-    // ValidationError(String),
-    //
-    // #[display(fmt = "No information found")]
-    // NotFound,
-    //
-    // #[display(fmt = "Data already exists")]
-    // AlreadyExists(String),
+    #[display(fmt = "Not found: {}", _0)]
+    NotFound(String),
+
     #[display(fmt = "The connection is closed or closing")]
     NotConnected,
 
-    NotYetImplemented,
-    // AuthError(String),
     ServiceUnavailable(String),
+    NotYetImplemented,
 }
 
 impl From<std::io::Error> for ServiceError {
-    fn from(e: std::io::Error) -> Self {
-        // TODO error conversion
-        ServiceError::InternalServerError(format!("{:?}", e))
+    fn from(error: std::io::Error) -> Self {
+        match error.kind() {
+            ErrorKind::NotFound => ServiceError::NotFound(error.to_string()),
+            // ErrorKind::PermissionDenied => ServiceError::AuthError(error.to_string()),
+            ErrorKind::AlreadyExists | ErrorKind::InvalidInput | ErrorKind::InvalidData => {
+                ServiceError::BadRequest(error.to_string())
+            }
+
+            ErrorKind::ConnectionRefused
+            | ErrorKind::ConnectionReset
+            | ErrorKind::ConnectionAborted
+            | ErrorKind::NotConnected
+            | ErrorKind::AddrInUse
+            | ErrorKind::AddrNotAvailable
+            | ErrorKind::TimedOut => {
+                error!("Connection error: {error:?}");
+                ServiceError::ServiceUnavailable(error.to_string())
+            }
+            ErrorKind::BrokenPipe
+            | ErrorKind::WouldBlock
+            | ErrorKind::WriteZero
+            | ErrorKind::Interrupted
+            | ErrorKind::Unsupported
+            | ErrorKind::UnexpectedEof
+            | ErrorKind::OutOfMemory
+            | ErrorKind::Other => {
+                error!("Internal error: {:?}", error);
+                ServiceError::InternalServerError(format!("{error:?}"))
+            }
+            _ => {
+                error!("Other error: {:?}", error);
+                ServiceError::InternalServerError(format!("{error:?}"))
+            }
+        }
     }
 }
 

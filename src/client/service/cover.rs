@@ -24,7 +24,7 @@ pub(crate) fn handle_cover(msg: &EntityCommand) -> Result<(String, Option<Value>
                 }
             }
             ("set_cover_position".into(), Some(data.into()))
-        } // TODO implement tilt command
+        } // TODO implement tilt command #6
     };
 
     Ok(result)

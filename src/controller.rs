@@ -102,14 +102,14 @@ impl Controller {
         if let Some(session) = self.sessions.get(ws_id) {
             if session.standby {
                 debug!("Remote is in standby, not sending message: {:?}", message);
-                // TODO queue entity update events?
+                // TODO queue entity update events? #5
                 return;
             }
-            // TODO use send instead?
-            // TODO error handling
-            session.recipient.do_send(SendWsMessage(message));
+            if let Err(e) = session.recipient.try_send(SendWsMessage(message)) {
+                error!("{ws_id} Internal message send error: {e}");
+            }
         } else {
-            warn!("attempting to send message but couldn't find session.");
+            warn!("attempting to send message but couldn't find session: {ws_id}");
         }
     }
 
@@ -297,7 +297,7 @@ impl Handler<Connect> for Controller {
                         return Err(Error::new(ErrorKind::Other, e.to_string()));
                     }
                 };
-                info!("Connected to: {url}");
+                info!("Connected to: {url} ({heartbeat})");
 
                 let (sink, stream) = framed.split();
                 let addr =
@@ -480,8 +480,8 @@ impl Handler<R2RequestMsg> for Controller {
                 );
                 Ok(())
             }
-            R2Request::SetupDriver => Err(ServiceError::NotYetImplemented), // TODO implement me
-            R2Request::SetDriverUserData => Err(ServiceError::NotYetImplemented), // TODO implement me
+            R2Request::SetupDriver => Err(ServiceError::NotYetImplemented), // TODO implement me #3
+            R2Request::SetDriverUserData => Err(ServiceError::NotYetImplemented), // TODO implement me #3
         };
 
         Box::pin(fut::result(result))
@@ -521,7 +521,7 @@ impl Handler<R2EventMsg> for Controller {
             }
             R2Event::ExitStandby => {
                 session.standby = false;
-                // TODO send updates
+                // TODO send updates #5
             }
             _ => info!("[{}] Unsupported event: {:?}", msg.ws_id, msg.event),
         }

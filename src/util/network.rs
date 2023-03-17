@@ -28,7 +28,7 @@ pub fn my_ipv4_interfaces() -> Vec<Ifv4Addr> {
 pub fn new_websocket_client(connection_timeout: Duration, tls: bool) -> awc::Client {
     if tls {
         // TLS configuration: https://github.com/actix/actix-web/blob/master/awc/tests/test_rustls_client.rs
-        // TODO self-signed certificate handling
+        // TODO self-signed certificate handling #4
         let mut config = ClientConfig::builder()
             .with_safe_defaults()
             .with_root_certificates(webpki_roots_cert_store())

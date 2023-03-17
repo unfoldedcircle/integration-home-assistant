@@ -24,7 +24,7 @@ pub(crate) fn handle_light(msg: &EntityCommand) -> Result<(String, Option<Value>
                 if let Some(color_temp_pct) =
                     params.get("color_temperature").and_then(|v| v.as_u64())
                 {
-                    // TODO keep an inventory of mired range per light
+                    // TODO keep an inventory of mired range per light #9
                     let min_mireds = 150;
                     let max_mireds = 500;
                     let color_temp =
