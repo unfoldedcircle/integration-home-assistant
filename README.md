@@ -12,6 +12,32 @@ TODO
 
 See [Docker image](./docker/README.md) for more information.
 
+### Configuration
+
+- Configuration file: [`configuration.yaml`](configuration.yaml)
+
+Configuration file handling uses the Rust Crate [config](https://docs.rs/config/latest/config/#) which allows
+loading configuration values from multiple sources and overwrite default values.
+
+The configuration file is for read-only settings! It should be used for system settings which might be tweaked and
+optimized. As general rule: the service should run without a configuration file.
+
+The configuration values can be overwritten with ENV variables.
+
+- Keys containing `_` cannot be overridden. E.g. `websocket.heartbeat.interval_sec`.
+- ENV prefix: `UC_`
+  - Example: `integration.interface` configuration setting: `UC_INTEGRATION_INTERFACE`
+
+## Environment Variables
+
+The following additional environment variables exist to configure additional behaviour:
+
+| Variable                      | Values         | Description                                                            |
+|-------------------------------|----------------|------------------------------------------------------------------------|
+| UC_DISABLE_CERT_VERIFICATION  | true / false   | Disables certificate verification for the Home Assistant WS connection |
+| UC_API_MSG_TRACING            | all / in / out | Enables incoming and outgoing WS Core-API message tracing              |
+| UC_HASS_MSG_TRACING           | all / in / out | Enables incoming and outgoing Home Assistant WS message tracing        |
+
 ## Contributing
 
 TODO

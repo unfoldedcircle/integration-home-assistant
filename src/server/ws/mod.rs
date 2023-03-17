@@ -3,12 +3,13 @@
 
 //! WebSocket server for the Remote Two integration API
 
-use crate::configuration::WebSocketSettings;
+use crate::configuration::{HeartbeatSettings, WebSocketSettings};
 use crate::Controller;
 use actix::Addr;
 use actix_web::error::JsonPayloadError;
 use actix_web::{error, get, web, Error, HttpRequest, HttpResponse};
 use log::{debug, info};
+use std::env;
 use std::time::Instant;
 use uc_api::core::web::ApiResponse;
 use uuid::Uuid;
@@ -29,14 +30,27 @@ struct WsConn {
     hb: Instant,
     /// [`Controller`] actix address for sending WS events & requests.
     controller_addr: Addr<Controller>,
+    heartbeat: HeartbeatSettings,
+    /// Enable incoming websocket message tracing: log every message. SECRETS ARE EXPOSED!
+    msg_tracing_in: bool,
+    /// Enable outgoing websocket message tracing: log every message
+    msg_tracing_out: bool,
 }
 
 impl WsConn {
-    fn new(client_id: String, controller_addr: Addr<Controller>) -> Self {
+    fn new(
+        client_id: String,
+        controller_addr: Addr<Controller>,
+        heartbeat: HeartbeatSettings,
+    ) -> Self {
+        let msg_tracing = env::var("UC_API_MSG_TRACING").unwrap_or_default();
         Self {
             id: client_id,
             hb: Instant::now(),
             controller_addr,
+            heartbeat,
+            msg_tracing_in: msg_tracing == "all" || msg_tracing == "in",
+            msg_tracing_out: msg_tracing == "all" || msg_tracing == "out",
         }
     }
 }
@@ -79,7 +93,11 @@ pub async fn ws_index(
         .unwrap_or_else(|| Uuid::new_v4().as_hyphenated().to_string());
 
     actix_web_actors::ws::start(
-        WsConn::new(client_id, controller.get_ref().clone()),
+        WsConn::new(
+            client_id,
+            controller.get_ref().clone(),
+            websocket_settings.heartbeat,
+        ),
         &request,
         stream,
     )

@@ -13,12 +13,8 @@ use actix::{
 use actix_web_actors::ws::{CloseCode, CloseReason, Message, ProtocolError, WebsocketContext};
 use bytestring::ByteString;
 use log::{debug, error, info, warn};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use uc_api::ws::{WsMessage, WsResultMsgData};
-
-// TODO make configurable!
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Local Actix message to handle WebSocket text message.
 ///
@@ -107,6 +103,10 @@ impl Handler<TextMsg> for WsConn {
     type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, text: TextMsg, ctx: &mut Self::Context) -> Self::Result {
+        if self.msg_tracing_in {
+            debug!("[{}] -> {}", self.id, text.0);
+        }
+
         let msg: WsMessage = match serde_json::from_slice(text.0.as_ref()) {
             Ok(v) => v,
             Err(e) => {
@@ -150,6 +150,9 @@ impl Handler<SendWsMessage> for WsConn {
 
     fn handle(&mut self, msg: SendWsMessage, ctx: &mut Self::Context) {
         if let Ok(msg) = serde_json::to_string(&msg.0) {
+            if self.msg_tracing_out {
+                debug!("[{}] <- {msg}", self.id);
+            }
             ctx.text(msg);
         } else {
             error!("[{}] Error serializing {:?}", self.id, msg.0)
@@ -159,9 +162,9 @@ impl Handler<SendWsMessage> for WsConn {
 
 impl WsConn {
     fn start_heartbeat(&self, ctx: &mut WebsocketContext<Self>) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
+        ctx.run_interval(self.heartbeat.interval, |act, ctx| {
             // TODO check if we got standby event from remote: suspend until out of standby and then test connection
-            if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
+            if Instant::now().duration_since(act.hb) > act.heartbeat.timeout {
                 info!("[{}] Closing connection due to failed heartbeat", act.id);
                 // remove WebSocket connection from our handler
                 act.controller_addr

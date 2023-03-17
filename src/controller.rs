@@ -31,7 +31,7 @@ use crate::client::HomeAssistantClient;
 use crate::configuration::Settings;
 use crate::errors::ServiceError;
 use crate::messages::{
-    Connect, Disconnect, GetDeviceState, NewR2Session, R2EventMsg, R2RequestMsg,
+    Connect, Disconnect, GetDeviceState, NewR2Session, R2EventMsg, R2RequestMsg, R2ResponseMsg,
     R2SessionDisconnect, SendWsMessage, SubscribeHassEvents, UnsubscribeHassEvents,
 };
 use crate::util::new_websocket_client;
@@ -284,7 +284,7 @@ impl Handler<Connect> for Controller {
         let url = self.settings.hass.url.clone();
         let token = self.settings.hass.token.clone();
         let client_address = ctx.address();
-        let heartbeat = self.settings.hass.heartbeat.clone();
+        let heartbeat = self.settings.hass.heartbeat;
 
         Box::pin(
             async move {
@@ -523,8 +523,19 @@ impl Handler<R2EventMsg> for Controller {
                 session.standby = false;
                 // TODO send updates
             }
-            _ => info!("Unsupported event: {:?}", msg.event),
+            _ => info!("[{}] Unsupported event: {:?}", msg.ws_id, msg.event),
         }
+    }
+}
+
+impl Handler<R2ResponseMsg> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: R2ResponseMsg, _ctx: &mut Self::Context) -> Self::Result {
+        info!(
+            "[{}] TODO implement remote response: {}",
+            msg.ws_id, msg.msg
+        );
     }
 }
 

@@ -42,6 +42,7 @@ pub struct CertificateSettings {
 #[derive(Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct WebSocketSettings {
     pub token: Option<String>,
+    pub heartbeat: HeartbeatSettings,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -79,8 +80,9 @@ impl Default for ReconnectSettings {
     }
 }
 
+/// WebSocket heartbeat settings for sending ping frames.
 #[serde_as]
-#[derive(Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
 pub struct HeartbeatSettings {
     /// How often heartbeat pings are sent
     #[serde_as(as = "DurationSeconds")]

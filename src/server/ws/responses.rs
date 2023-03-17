@@ -4,10 +4,13 @@
 //! Handle response messages from Remote Two
 
 use crate::errors::ServiceError;
+use crate::messages::R2ResponseMsg;
 use crate::server::ws::WsConn;
 use crate::Controller;
 use actix::Addr;
-use log::{info, warn};
+use log::{debug, error, warn};
+use std::str::FromStr;
+use uc_api::intg::ws::R2Response;
 use uc_api::ws::WsMessage;
 
 impl WsConn {
@@ -15,32 +18,26 @@ impl WsConn {
     pub(crate) async fn on_response(
         session_id: &str,
         response: WsMessage,
-        _controller_addr: Addr<Controller>,
+        controller_addr: Addr<Controller>,
     ) -> Result<(), ServiceError> {
         let msg = response
             .msg
             .as_deref()
             .ok_or_else(|| ServiceError::BadRequest("Missing property: msg".into()))?;
 
-        match msg {
-            "version" => {
-                info!("[{session_id}] TODO Handle version response!");
+        debug!("[{session_id}] Got response: {msg}");
+
+        if let Ok(resp_msg) = R2Response::from_str(msg) {
+            if let Err(e) = controller_addr.try_send(R2ResponseMsg {
+                ws_id: session_id.into(),
+                msg: resp_msg,
+                response,
+            }) {
+                // avoid returning an Err which would be sent back to the client
+                error!("[{session_id}] Controller mailbox error: {e}");
             }
-            "supported_entity_types" => {
-                info!("[{session_id}] TODO Handle supported_entity_types response!");
-            }
-            "configured_entities" => {
-                info!("[{session_id}] TODO Handle configured_entities response!");
-            }
-            "localization_cfg" => {
-                info!("[{session_id}] TODO Handle localization_cfg response!");
-            }
-            "setup_user_action" => {
-                info!("[{session_id}] TODO Handle setup_user_action message!");
-            }
-            _ => {
-                warn!("[{session_id}] Unknown response: {msg}");
-            }
+        } else {
+            warn!("[{session_id}] Unknown response: {msg}");
         }
 
         Ok(())

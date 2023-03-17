@@ -3,12 +3,12 @@
 
 //! Home Assistant client WebSocket API implementation with Actix actors.
 
+use std::env;
 use std::time::Instant;
 
 use actix::io::SinkWrite;
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context};
 use actix_codec::Framed;
-use awc::ws::Codec;
 use awc::{ws, BoxedSocket};
 use bytes::Bytes;
 use futures::stream::{SplitSink, SplitStream};
@@ -47,13 +47,17 @@ pub struct HomeAssistantClient {
     subscribe_events_id: Option<u32>,
     /// request id of the last `subscribe_events` request. This id will be used the result message.
     entity_states_id: Option<u32>,
-    sink: SinkWrite<ws::Message, SplitSink<Framed<BoxedSocket, Codec>, ws::Message>>,
+    sink: SinkWrite<ws::Message, SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>>,
     // TODO use abstract actix Receiver(s) instead of hard Controller dependency?
     controller_actor: Addr<Controller>,
     /// Last heart beat timestamp.
     last_hb: Instant,
     heartbeat: HeartbeatSettings,
-    msg_tracing: bool,
+    /// Enable incoming websocket message tracing: log every message.
+    msg_tracing_in: bool,
+    /// Enable outgoing websocket message tracing: log every message, except messages with key
+    /// `access_token`.
+    msg_tracing_out: bool,
 }
 
 impl HomeAssistantClient {
@@ -61,8 +65,8 @@ impl HomeAssistantClient {
         url: Url,
         controller_actor: Addr<Controller>,
         access_token: String,
-        sink: SplitSink<Framed<BoxedSocket, Codec>, ws::Message>,
-        stream: SplitStream<Framed<BoxedSocket, Codec>>,
+        sink: SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>,
+        stream: SplitStream<Framed<BoxedSocket, ws::Codec>>,
         heartbeat: HeartbeatSettings,
     ) -> Addr<Self> {
         HomeAssistantClient::create(|ctx| {
@@ -70,6 +74,7 @@ impl HomeAssistantClient {
             let scheme = url.scheme();
             let host = url.host_str().unwrap_or(url.as_str());
             let port = url.port_or_known_default().unwrap_or_default();
+            let msg_tracing = env::var("UC_HASS_MSG_TRACING").unwrap_or_default();
             HomeAssistantClient {
                 id: format!("{}:{}", host, port),
                 server: {
@@ -89,7 +94,8 @@ impl HomeAssistantClient {
                 controller_actor,
                 last_hb: Instant::now(),
                 heartbeat,
-                msg_tracing: true,
+                msg_tracing_in: msg_tracing == "all" || msg_tracing == "in",
+                msg_tracing_out: msg_tracing == "all" || msg_tracing == "out",
             }
         })
     }
@@ -124,7 +130,9 @@ impl HomeAssistantClient {
     }
 
     fn on_text_message(&mut self, txt: Bytes, ctx: &mut Context<HomeAssistantClient>) {
-        debug!("[{}] -> Text msg: {:?}", self.id, txt);
+        if self.msg_tracing_in {
+            debug!("[{}] -> {}", self.id, String::from_utf8_lossy(txt.as_ref()));
+        }
 
         let mut msg = match json_object_from_text_msg(&self.id, txt.as_ref()) {
             Ok(m) => m,
@@ -266,17 +274,14 @@ impl HomeAssistantClient {
             "json message must be an object".into(),
         ))?;
         let name = obj.get("type").and_then(|v| v.as_str()).unwrap_or("?");
+        let msg = msg.to_string();
         // hide access token in tracing mode
-        if self.msg_tracing && !obj.contains_key("access_token") {
-            debug!("[{}] <- {msg:?}", self.id);
+        if self.msg_tracing_out && !obj.contains_key("access_token") {
+            debug!("[{}] <- {msg}", self.id);
         } else {
             debug!("[{}] <- {name}", self.id);
         }
-        if self
-            .sink
-            .write(ws::Message::Text(msg.to_string().into()))
-            .is_err()
-        {
+        if self.sink.write(ws::Message::Text(msg.into())).is_err() {
             // sink is closed or closing, no chance to send a Close message
             warn!("[{}] Could not send {name}, closing connection", self.id);
             ctx.stop();
@@ -291,8 +296,12 @@ impl HomeAssistantClient {
         name: &str,
         ctx: &mut Context<HomeAssistantClient>,
     ) -> Result<(), ServiceError> {
-        if self.msg_tracing {
-            debug!("[{}] <- {:?}", self.id, msg);
+        if self.msg_tracing_out {
+            if let ws::Message::Text(txt) = &msg {
+                debug!("[{}] <- {txt}", self.id);
+            } else {
+                debug!("[{}] <- {:?}", self.id, msg);
+            }
         } else {
             debug!("[{}] <- {}", self.id, name);
         }

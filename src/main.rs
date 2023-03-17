@@ -15,7 +15,7 @@
 #![forbid(non_ascii_idents)]
 #![deny(unsafe_code)]
 
-use crate::configuration::get_configuration;
+use crate::configuration::{get_configuration, CertificateSettings, IntegrationSettings};
 use crate::controller::Controller;
 use crate::server::publish_service;
 use crate::util::create_single_cert_server_config;
@@ -96,24 +96,63 @@ async fn main() -> io::Result<()> {
     };
     let cfg = get_configuration(cfg_file).expect("Failed to read configuration");
 
+    let listeners = create_tcp_listeners(&cfg.integration)?;
+    let api_port = cfg.integration.http.port;
+    let websocket_settings = web::Data::new(cfg.integration.websocket.clone().unwrap_or_default());
     let driver_metadata = get_driver_metadata()?;
 
-    let listener = if cfg.integration.http.enabled {
-        let address = format!(
-            "{}:{}",
-            cfg.integration.interface, cfg.integration.http.port
-        );
+    let controller = web::Data::new(Controller::new(cfg, driver_metadata.clone()).start());
+
+    let mut http_server = HttpServer::new(move || {
+        App::new()
+            .wrap(middleware::Logger::default())
+            .app_data(
+                web::JsonConfig::default()
+                    .limit(16 * 1024) // limit size of the payload (global configuration)
+                    .error_handler(server::json_error_handler),
+            )
+            .app_data(websocket_settings.clone())
+            .app_data(controller.clone())
+            // Websockets
+            .service(server::ws_index)
+    })
+    .workers(1);
+
+    if let Some(listener) = listeners.listener_tls {
+        let server_cfg =
+            create_single_cert_server_config(&listeners.certs.public, &listeners.certs.private)?;
+        http_server = http_server.listen_rustls(listener, server_cfg)?;
+    }
+
+    if let Some(listener) = listeners.listener {
+        http_server = http_server.listen(listener)?;
+    }
+
+    publish_mdns(api_port, driver_metadata);
+
+    http_server.run().await?;
+
+    Ok(())
+}
+
+struct Listeners {
+    pub listener: Option<TcpListener>,
+    pub listener_tls: Option<TcpListener>,
+    pub certs: CertificateSettings,
+}
+
+fn create_tcp_listeners(cfg: &IntegrationSettings) -> Result<Listeners, io::Error> {
+    let listener = if cfg.http.enabled {
+        let address = format!("{}:{}", cfg.interface, cfg.http.port);
         println!("{} listening on: {address}", built_info::PKG_NAME);
         Some(TcpListener::bind(address)?)
     } else {
         None
     };
-    let (listener_tls, certs) = if cfg.integration.https.enabled {
-        let address = format!(
-            "{}:{}",
-            cfg.integration.interface, cfg.integration.https.port
-        );
-        let certs = match cfg.integration.certs.as_ref() {
+
+    let (listener_tls, certs) = if cfg.https.enabled {
+        let address = format!("{}:{}", cfg.interface, cfg.https.port);
+        let certs = match cfg.certs.as_ref() {
             None => {
                 error!("https requires integration.certs settings");
                 std::process::exit(1);
@@ -134,39 +173,11 @@ async fn main() -> io::Result<()> {
         ));
     }
 
-    let api_port = cfg.integration.http.port;
-    let websocket_settings = web::Data::new(cfg.integration.websocket.clone().unwrap_or_default());
-    let controller = web::Data::new(Controller::new(cfg, driver_metadata.clone()).start());
-
-    let mut http_server = HttpServer::new(move || {
-        App::new()
-            .wrap(middleware::Logger::default())
-            .app_data(
-                web::JsonConfig::default()
-                    .limit(16 * 1024) // limit size of the payload (global configuration)
-                    .error_handler(server::json_error_handler),
-            )
-            .app_data(websocket_settings.clone())
-            .app_data(controller.clone()) //register the lobby
-            // Websockets
-            .service(server::ws_index)
+    Ok(Listeners {
+        listener,
+        listener_tls,
+        certs,
     })
-    .workers(1);
-
-    if listener_tls.is_some() {
-        let server_cfg = create_single_cert_server_config(&certs.public, &certs.private)?;
-        http_server = http_server.listen_rustls(listener_tls.unwrap(), server_cfg)?;
-    }
-
-    if listener.is_some() {
-        http_server = http_server.listen(listener.unwrap())?;
-    }
-
-    publish_mdns(api_port, driver_metadata);
-
-    http_server.run().await?;
-
-    Ok(())
 }
 
 /// Deserialize and enhance driver information from compiled-in json data.

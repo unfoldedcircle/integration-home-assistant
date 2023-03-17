@@ -20,7 +20,6 @@ impl WsConn {
         request: WsMessage,
         controller_addr: Addr<Controller>,
     ) -> Result<(), ServiceError> {
-        debug!("[{session_id}] Got request: {request:?}");
         let id = request
             .id
             .ok_or_else(|| ServiceError::BadRequest("Missing property: id".into()))?;
@@ -28,6 +27,8 @@ impl WsConn {
             .msg
             .as_deref()
             .ok_or_else(|| ServiceError::BadRequest("Missing property: msg".into()))?;
+
+        debug!("[{session_id}] Got request: {msg}");
 
         if let Ok(req_msg) = R2Request::from_str(msg) {
             controller_addr

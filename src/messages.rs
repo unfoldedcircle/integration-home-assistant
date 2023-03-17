@@ -11,16 +11,18 @@ use crate::controller::Controller;
 use crate::errors::ServiceError;
 use crate::util::DeserializeMsgData;
 use actix::prelude::{Message, Recipient};
-use uc_api::intg::ws::{R2Event, R2Request};
+use uc_api::intg::ws::{R2Event, R2Request, R2Response};
 use uc_api::intg::DeviceState;
 use uc_api::ws::WsMessage;
 
 /// Send a WebSocket message to Remote Two.
+///
+/// The [`WsMessage`] is either an Integration-API request, response or event message.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct SendWsMessage(pub WsMessage);
 
-/// Connect to Home Assistant.
+/// Internal message to connect to Home Assistant.
 #[derive(Message)]
 #[rtype(result = "Result<(), std::io::Error>")]
 pub struct Connect {
@@ -28,7 +30,7 @@ pub struct Connect {
     // pub device_id: String,
 }
 
-/// Disconnect from Home Assistant.
+/// Internal message to disconnect from Home Assistant.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct Disconnect {
@@ -88,6 +90,15 @@ pub struct R2RequestMsg {
     pub req_id: u32,
     pub request: R2Request,
     pub msg_data: Option<serde_json::Value>,
+}
+
+/// Actor message for a Remote Two response.
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct R2ResponseMsg {
+    pub ws_id: String,
+    pub msg: R2Response,
+    pub response: WsMessage,
 }
 
 /// Convert the full request message to only the message data payload.

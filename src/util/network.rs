@@ -39,7 +39,7 @@ pub fn new_websocket_client(connection_timeout: Duration, tls: bool) -> awc::Cli
 
         // Disable TLS verification
         // Requires: rustls = { ... optional = true, features = ["dangerous_configuration"] }
-        if bool_from_env("UC_INTEGRATION_DISABLE_CERT_VERIFICATION") {
+        if bool_from_env("UC_DISABLE_CERT_VERIFICATION") {
             config
                 .dangerous()
                 .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
