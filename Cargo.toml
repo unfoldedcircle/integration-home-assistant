@@ -59,4 +59,4 @@ derive_more = "0.99"
 built = { version = "0.6", features = ["git2", "chrono", "semver"] }
 
 [dev-dependencies]
-rstest = "0.16"
+rstest = "0.17"
