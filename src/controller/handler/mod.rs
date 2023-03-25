@@ -14,7 +14,7 @@ mod setup;
 use crate::controller::R2RequestMsg;
 use crate::errors::ServiceError;
 use actix::Message;
-use uc_api::intg::IntegrationSetup;
+use uc_api::intg::{IntegrationSetup, SetupDriver};
 
 /// Internal message to delegate [`R2Request::SubscribeEvents`] requests.
 #[derive(Debug, Message)]
@@ -30,7 +30,7 @@ struct UnsubscribeHaEventsMsg(pub R2RequestMsg);
 #[derive(Message)]
 #[rtype(result = "Result<(), std::io::Error>")]
 struct ConnectMsg {
-    // TODO device identifier for multi-HA connections: feature not yet available
+    // device identifier for multi-HA connections: feature not yet available
     // pub device_id: String,
 }
 
@@ -38,7 +38,7 @@ struct ConnectMsg {
 #[derive(Message)]
 #[rtype(result = "()")]
 struct DisconnectMsg {
-    // TODO device identifier for multi-HA connections: feature not yet available
+    // device identifier for multi-HA connections: feature not yet available
     // pub device_id: String,
 }
 
@@ -47,8 +47,7 @@ struct DisconnectMsg {
 #[rtype(result = "Result<(), ServiceError>")]
 struct SetupDriverMsg {
     pub ws_id: String,
-    pub req_id: u32,
-    pub data: IntegrationSetup,
+    pub data: SetupDriver,
 }
 
 /// Internal message to set driver setup input data
@@ -56,6 +55,14 @@ struct SetupDriverMsg {
 #[rtype(result = "Result<(), ServiceError>")]
 struct SetDriverUserDataMsg {
     pub ws_id: String,
-    pub req_id: u32,
     pub data: IntegrationSetup,
+}
+
+/// Internal message to abort setup flow due to a timeout or an abort message from Remote Two.
+#[derive(Message)]
+#[rtype(result = "()")]
+pub(crate) struct AbortDriverSetup {
+    pub ws_id: String,
+    /// internal timeout
+    pub timeout: bool,
 }

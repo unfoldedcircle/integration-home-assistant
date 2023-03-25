@@ -32,11 +32,13 @@ The configuration values can be overwritten with ENV variables.
 
 The following additional environment variables exist to configure additional behaviour:
 
-| Variable                      | Values         | Description                                                            |
-|-------------------------------|----------------|------------------------------------------------------------------------|
-| UC_DISABLE_CERT_VERIFICATION  | true / false   | Disables certificate verification for the Home Assistant WS connection |
-| UC_API_MSG_TRACING            | all / in / out | Enables incoming and outgoing WS Core-API message tracing              |
-| UC_HASS_MSG_TRACING           | all / in / out | Enables incoming and outgoing Home Assistant WS message tracing        |
+| Variable                     | Values               | Description                                                                                                 |
+|------------------------------|----------------------|-------------------------------------------------------------------------------------------------------------|
+| UC_CONFIG_HOME               | _directory path_     | Configuration directory to save the user configuration from the driver setup.<br>Default: current directory |
+| UC_USER_CFG_FILENAME         | _filename_           | Configuration filename for the user settings.<br>Default: `home-assistant.json`                             |
+| UC_DISABLE_CERT_VERIFICATION | `true` / `false`     | Disables certificate verification for the Home Assistant WS connection.<br>Default: `false`                 |
+| UC_API_MSG_TRACING           | `all` / `in` / `out` | Enables incoming and outgoing WS Core-API message tracing<br>Default: no tracing                            |
+| UC_HASS_MSG_TRACING          | `all` / `in` / `out` | Enables incoming and outgoing Home Assistant WS message tracing<br>Default: no tracing                      |
 
 ## Contributing
 

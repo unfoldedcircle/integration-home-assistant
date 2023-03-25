@@ -42,7 +42,7 @@ serde_with = "2"
 rust-fsm = "0.6"
 
 clap = "3"
-config = { version = "0.13", default-features = false, features = ["yaml"] }
+config = { version = "0.13", default-features = false, features = ["yaml", "json"] }
 const_format = "0.2"
 env_logger = "0.10"
 lazy_static = "1.4"

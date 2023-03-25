@@ -1,11 +1,9 @@
 {
-  "driver_id": "home-assistant",
+  "driver_id": "hass",
   "version": "",
   "min_core_api": "0.20.0",
   "name": {
-    "en": "Home Assistant demo",
-    "de": "Home Assistant Testtreiber",
-    "fr": "Démonstration de Home Assistant"
+    "en": "Home Assistant"
   },
   "icon": "custom:hass.png",
   "description": {
@@ -14,25 +12,64 @@
     "fr": "Pilote de développement pour Home Assistant. Il ne s'agit pas encore d'une version officielle."
   },
   "developer": {
-    "name": "Unfolded Circle Aps",
+    "name": "Unfolded Circle ApS",
     "url": "https://www.unfoldedcircle.com"
   },
   "home_page": "https://www.unfoldedcircle.com",
   "setup_data_schema": {
     "title": {
-      "en": "Integration setup test"
+      "en": "Home Assistant settings",
+      "de": "Home Assistant Konfiguration",
+      "fr": "Configuration Home Assistant"
     },
     "settings": [
       {
-        "id": "action",
+        "id": "info",
         "label": {
-          "en": "User action needed"
+          "en": "Home Assistant Server",
+          "fr": "Serveur Home Assistant"
         },
         "field": {
           "label": {
             "value": {
-              "en": "This is some [Markdown](https://en.wikipedia.org/wiki/Markdown) text just for testing.\n\n## Header\n\nMore formatted text, e.g. in _italic_ or **bold**\n\n### Sub header\n\nThe quick brown fox jumps over the lazy dog."
+              "en": "The driver requires WebSocket API access to communicate with Home Assistant.\nSee [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) for more information on how to create a long lived access token.",
+              "de": "Der Treiber benötigt WebSocket-API Zugriff, um mit Home Assistant zu kommunizieren.\nWeitere Informationen zur Erstellung eines langlebigen Zugriffstokens findest du in der [Home Assistant Dokumentation](https://www.home-assistant.io/docs/authentication/)",
+              "fr": "Le pilote nécessite l'accès à l'API WebSocket pour communiquer avec Home Assistant.\nVoir [Home Assistant documentation] (https://www.home-assistant.io/docs/authentication/) pour plus d'informations sur la création d'un \"long lived access token\"."
             }
+          }
+        }
+      },
+      {
+        "id": "url",
+        "label": {
+          "en": "WebSocket API URL"
+        },
+        "field": {
+          "text": {
+            "value": "ws://homeassistant.local:8123/api/websocket"
+          }
+        }
+      },
+      {
+        "id": "token",
+        "label": {
+          "en": "Long lived access token"
+        },
+        "field": {
+          "password": {
+          }
+        }
+      },
+      {
+        "id": "expert",
+        "label": {
+          "en": "Configure enhanced options",
+          "de": "Erweiterte Optionen konfigurieren",
+          "fr": "Configurer les options avancées"
+        },
+        "field": {
+          "checkbox": {
+            "value": false
           }
         }
       }

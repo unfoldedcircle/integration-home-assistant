@@ -1,19 +1,29 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-//! Configuration settings read from the configuration file.
+//! Configuration file handling.
 
+use crate::errors::ServiceError;
+use crate::{APP_VERSION, DRIVER_METADATA};
 use config::Config;
-use std::fmt::{Display, Formatter};
-use std::time::Duration;
-
-use log::warn;
+use log::{error, info, warn};
 use serde_with::{serde_as, DurationMilliSeconds, DurationSeconds};
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use std::{env, fs, io};
+use uc_api::intg::IntegrationDriverUpdate;
 use url::Url;
 
-const DEF_CONNECTION_TIMEOUT: u8 = 3;
+pub const ENV_SETUP_TIMEOUT: &str = "UC_SETUP_TIMEOUT";
+pub const DEF_SETUP_TIMEOUT_SEC: u64 = 300;
 
-#[derive(serde::Deserialize, serde::Serialize)]
+const ENV_USER_CFG_FILENAME: &str = "UC_USER_CFG_FILENAME";
+const DEV_USER_CFG_FILENAME: &str = "home-assistant.json";
+const ENV_CONFIG_HOME: &str = "UC_CONFIG_HOME";
+
+#[derive(Default, serde::Deserialize, serde::Serialize)]
 pub struct Settings {
     pub integration: IntegrationSettings,
     pub hass: HomeAssistantSettings,
@@ -26,6 +36,24 @@ pub struct IntegrationSettings {
     pub https: WebServerSettings,
     pub certs: Option<CertificateSettings>,
     pub websocket: Option<WebSocketSettings>,
+}
+
+impl Default for IntegrationSettings {
+    fn default() -> Self {
+        Self {
+            interface: "0.0.0.0".to_string(),
+            http: WebServerSettings {
+                enabled: true,
+                port: 8000,
+            },
+            https: WebServerSettings {
+                enabled: false, // requires user provided certificate
+                port: 8443,
+            },
+            certs: None,
+            websocket: None,
+        }
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -46,7 +74,7 @@ pub struct WebSocketSettings {
     pub heartbeat: HeartbeatSettings,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct HomeAssistantSettings {
     pub url: Url,
     pub token: String,
@@ -57,8 +85,21 @@ pub struct HomeAssistantSettings {
     pub heartbeat: HeartbeatSettings,
 }
 
+impl Default for HomeAssistantSettings {
+    fn default() -> Self {
+        Self {
+            url: Url::parse("ws://homeassistant.local:8123/api/websocket").unwrap(),
+            token: "".to_string(),
+            connection_timeout: 3,
+            max_frame_size_kb: 5120,
+            reconnect: Default::default(),
+            heartbeat: Default::default(),
+        }
+    }
+}
+
 #[serde_as]
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct ReconnectSettings {
     pub attempts: u16,
     #[serde_as(as = "DurationMilliSeconds")]
@@ -73,7 +114,7 @@ pub struct ReconnectSettings {
 impl Default for ReconnectSettings {
     fn default() -> Self {
         Self {
-            attempts: 5,
+            attempts: 100,
             duration: Duration::from_secs(1),
             duration_max: Duration::from_secs(30),
             backoff_factor: 1.5,
@@ -114,43 +155,49 @@ impl Display for HeartbeatSettings {
     }
 }
 
-impl Default for Settings {
-    fn default() -> Settings {
-        Settings {
-            integration: IntegrationSettings {
-                interface: "0.0.0.0".to_string(),
-                http: WebServerSettings {
-                    enabled: true,
-                    port: 8000,
-                },
-                https: WebServerSettings {
-                    enabled: false, // requires user provided certificate
-                    port: 8443,
-                },
-                certs: None,
-                websocket: None,
-            },
-            hass: HomeAssistantSettings {
-                url: Url::parse("ws://hassio.local:8123/api/websocket").unwrap(),
-                token: "".to_string(),
-                connection_timeout: DEF_CONNECTION_TIMEOUT,
-                max_frame_size_kb: 1024,
-                reconnect: Default::default(),
-                heartbeat: Default::default(),
-            },
+/// Load the configuration settings.
+///
+/// The application provides default values which can be overriden in the following order:
+/// 1. Configuration settings in the read-only yaml configuration file specified in `filename`
+/// 2. User provided configuration settings from the driver setup
+/// 3. Environment variables with prefix `UC_` (works only for cfg keys not containing a `_`!)
+///
+/// If there's a configuration load error, the configuration will be reloaded without the user
+/// provided configuration settings for auto-recovery with default values.
+pub fn get_configuration(filename: Option<&str>) -> Result<Settings, config::ConfigError> {
+    let user_config = user_settings_path();
+    if !user_config.is_file() {
+        info!("No user settings file found");
+        return load_configuration(filename, None);
+    }
+
+    match load_configuration(filename, Some(user_config)) {
+        Ok(cfg) => Ok(cfg),
+        Err(e) => {
+            error!("Error loading configuration, retrying without user configuration. Error: {e}");
+            load_configuration(filename, None)
         }
     }
 }
 
-pub fn get_configuration(filename: Option<&str>) -> Result<Settings, config::ConfigError> {
+fn load_configuration(
+    filename: Option<&str>,
+    user_config: Option<PathBuf>,
+) -> Result<Settings, config::ConfigError> {
     // default configuration
     let mut config = Config::builder().add_source(Config::try_from(&Settings::default())?);
     // read optional configuration file to override defaults
     if let Some(filename) = filename {
         config = config.add_source(config::File::with_name(filename));
     }
+
+    // Overlay user provided configuration file from driver setup flow.
+    if let Some(user_config) = user_config {
+        config = config.add_source(config::File::from(user_config));
+    }
+
     // Add in settings from the environment (with a prefix of UC)
-    // Eg.. `UC_HASS_URL=http://localhost:8123/api/websocket` would set the `hass.url` key
+    // E.g. `UC_HASS_URL=http://localhost:8123/api/websocket` would set the `hass.url` key
     // This does NOT WORK for nested configurations! https://github.com/mehcode/config-rs/issues/312
     let config = config
         .add_source(config::Environment::with_prefix("UC").separator("_"))
@@ -191,4 +238,55 @@ fn check_cfg_values(mut settings: Settings) -> Result<Settings, config::ConfigEr
     }
 
     Ok(settings)
+}
+
+/// Deserialize and enhance driver information from compiled-in json data.
+pub fn get_driver_metadata() -> Result<IntegrationDriverUpdate, io::Error> {
+    let mut driver: IntegrationDriverUpdate =
+        serde_json::from_str(DRIVER_METADATA).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Invalid driver.json format: {e}"),
+            )
+        })?;
+
+    if driver.driver_id.is_none() {
+        driver.driver_id = Some("home-assistant".into())
+    }
+    if !driver
+        .name
+        .as_ref()
+        .map(|v| !v.is_empty())
+        .unwrap_or_default()
+    {
+        driver.name = Some(HashMap::from([("en".into(), "Home Assistant".into())]))
+    }
+    driver.token = None; // don't expose sensitive information
+    driver.version = Some(APP_VERSION.to_string());
+
+    Ok(driver)
+}
+
+/// Wrapper to add the `hass` root property to make it compatible with the main configuration file.
+#[derive(serde::Deserialize, serde::Serialize)]
+struct UserSettingsWrapper {
+    hass: HomeAssistantSettings,
+}
+
+/// Store user configuration from the setup flow.
+pub fn save_user_settings(cfg: &HomeAssistantSettings) -> Result<(), ServiceError> {
+    let cfg = UserSettingsWrapper { hass: cfg.clone() };
+    fs::write(user_settings_path(), serde_json::to_string_pretty(&cfg)?)?;
+    Ok(())
+}
+
+/// Get user configuration file path.
+///
+/// This configuration file is updatable with [`save_user_settings`] from the driver setup flow.
+///
+/// The configuration file is located in the configuration directory specified in the env variable
+/// `UC_CONFIG_HOME`. If not set, the current directory is used.
+fn user_settings_path() -> PathBuf {
+    let file = env::var(ENV_USER_CFG_FILENAME).unwrap_or(DEV_USER_CFG_FILENAME.into());
+    Path::new(&env::var(ENV_CONFIG_HOME).unwrap_or_default()).join(file)
 }

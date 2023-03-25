@@ -3,10 +3,10 @@
 
 //! Actix message handler for [R2EventMsg].
 
-use crate::controller::handler::{ConnectMsg, DisconnectMsg};
-use crate::controller::{Controller, OperationModeInput, R2EventMsg};
+use crate::controller::handler::{AbortDriverSetup, ConnectMsg, DisconnectMsg};
+use crate::controller::{Controller, R2EventMsg};
 use actix::{AsyncContext, Handler};
-use log::{error, warn};
+use log::error;
 use uc_api::intg::ws::R2Event;
 use uc_api::intg::DeviceState;
 
@@ -46,16 +46,10 @@ impl Handler<R2EventMsg> for Controller {
                 // TODO send updates #5
             }
             R2Event::AbortDriverSetup => {
-                if self
-                    .machine
-                    .consume(&OperationModeInput::AbortSetup)
-                    .is_err()
-                {
-                    warn!("Ignoring {}: driver is not in setup mode", msg.event);
-                    //return;
-                }
-
-                // TODO implement driver setup abort #3
+                ctx.notify(AbortDriverSetup {
+                    ws_id: msg.ws_id,
+                    timeout: false,
+                });
             }
         }
     }

@@ -13,6 +13,7 @@
       <env name="RUST_LOG" value="debug,uc_intg_hass::client=debug,uc_intg_hass::server=debug,mdns_sd=info" />
       <env name="UC_API_MSG_TRACING" value="all" />
       <env name="UC_HASS_MSG_TRACING" value="all" />
+      <env name="UC_SETUP_TIMEOUT" value="20" />
     </envs>
     <option name="isRedirectInput" value="false" />
     <option name="redirectInputPath" value="" />

@@ -127,20 +127,32 @@ impl Handler<TextMsg> for WsConn {
                     None => Err(ServiceError::BadRequest("Missing property: kind".into())),
                     Some(ref k) => match k.as_str() {
                         "req" => WsConn::on_request(&session_id, msg, controller_addr).await,
-                        "resp" => WsConn::on_response(&session_id, msg, controller_addr).await,
-                        "event" => WsConn::on_event(&session_id, msg, controller_addr).await,
+                        "resp" => {
+                            WsConn::on_response(&session_id, msg, controller_addr).await?;
+                            Ok(None)
+                        }
+                        "event" => {
+                            WsConn::on_event(&session_id, msg, controller_addr).await?;
+                            Ok(None)
+                        }
                         _ => Err(ServiceError::BadRequest("Unsupported kind value".into())),
                     },
                 }
             }
             .into_actor(self) // converts future to ActorFuture
-            .map(move |result: Result<(), ServiceError>, act, ctx| {
-                if let Err(e) = result {
-                    warn!("[{}] Error processing received text message: {e}", act.id);
-                    let response = service_error_to_ws_message(&act.id, req_id, e);
-                    ctx.notify(SendWsMessage(response));
-                }
-            }),
+            .map(
+                move |result: Result<Option<WsMessage>, ServiceError>, act, ctx| match result {
+                    Ok(Some(response)) => {
+                        ctx.notify(SendWsMessage(response));
+                    }
+                    Err(e) => {
+                        warn!("[{}] Error processing received text message: {e}", act.id);
+                        let response = service_error_to_ws_message(&act.id, req_id, e);
+                        ctx.notify(SendWsMessage(response));
+                    }
+                    _ => {}
+                },
+            ),
         )
     }
 }

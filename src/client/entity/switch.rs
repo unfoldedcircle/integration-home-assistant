@@ -59,7 +59,7 @@ pub(crate) fn convert_switch_entity(
 
     Ok(AvailableIntgEntity {
         entity_id,
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared device_id handling
         entity_type: EntityType::Switch,
         device_class,
         name,

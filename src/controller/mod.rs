@@ -9,14 +9,18 @@ mod messages;
 pub use messages::*;
 
 use crate::client::HomeAssistantClient;
-use crate::configuration::Settings;
+use crate::configuration::{Settings, DEF_SETUP_TIMEOUT_SEC, ENV_SETUP_TIMEOUT};
+use crate::controller::handler::AbortDriverSetup;
+use crate::errors::ServiceError;
 use crate::util::new_websocket_client;
 use actix::prelude::{Actor, Context, Recipient};
-use actix::Addr;
+use actix::{Addr, AsyncContext, SpawnHandle};
 use log::{debug, error, info, warn};
 use rust_fsm::*;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
+use std::env;
+use std::str::FromStr;
 use std::time::Duration;
 use uc_api::intg::{DeviceState, IntegrationDriverUpdate};
 use uc_api::ws::{EventCategory, WsMessage};
@@ -27,23 +31,27 @@ state_machine! {
 
     RequireSetup => {
         ConfigurationAvailable => Running,
+        AbortSetup => RequireSetup,
         SetupDriverRequest => SetupFlow [SetupFlowTimer],
     },
     Running(SetupDriverRequest) => SetupFlow [SetupFlowTimer],
     Running(R2Request) => Running,
     SetupFlow => {
-        AbortSetup => RequireSetup,
-        // Successful => Running,
-        RequestUserInput => WaitSetupUserData
+        RequestUserInput => WaitSetupUserData,
+        Successful => Running [CancelSetupFlowTimer],
+        SetupError => SetupError [CancelSetupFlowTimer],
+        AbortSetup => RequireSetup [CancelSetupFlowTimer],
     },
     WaitSetupUserData => {
-        // SetupUserRequestTimeout => SetupError,
         SetupUserData => SetupFlow,
+        SetupError => SetupError [CancelSetupFlowTimer],
+        AbortSetup => RequireSetup [CancelSetupFlowTimer],
     },
-    // SetupError => {
-    //     AbortSetup => RequireSetup,
-    //     SetupDriverRequest => SetupFlow,
-    // }
+    SetupError => {
+        AbortSetup => RequireSetup,
+        SetupDriverRequest => SetupFlow,
+        SetupError => SetupError,
+    }
 }
 
 struct R2Session {
@@ -72,8 +80,11 @@ impl R2Session {
     }
 }
 
+/// Central controller handling integration WS requests and HA client connection.
+///
+/// Uses the Actix actor framework to communicate with the Core-Integration server module and
+/// the Home Assistant client.  
 pub struct Controller {
-    // TODO use actor address instead? Recipient is generic but only allows one specific message
     /// Active Remote Two WebSocket sessions
     sessions: HashMap<String, R2Session>,
     /// Home Assistant connection state
@@ -87,14 +98,21 @@ pub struct Controller {
     ha_reconnect_duration: Duration,
     ha_reconnect_attempt: u16,
     drv_metadata: IntegrationDriverUpdate,
+    /// State machine for driver state: setup flow or running state
     machine: StateMachine<OperationMode>,
+    /// Driver setup timeout handle
+    setup_timeout: Option<SpawnHandle>,
 }
 
 impl Controller {
     pub fn new(settings: Settings, drv_metadata: IntegrationDriverUpdate) -> Self {
         let mut machine = StateMachine::new();
-        // first baby step, configuration is still read from yaml file
-        let _ = machine.consume(&OperationModeInput::ConfigurationAvailable);
+        // if we have all required HA connection settings, we can skip driver setup
+        if settings.hass.url.has_host() && !settings.hass.token.is_empty() {
+            let _ = machine.consume(&OperationModeInput::ConfigurationAvailable);
+        } else {
+            info!("Home Assistant connection requires setup");
+        }
         Self {
             sessions: Default::default(),
             device_state: DeviceState::Disconnected,
@@ -108,6 +126,7 @@ impl Controller {
             ha_reconnect_attempt: 0,
             drv_metadata,
             machine,
+            setup_timeout: None,
         }
     }
 
@@ -165,6 +184,57 @@ impl Controller {
             "New reconnect timeout: {}",
             self.ha_reconnect_duration.as_millis()
         )
+    }
+
+    /// Perform a state machine transition for the given input.
+    ///
+    /// An error is returned, if a state transition with the current state and the provided input
+    /// is not allowed.
+    fn sm_consume(
+        &mut self,
+        ws_id: &str,
+        input: &OperationModeInput,
+        ctx: &mut Context<Controller>,
+    ) -> Result<(), ServiceError> {
+        debug!(
+            "State machine input: {input:?}, state: {:?}",
+            self.machine.state()
+        );
+        match self.machine.consume(input) {
+            Ok(None) => {
+                info!("State machine transition: {:?}", self.machine.state());
+                Ok(())
+            }
+            Ok(Some(OperationModeOutput::SetupFlowTimer)) => {
+                if let Some(handle) = self.setup_timeout.take() {
+                    ctx.cancel_future(handle);
+                }
+                let timeout = env::var(ENV_SETUP_TIMEOUT)
+                    .ok()
+                    .and_then(|v| u64::from_str(&v).ok())
+                    .unwrap_or(DEF_SETUP_TIMEOUT_SEC);
+                debug!("Starting SetupFlowTimer: {timeout} sec");
+                self.setup_timeout = Some(ctx.notify_later(
+                    AbortDriverSetup {
+                        ws_id: ws_id.to_string(),
+                        timeout: true,
+                    },
+                    Duration::from_secs(timeout),
+                ));
+                Ok(())
+            }
+            Ok(Some(OperationModeOutput::CancelSetupFlowTimer)) => {
+                debug!("Cancelling SetupFlowTimer");
+                if let Some(handle) = self.setup_timeout.take() {
+                    ctx.cancel_future(handle);
+                }
+                Ok(())
+            }
+            Err(_) => Err(ServiceError::BadRequest(format!(
+                "Transition {input:?} not allowed in state {:?}",
+                self.machine.state()
+            ))),
+        }
     }
 }
 

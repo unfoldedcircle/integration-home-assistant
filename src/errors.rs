@@ -27,6 +27,8 @@ pub enum ServiceError {
     NotConnected,
 
     ServiceUnavailable(String),
+
+    #[allow(dead_code)] // temporarily used for development
     NotYetImplemented,
 }
 
@@ -90,5 +92,11 @@ impl From<strum::ParseError> for ServiceError {
 impl<T> From<SendError<T>> for ServiceError {
     fn from(e: SendError<T>) -> Self {
         ServiceError::InternalServerError(format!("Error sending internal message: {:?}", e))
+    }
+}
+
+impl From<url::ParseError> for ServiceError {
+    fn from(e: url::ParseError) -> Self {
+        ServiceError::BadRequest(e.to_string())
     }
 }

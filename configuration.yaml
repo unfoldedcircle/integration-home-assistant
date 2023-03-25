@@ -14,18 +14,3 @@ integration:
     heartbeat:
       interval_sec: 10
       timeout_sec: 20
-
-hass-def:
-  url: ws://hassio.local:8123/api/websocket
-  token: YOUR_HA_TOKEN - better use UC_HASS_TOKEN environment variable to set it!
-  connection_timeout: 3
-  #disable_cert_validation: no # not yet implemented
-  max_frame_size_kb: 5120
-  reconnect:
-    attempts: 10
-    duration_ms: 1000
-    duration_max_ms: 20000
-    backoff_factor: 1.5
-  heartbeat:
-    interval_sec: 30
-    timeout_sec: 40

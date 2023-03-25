@@ -147,7 +147,7 @@ pub(crate) fn convert_climate_entity(
 
     Ok(AvailableIntgEntity {
         entity_id,
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::Climate,
         device_class: None,
         name,

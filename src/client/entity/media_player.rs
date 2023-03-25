@@ -199,7 +199,7 @@ pub(crate) fn convert_media_player_entity(
 
     Ok(AvailableIntgEntity {
         entity_id,
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::MediaPlayer,
         device_class,
         name,

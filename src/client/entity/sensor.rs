@@ -40,7 +40,7 @@ pub(crate) fn sensor_event_to_entity_change(
     )?;
 
     Ok(EntityChange {
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::Sensor,
         entity_id: data.entity_id,
         attributes,
@@ -97,7 +97,7 @@ pub(crate) fn convert_sensor_entity(
 
     Ok(AvailableIntgEntity {
         entity_id,
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::Sensor,
         device_class,
         name,

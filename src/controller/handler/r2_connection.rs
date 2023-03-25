@@ -21,8 +21,6 @@ impl Handler<R2SessionDisconnect> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: R2SessionDisconnect, _: &mut Context<Self>) {
-        if self.sessions.remove(&msg.id).is_some() {
-            // TODO
-        }
+        self.sessions.remove(&msg.id);
     }
 }

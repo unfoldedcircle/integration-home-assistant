@@ -45,9 +45,13 @@ pub struct R2SessionDisconnect {
 
 /// Actor message for a Remote Two request.
 ///
-/// Pass an integration API request message fom a connected integration client to the [`Controller`].
+/// Pass an integration API request message fom a connected integration client to the
+/// [`Controller`]. The controller can either respond directly with a response if some [WsMessage]
+/// is returned, or asynchronously at a later time if `None` is returned.
+///
+/// - a returned [ServiceError] will mapped to an error response message for the Remote Two.
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), ServiceError>")]
+#[rtype(result = "Result<Option<WsMessage>, ServiceError>")]
 pub struct R2RequestMsg {
     pub ws_id: String,
     pub req_id: u32,

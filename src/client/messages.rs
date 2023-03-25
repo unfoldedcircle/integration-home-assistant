@@ -10,17 +10,6 @@ use uc_api::intg::{AvailableIntgEntity, EntityChange, EntityCommand};
 
 use crate::errors::ServiceError;
 
-/*
-TODO controller -> HA
-    x close
-    x callService (= sendCommand)
-    getStates (= getAvailableEntities)
-    subscribeEvent?
-
-TODO HA -> controller
-    x connectionState
-    x updateEntity
- */
 /// Call a service in Home Assistant
 #[derive(Message)]
 #[rtype(result = "Result<(), ServiceError>")]

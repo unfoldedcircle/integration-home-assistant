@@ -106,7 +106,7 @@ pub(crate) fn convert_cover_entity(
 
     Ok(AvailableIntgEntity {
         entity_id,
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::Cover,
         device_class,
         name,

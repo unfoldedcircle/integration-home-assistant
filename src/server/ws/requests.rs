@@ -14,12 +14,19 @@ use uc_api::intg::ws::R2Request;
 use uc_api::ws::WsMessage;
 
 impl WsConn {
-    /// Handle request messages from R2
+    /// Handle request messages from R2.
+    ///
+    /// The received WebSocket text message will be forwarded with an Actix [R2RequestMsg] to the
+    /// Controller.
+    ///
+    /// - A returned [ServiceError] from the [R2RequestMsg] will be propagated back, which is then
+    ///   mapped to a WebSocket response error message.
+    /// - The successful response message must be sent asynchronously by the Controller!
     pub(crate) async fn on_request(
         session_id: &str,
         request: WsMessage,
         controller_addr: Addr<Controller>,
-    ) -> Result<(), ServiceError> {
+    ) -> Result<Option<WsMessage>, ServiceError> {
         let id = request
             .id
             .ok_or_else(|| ServiceError::BadRequest("Missing property: id".into()))?;

@@ -48,7 +48,6 @@ pub struct HomeAssistantClient {
     /// request id of the last `subscribe_events` request. This id will be used the result message.
     entity_states_id: Option<u32>,
     sink: SinkWrite<ws::Message, SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>>,
-    // TODO use abstract actix Receiver(s) instead of hard Controller dependency?
     controller_actor: Addr<Controller>,
     /// Last heart beat timestamp.
     last_hb: Instant,

@@ -17,6 +17,7 @@ impl Handler<ConnectionEvent> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: ConnectionEvent, ctx: &mut Self::Context) -> Self::Result {
+        // TODO enhance state machine with connection & reconnection states (as in remote-core)
         match msg.state {
             ConnectionState::AuthenticationFailed => {
                 // error state prevents auto-reconnect in upcoming Closed event
@@ -34,9 +35,6 @@ impl Handler<ConnectionEvent> for Controller {
                     DeviceState::Connecting | DeviceState::Connected
                 ) {
                     info!("Start reconnecting to HA: {}", msg.client_id);
-                    // TODO add incremental delay logic as in the connection establish process,
-                    // otherwise there's an infinite connect -> close -> connect loop without abort
-                    // for certain errors (e.g. when we forget to increment the message id).
                     self.set_device_state(DeviceState::Connecting);
 
                     ctx.notify(ConnectMsg {});
@@ -60,7 +58,6 @@ impl Handler<ConnectMsg> for Controller {
     type Result = ResponseActFuture<Self, Result<(), Error>>;
 
     fn handle(&mut self, _msg: ConnectMsg, ctx: &mut Self::Context) -> Self::Result {
-        // TODO initial setup flow check #3
         if !matches!(self.machine.state(), &OperationModeState::Running) {
             return Box::pin(fut::result(Err(Error::new(
                 ErrorKind::InvalidInput,
