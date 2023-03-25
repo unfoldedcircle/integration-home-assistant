@@ -3,8 +3,8 @@
 
 //! Actix WebSocket actor for an established Remote Two client connection.
 
+use crate::controller::{NewR2Session, R2SessionDisconnect, SendWsMessage};
 use crate::errors::ServiceError;
-use crate::messages::{NewR2Session, R2SessionDisconnect, SendWsMessage};
 use crate::server::ws::WsConn;
 use actix::{
     fut, Actor, ActorContext, ActorFutureExt, AsyncContext, ContextFutureSpawner, Handler,

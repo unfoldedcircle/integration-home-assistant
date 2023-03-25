@@ -3,8 +3,8 @@
 
 //! Handle response messages from Remote Two
 
+use crate::controller::R2ResponseMsg;
 use crate::errors::ServiceError;
-use crate::messages::R2ResponseMsg;
 use crate::server::ws::WsConn;
 use crate::Controller;
 use actix::Addr;

@@ -34,7 +34,7 @@ pub struct CallService {
 #[rtype(result = "Result<(), ServiceError>")]
 pub struct GetStates;
 
-/// Asynchronous response from `GetStates`
+/// Asynchronous HA response from `GetStates`
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct AvailableEntities {

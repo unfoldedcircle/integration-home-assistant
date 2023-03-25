@@ -12,7 +12,6 @@ use crate::errors::ServiceError;
 use crate::util::DeserializeMsgData;
 use actix::prelude::{Message, Recipient};
 use uc_api::intg::ws::{R2Event, R2Request, R2Response};
-use uc_api::intg::DeviceState;
 use uc_api::ws::WsMessage;
 
 /// Send a WebSocket message to Remote Two.
@@ -21,32 +20,6 @@ use uc_api::ws::WsMessage;
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct SendWsMessage(pub WsMessage);
-
-/// Internal message to connect to Home Assistant.
-#[derive(Message)]
-#[rtype(result = "Result<(), std::io::Error>")]
-pub struct Connect {
-    // TODO device identifier for multi-HA connections: feature not yet available
-    // pub device_id: String,
-}
-
-/// Internal message to disconnect from Home Assistant.
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct Disconnect {
-    // TODO device identifier for multi-HA connections: feature not yet available
-    // pub device_id: String,
-}
-
-/// Internal message to delegate [`R2Request::SubscribeEvents`] requests.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), ServiceError>")]
-pub struct SubscribeHassEvents(pub R2RequestMsg);
-
-/// Internal message to delegate [`R2Request::UnsubscribeEvents`] requests.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), ServiceError>")]
-pub struct UnsubscribeHassEvents(pub R2RequestMsg);
 
 /// New WebSocket connection from Remote Two established.
 ///
@@ -68,16 +41,6 @@ pub struct NewR2Session {
 pub struct R2SessionDisconnect {
     /// unique identifier of WS connection
     pub id: String,
-}
-
-/// Get the Home Assistant connection device states.
-///
-/// Returns [`DeviceState`] enum.
-#[derive(Message)]
-#[rtype(result = "DeviceState")]
-pub struct GetDeviceState {
-    // device identifier not required: only single HA connection supported
-    // pub device_id: String,
 }
 
 /// Actor message for a Remote Two request.

@@ -36,7 +36,6 @@ mod client;
 mod configuration;
 mod controller;
 mod errors;
-mod messages;
 mod server;
 mod util;
 
