@@ -1,17 +1,17 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use actix::Addr;
-use std::str::FromStr;
+//! Handle events from Remote Two
 
+use crate::controller::R2EventMsg;
 use crate::errors::ServiceError;
+use crate::server::ws::WsConn;
 use crate::Controller;
-use log::{error, warn};
+use actix::Addr;
+use log::{debug, error, warn};
+use std::str::FromStr;
 use uc_api::intg::ws::R2Event;
 use uc_api::ws::WsMessage;
-
-use crate::messages::R2EventMsg;
-use crate::server::ws::WsConn;
 
 impl WsConn {
     /// Handle events from R2
@@ -25,16 +25,19 @@ impl WsConn {
             .as_deref()
             .ok_or_else(|| ServiceError::BadRequest("Missing property: msg".into()))?;
 
+        debug!("[{session_id}] Got event: {msg}");
+
         if let Ok(req_msg) = R2Event::from_str(msg) {
             if let Err(e) = controller_addr.try_send(R2EventMsg {
                 ws_id: session_id.into(),
                 event: req_msg,
                 msg_data: event.msg_data,
             }) {
-                error!("[{}] Controller mailbox error: {}", session_id, e);
+                // avoid returning an Err which would be sent back to the client
+                error!("[{session_id}] Controller mailbox error: {e}");
             }
         } else {
-            warn!("[{}] Unknown event: {}", session_id, msg);
+            warn!("[{session_id}] Unknown event: {msg}");
         }
 
         Ok(())

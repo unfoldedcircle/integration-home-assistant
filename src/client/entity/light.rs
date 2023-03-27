@@ -23,7 +23,7 @@ pub(crate) fn map_light_attributes(
     attributes.insert("state".into(), state);
 
     if let Some(ha_attr) = ha_attr {
-        // FIXME brightness adjustment for RGB## modes. https://developers.home-assistant.io/docs/core/entity/light
+        // FIXME brightness adjustment for RGB## modes #7. https://developers.home-assistant.io/docs/core/entity/light
         // Note that in color modes COLOR_MODE_RGB, COLOR_MODE_RGBW and COLOR_MODE_RGBWW there is
         // brightness information both in the light's brightness property and in the color. As an
         // example, if the light's brightness is 128 and the light's color is (192, 64, 32), the
@@ -84,7 +84,7 @@ pub(crate) fn map_light_attributes(
             None => {}
             v => {
                 error!(
-                    "TODO {} implement color mode conversion for color_mode: {}",
+                    "TODO {} implement color mode conversion for color_mode: {}. Probably #7",
                     entity_id,
                     v.unwrap()
                 );
@@ -186,14 +186,14 @@ pub(crate) fn convert_light_entity(
         }
     }
 
-    // TODO color entity options: color_temperature_steps - do we get that from HASS?
+    // TODO color entity options: color_temperature_steps - do we get that from HASS? #8
 
     // convert attributes
     let attributes = Some(map_light_attributes(&entity_id, &state, Some(ha_attr))?);
 
     Ok(AvailableIntgEntity {
         entity_id,
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::Light,
         device_class: None,
         name,

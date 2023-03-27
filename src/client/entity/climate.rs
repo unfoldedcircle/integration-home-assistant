@@ -96,7 +96,7 @@ pub(crate) fn convert_climate_entity(
         .unwrap_or_default() as u32;
     let mut climate_feats = Vec::with_capacity(4);
 
-    // FIXME this only a theoretical implementation and completely untested!
+    // TODO not completely tested, need to test "cool"! #11
     // https://developers.home-assistant.io/docs/core/entity/climate#hvac-modes
     // Need to find some real climate devices to test...
     if let Some(hvac_modes) = ha_attr.get("hvac_modes").and_then(|v| v.as_array()) {
@@ -121,12 +121,12 @@ pub(crate) fn convert_climate_entity(
         */
     }
 
-    // TODO is this the correct way to find out if the device can measure the current temperature?
+    // TODO is this the correct way to find out if the device can measure the current temperature? #12
     if is_float_value(ha_attr, "current_temperature") {
         climate_feats.push(ClimateFeature::CurrentTemperature);
     }
 
-    // handle options. TODO untested! Only based on some GitHub issue logs :-)
+    // handle options. TODO untested! Only based on some GitHub issue logs :-) #12
     let mut options = serde_json::Map::new();
     if let Some(v) = number_value(ha_attr, "min_temp") {
         options.insert(ClimateOption::MinTemperature.to_string(), v);
@@ -137,7 +137,7 @@ pub(crate) fn convert_climate_entity(
     if let Some(v) = number_value(ha_attr, "target_temp_step") {
         options.insert(ClimateOption::TargetTemperatureStep.to_string(), v);
     }
-    // TODO how do we get the HA temperature_unit attribute? Couldn't find an example...
+    // TODO how do we get the HA temperature_unit attribute? Couldn't find an example... #10
     if let Some(v) = ha_attr.get("temperature_unit") {
         options.insert(ClimateOption::TemperatureUnit.to_string(), v.clone());
     }
@@ -147,7 +147,7 @@ pub(crate) fn convert_climate_entity(
 
     Ok(AvailableIntgEntity {
         entity_id,
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::Climate,
         device_class: None,
         name,

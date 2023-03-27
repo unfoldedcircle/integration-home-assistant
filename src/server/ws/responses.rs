@@ -1,49 +1,43 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-use actix::Addr;
-use log::{info, warn};
+//! Handle response messages from Remote Two
 
+use crate::controller::R2ResponseMsg;
 use crate::errors::ServiceError;
-use crate::Controller;
-use uc_api::ws::WsMessage;
-
 use crate::server::ws::WsConn;
+use crate::Controller;
+use actix::Addr;
+use log::{debug, error, warn};
+use std::str::FromStr;
+use uc_api::intg::ws::R2Response;
+use uc_api::ws::WsMessage;
 
 impl WsConn {
     /// Handle response messages from R2
     pub(crate) async fn on_response(
         session_id: &str,
         response: WsMessage,
-        _controller_addr: Addr<Controller>,
+        controller_addr: Addr<Controller>,
     ) -> Result<(), ServiceError> {
         let msg = response
             .msg
             .as_deref()
             .ok_or_else(|| ServiceError::BadRequest("Missing property: msg".into()))?;
 
-        match msg {
-            "version" => {
-                info!("[{}] TODO Handle version response!", session_id);
+        debug!("[{session_id}] Got response: {msg}");
+
+        if let Ok(resp_msg) = R2Response::from_str(msg) {
+            if let Err(e) = controller_addr.try_send(R2ResponseMsg {
+                ws_id: session_id.into(),
+                msg: resp_msg,
+                response,
+            }) {
+                // avoid returning an Err which would be sent back to the client
+                error!("[{session_id}] Controller mailbox error: {e}");
             }
-            "supported_entity_types" => {
-                info!(
-                    "[{}] TODO Handle supported_entity_types response!",
-                    session_id
-                );
-            }
-            "configured_entities" => {
-                info!("[{}] TODO Handle configured_entities response!", session_id);
-            }
-            "localization_cfg" => {
-                info!("[{}] TODO Handle localization_cfg response!", session_id);
-            }
-            "setup_user_action" => {
-                info!("[{}] TODO Handle setup_user_action message!", session_id);
-            }
-            _ => {
-                warn!("[{}] Unknown response: {}", session_id, msg);
-            }
+        } else {
+            warn!("[{session_id}] Unknown response: {msg}");
         }
 
         Ok(())

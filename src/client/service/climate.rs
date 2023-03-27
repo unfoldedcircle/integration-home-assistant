@@ -38,7 +38,7 @@ pub(crate) fn handle_climate(msg: &EntityCommand) -> Result<(String, Option<Valu
                 }
             }
 
-            // TODO can we send a temperature param in set_hvac_mode?
+            // TODO can we send a temperature param in set_hvac_mode? #12
             // If not: remove example from entity docs...
             copy_entry(params, &mut data, "temperature");
 

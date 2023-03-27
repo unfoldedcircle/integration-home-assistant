@@ -187,7 +187,7 @@ pub(crate) fn convert_media_player_entity(
     }
      */
 
-    // TODO media_player entity options: volume_steps - do we get that from HASS?
+    // TODO media_player entity options: volume_steps - do we get that from HASS? #14
 
     // convert attributes
     let attributes = Some(map_media_player_attributes(
@@ -199,7 +199,7 @@ pub(crate) fn convert_media_player_entity(
 
     Ok(AvailableIntgEntity {
         entity_id,
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::MediaPlayer,
         device_class,
         name,

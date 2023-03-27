@@ -40,7 +40,7 @@ pub(crate) fn sensor_event_to_entity_change(
     )?;
 
     Ok(EntityChange {
-        device_id: None, // TODO set device_id, even if we don't support multiple HA instances (yet)
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::Sensor,
         entity_id: data.entity_id,
         attributes,
@@ -53,7 +53,7 @@ pub(crate) fn binary_sensor_event_to_entity_change(
     let mut attributes = serde_json::Map::with_capacity(3);
     let state = convert_ha_onoff_state(&data.new_state.state)?;
 
-    // TODO decide on how to handle the special binary sensor
+    // TODO decide on how to handle the special binary sensor #13
     attributes.insert("value".into(), (Some("ON") == state.as_str()).into());
     attributes.insert("state".into(), state);
     attributes.insert("unit".into(), "boolean".into());
@@ -97,7 +97,7 @@ pub(crate) fn convert_sensor_entity(
 
     Ok(AvailableIntgEntity {
         entity_id,
-        device_id: None, // TODO prepare device_id handling
+        device_id: None, // prepared for device_id handling
         entity_type: EntityType::Sensor,
         device_class,
         name,
