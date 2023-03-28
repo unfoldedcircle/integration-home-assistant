@@ -1,16 +1,24 @@
 FROM debian:bookworm-slim
 
 EXPOSE 8000
-EXPOSE 8443
+EXPOSE 9443
 
-ENV UC_HASS_URL=ws://hassio.local:8123/api/websocket
-ENV UC_HASS_TOKEN=OVERRIDE_WITH_YOUR_LONG_LIVED_ACCESS_TOKEN
+ARG CONFIG_PATH=/config
+ENV UC_CONFIG_HOME=$CONFIG_PATH
+
+RUN mkdir $CONFIG_PATH && chown 10000 $CONFIG_PATH
+
+# for static configuration without driver setup flow:
+#ENV UC_HASS_URL=ws://hassio.local:8123/api/websocket
+#ENV UC_HASS_TOKEN=OVERRIDE_WITH_YOUR_LONG_LIVED_ACCESS_TOKEN
 
 WORKDIR /app
 
 COPY ./app /app
 
 USER 10000
+
+VOLUME $CONFIG_PATH
 
 CMD ["/app/uc-intg-hass"]
 

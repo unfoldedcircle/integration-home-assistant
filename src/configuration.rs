@@ -48,7 +48,7 @@ impl Default for IntegrationSettings {
             },
             https: WebServerSettings {
                 enabled: false, // requires user provided certificate
-                port: 8443,
+                port: 9443,
             },
             certs: None,
             websocket: None,
@@ -276,7 +276,11 @@ struct UserSettingsWrapper {
 /// Store user configuration from the setup flow.
 pub fn save_user_settings(cfg: &HomeAssistantSettings) -> Result<(), ServiceError> {
     let cfg = UserSettingsWrapper { hass: cfg.clone() };
-    fs::write(user_settings_path(), serde_json::to_string_pretty(&cfg)?)?;
+    fs::write(user_settings_path(), serde_json::to_string_pretty(&cfg)?).map_err(|e| {
+        let msg = format!("Error saving user configuration: {e}");
+        error!("{msg}");
+        ServiceError::InternalServerError(msg)
+    })?;
     Ok(())
 }
 

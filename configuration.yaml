@@ -5,7 +5,7 @@ integration:
     port: 8000
   https:
     enabled: false
-    port: 8443
+    port: 9443
   certs:
     public: certs/local-cert.pem
     private: certs/local-key.pem
@@ -14,3 +14,17 @@ integration:
     heartbeat:
       interval_sec: 10
       timeout_sec: 20
+# to override default configuration:
+#hass:
+#  url: ws://homeassistant.local:8123/api/websocket
+#  token: YOUR_HA_TOKEN - better use UC_HASS_TOKEN environment variable to set it!
+#  connection_timeout: 3
+#  max_frame_size_kb: 5120
+#  reconnect:
+#    attempts: 100
+#    duration_ms: 1000
+#    duration_max_ms: 30000
+#    backoff_factor: 1.5
+#  heartbeat:
+#    interval_sec: 20
+#    timeout_sec: 40

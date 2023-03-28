@@ -1,6 +1,6 @@
 # Container Image for Home-Assistant Integration
 
-The provided [Dockerfile](Dockerfile) creates a Linux container for the Home Assistant integration.
+The provided [Dockerfile](Dockerfile) creates a Linux amd64 container for the Home Assistant integration.
 
 The information on this page are for building a container image yourself on a Linux host.  
 To get the latest image from us, you can simply pull it from Dockerhub:
@@ -25,16 +25,35 @@ See [build script](build.sh) for more information, e.g. optional configuration f
 
 ## Run
 
-To run the Home Assistant integration you need to set your access token in the environment variable `UC_HASS_TOKEN`.  
-By default the integration tries to connect to <ws://hassio.local:8123/api/websocket>. This can be overridden with the
-environment variable `UC_HASS_URL`.
+To run the Home Assistant integration you need the Home Assistant server API URL and a long-lived access token.
 
+They can either be provided by the user in the driver setup flow, or statically configured in the configuration file or
+set with the environment variables `UC_HASS_URL` and `UC_HASS_TOKEN`.
+
+By default, the integration tries to connect to <ws://homeassistant.local:8123/api/websocket>.
+
+Provide configuration with the driver setup flow and store user configuration in a volume:
+```bash
+docker run --rm --name uc-intg-hass \
+  -p 8000:8000 \
+  integration-hass:latest
+```
+
+The configuration will be saved in the `$UC_CONFIG_HOME` directory, which is by default a volume. This can also be
+bind-mounted to the host (directory needs to be writeable for user_id 10000):
+```bash
+docker run --rm --name uc-intg-hass \
+  -p 8000:8000 \
+  -v $YOUR_HOST_CONFIG_DIRECTORY:/config \
+  integration-hass:latest
+```
+
+The Home Assistant server configuration can also be set with environment variables:
 ```bash
 docker run --rm --name uc-intg-hass \
   -e UC_HASS_URL=$YOUR_HOME_ASSISTANT_URL \
   -e UC_HASS_TOKEN=$YOUR_LONG_LIVED_ACCESS_TOKEN \
   -p 8000:8000 \
-  -p 8443:8443 \
   integration-hass:latest
 ```
 
