@@ -187,7 +187,7 @@ pub(crate) fn convert_media_player_entity(
     }
      */
 
-    // TODO media_player entity options: volume_steps - do we get that from HASS? #14
+    // Note: volume_steps doesn't seem to be retrievable from HA (#14)
 
     // convert attributes
     let attributes = Some(map_media_player_attributes(
