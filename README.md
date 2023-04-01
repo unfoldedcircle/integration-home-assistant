@@ -46,6 +46,8 @@ variables. Mainly `UC_CONFIG_HOME` and some `UC_INTEGRATION_*`.
 
 ## How to Build and Run
 
+If you don't have Rust installed yet: <https://www.rust-lang.org/tools/install>
+
 `cargo build` to build.
 
 `cargo run` to start the integration driver.
@@ -58,6 +60,9 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute 
 
 We use [SemVer](http://semver.org/) for versioning. For the versions available, see the
 [tags and releases on this repository](https://github.com/unfoldedcircle/integration-home-assistant/releases).
+
+The major changes found in each new release are listed in the [changelog](./CHANGELOG.md) and
+under the GitHub [releases](https://github.com/unfoldedcircle/integration-home-assistant/releases).
 
 ## License
 
