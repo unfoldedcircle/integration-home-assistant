@@ -7,16 +7,18 @@ Great, please let us know!
 
 ### Bug Reports :bug:
 
-If you find a bug, please search for it first in the [Issues](https://github.com/unfoldedcircle/integration-home-assistant/issues),
+If you find a bug, please search for it first in the [GitHub issues](https://github.com/unfoldedcircle/integration-home-assistant/issues),
 and if it isn't already tracked, [create a new issue](https://github.com/unfoldedcircle/integration-home-assistant/issues/new).
 
 ### Pull Requests
 
 **Any pull request needs to be reviewed and approved by the Unfolded Circle development team.**
 
-⚠️ We love contributions from everyone, but we kindly ask you, that if you plan to make substantial changes,
-that you please reach out to us first. Open a feature request or enhancement with your proposed changes, or use one
-of the other [feedback channels](#feedback-speech_balloon) to contact us.
+We love contributions from everyone.
+
+⚠️ If you plan to make substantial changes, we kindly ask you, that you please reach out to us first.  
+Either by opening a feature request describing your proposed changes before submitting code, or by contacting us on
+one of the other [feedback channels](#feedback-speech_balloon).
 
 Since this software (or part of it) is being used on the embedded Remote Two device, we have to make sure it remains
 compatible with the embedded runtime environment and runs smoothly.
@@ -25,9 +27,9 @@ With that out of the way, here's the process of creating a pull request and maki
 
 ### Contributing Code :bulb:
 
-1. Fork the repo (preferably on a feature-branch).
-
-2. Make your changes or enhancements.
+1. Fork the repo.
+   
+2. Make your changes or enhancements (preferably on a feature-branch).
 
     Contributed code must be licensed under the Mozilla Public License 2.0 (MPL-2.0).  
     It is required to add a boilerplate copyright notice to the top of each file:

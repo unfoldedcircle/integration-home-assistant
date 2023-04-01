@@ -31,7 +31,7 @@ The configuration values can be overwritten with ENV variables.
 
 ### Environment Variables
 
-The following additional environment variables exist to configure additional behaviour:
+The following environment variables exist in addition to the configuration file:
 
 | Variable                     | Values               | Description                                                                                                 |
 |------------------------------|----------------------|-------------------------------------------------------------------------------------------------------------|
@@ -42,7 +42,7 @@ The following additional environment variables exist to configure additional beh
 | UC_HASS_MSG_TRACING          | `all` / `in` / `out` | Enables incoming and outgoing Home Assistant WS message tracing<br>Default: no tracing                      |
 
 On the Remote Two device, the integration is configured for the embedded runtime environment with several environment
-variables. Mainly `UC_CONFIG_HOME` and some `UC_INTEGRATION_*`. 
+variables. Mainly `UC_CONFIG_HOME` and some `UC_INTEGRATION_*`.
 
 ## How to Build and Run
 
