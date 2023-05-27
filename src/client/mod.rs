@@ -20,7 +20,7 @@ use url::Url;
 
 use crate::client::messages::{ConnectionEvent, ConnectionState};
 use crate::client::model::Event;
-use crate::configuration::HeartbeatSettings;
+use crate::configuration::{HeartbeatSettings, ENV_HASS_MSG_TRACING};
 use crate::errors::ServiceError;
 use crate::Controller;
 
@@ -73,7 +73,7 @@ impl HomeAssistantClient {
             let scheme = url.scheme();
             let host = url.host_str().unwrap_or(url.as_str());
             let port = url.port_or_known_default().unwrap_or_default();
-            let msg_tracing = env::var("UC_HASS_MSG_TRACING").unwrap_or_default();
+            let msg_tracing = env::var(ENV_HASS_MSG_TRACING).unwrap_or_default();
             HomeAssistantClient {
                 id: format!("{}:{}", host, port),
                 server: {

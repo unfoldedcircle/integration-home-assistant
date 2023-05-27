@@ -1,6 +1,7 @@
 // Copyright (c) 2023 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::configuration::ENV_DISABLE_CERT_VERIFICATION;
 use crate::util::bool_from_env;
 use actix_tls::connect::rustls::webpki_roots_cert_store;
 use if_addrs::{IfAddr, Ifv4Addr};
@@ -39,7 +40,7 @@ pub fn new_websocket_client(connection_timeout: Duration, tls: bool) -> awc::Cli
 
         // Disable TLS verification
         // Requires: rustls = { ... optional = true, features = ["dangerous_configuration"] }
-        if bool_from_env("UC_DISABLE_CERT_VERIFICATION") {
+        if bool_from_env(ENV_DISABLE_CERT_VERIFICATION) {
             config
                 .dangerous()
                 .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
