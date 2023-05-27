@@ -1,14 +1,13 @@
 // Copyright (c) 2023 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-//! mDNS advertisement
+//! mDNS advertisement with mdns-sd Rust crate
 
 use crate::errors::ServiceError;
 use crate::util::my_ipv4_interfaces;
 use lazy_static::lazy_static;
 use log::{error, info};
-use mdns_sd::ServiceDaemon;
-use mdns_sd::ServiceInfo;
+use mdns_sd::{ServiceDaemon, ServiceInfo};
 use std::net::Ipv4Addr;
 
 lazy_static! {
@@ -28,17 +27,19 @@ lazy_static! {
 /// # Arguments
 ///
 /// * `instance_name`: Instance name
-/// * `reg_type`: The service type followed by the protocol, separated by a dot (for example, "_ssh._tcp")
+/// * `service_name`: The service name (e.g. `http`).
+/// * `protocol`: The protocol of the service (e.g. `tcp`).
 /// * `port`: The port on which the service accepts connections.
 /// * `txt`: Optional TXT record data with format: `key=value`. The value is optional.
 pub fn publish_service(
     instance_name: impl AsRef<str>,
-    reg_type: impl Into<String>,
+    service_name: impl AsRef<str>,
+    protocol: impl AsRef<str>,
     port: u16,
     txt: Vec<String>,
 ) -> Result<(), ServiceError> {
     if let Some(mdns_service) = &*MDNS_SERVICE {
-        let mut reg_type = reg_type.into();
+        let mut reg_type = format!("_{}._{}", service_name.as_ref(), protocol.as_ref());
         if !reg_type.ends_with(".local.") {
             reg_type.push_str(".local.");
         }

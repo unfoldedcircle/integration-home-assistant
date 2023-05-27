@@ -50,9 +50,32 @@ interface only.
 
 If you don't have Rust installed yet: <https://www.rust-lang.org/tools/install>
 
-`cargo build` to build.
+### Build
 
-`cargo run` to start the integration driver.
+Without mDNS advertisement support:
+
+```shell
+cargo build
+```
+
+With [zeroconf](https://crates.io/crates/zeroconf) library, wrapping underlying ZeroConf/mDNS implementations such as
+Bonjour on macOS or Avahi on Linux:
+```shell
+cargo build --features zeroconf
+```
+
+With pure Rust [mdns-sd](https://crates.io/crates/mdns-sd) library:
+```shell
+cargo build --features mdns-sd
+```
+This will run on any platform, but with limited functionality (no IPv6 support) and potential incompatibilities.
+
+### Run
+
+To start the integration driver:
+```shell
+cargo run
+```
 
 ## Contributing
 

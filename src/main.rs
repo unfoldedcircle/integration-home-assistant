@@ -188,7 +188,8 @@ fn publish_mdns(api_port: u16, drv_metadata: IntegrationDriverUpdate) {
         drv_metadata
             .driver_id
             .expect("driver_id must be set in driver metadata"),
-        "_uc-integration._tcp",
+        "uc-integration",
+        "tcp",
         api_port,
         vec![
             format!(
