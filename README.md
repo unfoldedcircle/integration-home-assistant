@@ -36,13 +36,15 @@ The following environment variables exist in addition to the configuration file:
 | Variable                     | Values               | Description                                                                                                 |
 |------------------------------|----------------------|-------------------------------------------------------------------------------------------------------------|
 | UC_CONFIG_HOME               | _directory path_     | Configuration directory to save the user configuration from the driver setup.<br>Default: current directory |
+| UC_DISABLE_MDNS_PUBLISH      | `true` / `false`     | Disables mDNS service advertisement.<br>Default: `false`                                                    |
 | UC_USER_CFG_FILENAME         | _filename_           | JSON configuration filename for the user settings.<br>Default: `home-assistant.json`                        |
 | UC_DISABLE_CERT_VERIFICATION | `true` / `false`     | Disables certificate verification for the Home Assistant WS connection.<br>Default: `false`                 |
 | UC_API_MSG_TRACING           | `all` / `in` / `out` | Enables incoming and outgoing WS Core-API message tracing<br>Default: no tracing                            |
 | UC_HASS_MSG_TRACING          | `all` / `in` / `out` | Enables incoming and outgoing Home Assistant WS message tracing<br>Default: no tracing                      |
 
 On the Remote Two device, the integration is configured for the embedded runtime environment with several environment
-variables. Mainly `UC_CONFIG_HOME` and some `UC_INTEGRATION_*`.
+variables. Mainly `UC_DISABLE_MDNS_PUBLISH=true`, `UC_CONFIG_HOME` and some `UC_INTEGRATION_*` to listen on the local
+interface only.
 
 ## How to Build and Run
 
