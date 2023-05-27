@@ -66,7 +66,10 @@ fn service_publisher(
 
     loop {
         // What is a good production timeout?
-        event_loop.poll(Duration::from_secs(1)).unwrap();
+        if let Err(e) = event_loop.poll(Duration::from_secs(1)) {
+            error!("mDNS event loop polling error: {e}");
+            return;
+        }
     }
 }
 
