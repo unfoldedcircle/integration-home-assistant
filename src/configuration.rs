@@ -21,7 +21,39 @@ pub const DEF_SETUP_TIMEOUT_SEC: u64 = 300;
 
 const ENV_USER_CFG_FILENAME: &str = "UC_USER_CFG_FILENAME";
 const DEV_USER_CFG_FILENAME: &str = "home-assistant.json";
+
+/// Environment variable for the user configuration directory.
+///
+/// This ENV variable is set on the Remote device to the integration specific data directory.
 const ENV_CONFIG_HOME: &str = "UC_CONFIG_HOME";
+
+/// Environment variable to disable mDNS service publishing.
+///
+/// When running on the Remote device, service publishing is not required.
+pub const ENV_DISABLE_MDNS_PUBLISH: &str = "UC_DISABLE_MDNS_PUBLISH";
+
+/// Environment variable to enable Home Assistant server WebSocket message tracing.
+///
+/// Valid values:
+/// - `all`: enable incoming and outgoing message traces
+/// - `in`: only incoming messages
+/// - `out`: only outgoing messages
+///
+/// **Attention:** this setting is only for debugging and exposes all data, including credentials!
+pub const ENV_HASS_MSG_TRACING: &str = "UC_HASS_MSG_TRACING";
+
+/// Environment variable to enable Remote Two Integration API WebSocket message tracing.
+///
+/// Valid values:
+/// - `all`: enable incoming and outgoing message traces
+/// - `in`: only incoming messages
+/// - `out`: only outgoing messages
+///
+/// **Attention:** this setting is only for debugging and exposes all data, including credentials!
+pub const ENV_API_MSG_TRACING: &str = "UC_API_MSG_TRACING";
+
+/// Environment variable to disable TLS verification to the Home Assistant server.
+pub const ENV_DISABLE_CERT_VERIFICATION: &str = "UC_DISABLE_CERT_VERIFICATION";
 
 #[derive(Default, serde::Deserialize, serde::Serialize)]
 pub struct Settings {

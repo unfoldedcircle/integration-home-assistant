@@ -3,7 +3,7 @@
 
 //! WebSocket server for the Remote Two integration API
 
-use crate::configuration::{HeartbeatSettings, WebSocketSettings};
+use crate::configuration::{HeartbeatSettings, WebSocketSettings, ENV_API_MSG_TRACING};
 use crate::Controller;
 use actix::Addr;
 use actix_web::error::JsonPayloadError;
@@ -43,7 +43,7 @@ impl WsConn {
         controller_addr: Addr<Controller>,
         heartbeat: HeartbeatSettings,
     ) -> Self {
-        let msg_tracing = env::var("UC_API_MSG_TRACING").unwrap_or_default();
+        let msg_tracing = env::var(ENV_API_MSG_TRACING).unwrap_or_default();
         Self {
             id: client_id,
             hb: Instant::now(),

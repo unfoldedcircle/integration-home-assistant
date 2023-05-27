@@ -15,10 +15,12 @@
 #![forbid(non_ascii_idents)]
 #![deny(unsafe_code)]
 
-use crate::configuration::{get_configuration, CertificateSettings, IntegrationSettings};
+use crate::configuration::{
+    get_configuration, CertificateSettings, IntegrationSettings, ENV_DISABLE_MDNS_PUBLISH,
+};
 use crate::controller::Controller;
 use crate::server::publish_service;
-use crate::util::create_single_cert_server_config;
+use crate::util::{bool_from_env, create_single_cert_server_config};
 use actix::Actor;
 use actix_web::{middleware, web, App, HttpServer};
 use clap::{arg, Command};
@@ -126,7 +128,9 @@ async fn main() -> io::Result<()> {
         http_server = http_server.listen(listener)?;
     }
 
-    publish_mdns(api_port, driver_metadata);
+    if !bool_from_env(ENV_DISABLE_MDNS_PUBLISH) {
+        publish_mdns(api_port, driver_metadata);
+    }
 
     http_server.run().await?;
 
