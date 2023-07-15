@@ -47,10 +47,10 @@ jobs:
       - id: setup
         uses: ./.github/actions/rust-setup
 
-      - run: cargo test
+      - run: cargo test --features mdns-sd
 
       - name: Run clippy
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --features mdns-sd -- -D warnings
 
   build:
     name: Build release
@@ -76,7 +76,7 @@ jobs:
 
       - name: Release build
         shell: bash
-        run: cargo build --release
+        run: cargo build --features mdns-sd --release
 
 # This takes over 5 min! Do it manually...
 #      - name: Create license report for releases

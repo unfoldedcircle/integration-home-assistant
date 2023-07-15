@@ -4,12 +4,12 @@
 use crate::configuration::ENV_DISABLE_CERT_VERIFICATION;
 use crate::util::bool_from_env;
 use actix_tls::connect::rustls::webpki_roots_cert_store;
-use if_addrs::{IfAddr, Ifv4Addr};
 use rustls::ClientConfig;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub fn my_ipv4_interfaces() -> Vec<Ifv4Addr> {
+#[cfg(feature = "mdns-sd")]
+pub fn my_ipv4_interfaces() -> Vec<if_addrs::Ifv4Addr> {
     if_addrs::get_if_addrs()
         .unwrap_or_default()
         .into_iter()
@@ -18,7 +18,7 @@ pub fn my_ipv4_interfaces() -> Vec<Ifv4Addr> {
                 None
             } else {
                 match i.addr {
-                    IfAddr::V4(ifv4) => Some(ifv4),
+                    if_addrs::IfAddr::V4(ifv4) => Some(ifv4),
                     _ => None,
                 }
             }

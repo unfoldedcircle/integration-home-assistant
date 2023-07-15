@@ -10,6 +10,11 @@ description = "Unfolded Circle Home-Assistant integration for Remote Two"
 [profile.release]
 strip = true  # Automatically strip symbols from the binary.
 
+[features]
+default = []
+mdns-sd = ["dep:mdns-sd"]
+zeroconf = ["dep:zeroconf"]
+
 [dependencies]
 uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.7.1-alpha" }
 #uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "b92dbde77ea7ff800aab4505547e0792d985430f" }
@@ -31,9 +36,11 @@ bytes = "1"
 futures = "0.3"
 
 # see mdns-sd patch at the end of this file
-mdns-sd = "0.7.3"
+mdns-sd = { version = "0.7.3", optional = true }
 if-addrs = "0.10"
 hostname = "0.3"
+# see zeroconf patch at the end of this file
+zeroconf = { version = "0.10.5", optional = true }
 
 # JSON (de)serialization
 serde = { version = "1", features = ["derive"] }
@@ -66,3 +73,5 @@ rstest = "0.17"
 
 [patch.crates-io]
 mdns-sd = { git = "https://github.com/zehnm/mdns-sd", rev = "401bab9b34f1a79c06b87432071abb2d4a379a75" }
+# PR ERobsham:bugfix/respect_timeout_on_linux
+zeroconf = { git = "https://github.com/ERobsham/zeroconf-rs", rev = "a6e399d16dc04f94bf87ef60be222e966b94bd86" }
