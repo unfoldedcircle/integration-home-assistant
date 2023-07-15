@@ -11,7 +11,7 @@ use log::error;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::{AvailableIntgEntity, EntityChange};
-use uc_api::{EntityType, MediaPlayerFeature};
+use uc_api::{EntityType, MediaPlayerDeviceClass, MediaPlayerFeature};
 use url::Url;
 
 // https://developers.home-assistant.io/docs/core/entity/media-player#supported-features
@@ -25,12 +25,12 @@ pub const SUPPORT_TURN_ON: u32 = 128;
 pub const SUPPORT_TURN_OFF: u32 = 256;
 // pub const SUPPORT_PLAY_MEDIA: u32 = 512;
 pub const SUPPORT_VOLUME_STEP: u32 = 1024;
-// pub const SUPPORT_SELECT_SOURCE: u32 = 2048;
+pub const SUPPORT_SELECT_SOURCE: u32 = 2048;
 pub const SUPPORT_STOP: u32 = 4096;
 // pub const SUPPORT_CLEAR_PLAYLIST: u32 = 8192;
 pub const SUPPORT_PLAY: u32 = 16384;
 pub const SUPPORT_SHUFFLE_SET: u32 = 32768;
-// pub const SUPPORT_SELECT_SOUND_MODE: u32 = 65536;
+pub const SUPPORT_SELECT_SOUND_MODE: u32 = 65536;
 // pub const SUPPORT_BROWSE_MEDIA: u32 = 131072;
 pub const SUPPORT_REPEAT_SET: u32 = 262144;
 // pub const SUPPORT_GROUPING: u32 = 524288;
@@ -44,7 +44,7 @@ pub(crate) fn map_media_player_attributes(
     let mut attributes = serde_json::Map::with_capacity(8);
 
     let state = match state {
-        "playing" | "paused" => state.to_uppercase().into(),
+        "playing" | "paused" | "standby" | "buffering" => state.to_uppercase().into(),
         "idle" => "ON".into(),
         _ => convert_ha_onoff_state(state)?,
     };
@@ -66,7 +66,9 @@ pub(crate) fn map_media_player_attributes(
             attributes.insert("repeat".into(), value.to_uppercase().into());
         }
         json::move_entry(ha_attr, &mut attributes, "source");
+        json::move_entry(ha_attr, &mut attributes, "source_list");
         json::move_entry(ha_attr, &mut attributes, "sound_mode");
+        json::move_entry(ha_attr, &mut attributes, "sound_mode_list");
 
         if let Some(value) = ha_attr.get("entity_picture").and_then(|v| v.as_str()) {
             // let's hope it's only http, https or a local path :-)
@@ -88,7 +90,7 @@ pub(crate) fn map_media_player_attributes(
                     .into(),
                 );
             } else {
-                error!("Unexpected entity_picture format: {}", value);
+                error!("Unexpected entity_picture format: {value}");
             }
         }
     }
@@ -123,11 +125,11 @@ pub(crate) fn convert_media_player_entity(
 ) -> Result<AvailableIntgEntity, ServiceError> {
     let friendly_name = ha_attr.get("friendly_name").and_then(|v| v.as_str());
     let name = HashMap::from([("en".into(), friendly_name.unwrap_or(&entity_id).into())]);
-    let device_class = ha_attr.get("device_class").and_then(|v| v.as_str());
-    let device_class = match device_class {
-        Some("receiver") | Some("speaker") => device_class.map(|v| v.into()),
-        _ => None,
-    };
+    let device_class = ha_attr
+        .get("device_class")
+        .and_then(|v| v.as_str())
+        .and_then(|v| MediaPlayerDeviceClass::try_from(v).ok())
+        .map(|v| v.to_string());
 
     // handle features
     let supported_features = ha_attr
@@ -144,6 +146,9 @@ pub(crate) fn convert_media_player_entity(
     }
     if supported_features & SUPPORT_VOLUME_STEP > 0 {
         media_feats.push(MediaPlayerFeature::VolumeUpDown);
+    }
+    if supported_features & SUPPORT_SELECT_SOURCE > 0 {
+        media_feats.push(MediaPlayerFeature::SelectSource);
     }
     if supported_features & SUPPORT_VOLUME_MUTE > 0 {
         // HASS media player doesn't support mute toggle!
@@ -168,6 +173,9 @@ pub(crate) fn convert_media_player_entity(
     if supported_features & SUPPORT_SHUFFLE_SET > 0 {
         media_feats.push(MediaPlayerFeature::Shuffle);
     }
+    if supported_features & SUPPORT_SELECT_SOUND_MODE > 0 {
+        media_feats.push(MediaPlayerFeature::SelectSoundMode);
+    }
     if supported_features & SUPPORT_SEEK > 0 {
         media_feats.push(MediaPlayerFeature::Seek);
         media_feats.push(MediaPlayerFeature::MediaDuration);
@@ -181,10 +189,6 @@ pub(crate) fn convert_media_player_entity(
 
     /* TODO from YIO v1
     features.push("APP_NAME"); ???
-
-    if supported_features & SUPPORT_SELECT_SOURCE > 0 {
-        features.push("SOURCE");
-    }
      */
 
     // Note: volume_steps doesn't seem to be retrievable from HA (#14)

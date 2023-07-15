@@ -1,6 +1,6 @@
 [package]
 name = "uc-intg-hass"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
 license = "MPL-2.0"
@@ -16,8 +16,7 @@ mdns-sd = ["dep:mdns-sd"]
 zeroconf = ["dep:zeroconf"]
 
 [dependencies]
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.7.1-alpha" }
-#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "b92dbde77ea7ff800aab4505547e0792d985430f" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.8.0-alpha" }
 # for local development:
 #uc_api = { path = "../api-model-rs" }
 

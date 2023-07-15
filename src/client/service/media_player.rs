@@ -84,6 +84,46 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
             }
             ("shuffle_set".into(), Some(data.into()))
         }
+        // TODO can we find out related HA entities and forward the command to these? Would we very convenient for the user!
+        // E.g. the remote entity which usually comes with a media-player entity as for ATV or LG TV
+        MediaPlayerCommand::ChannelUp
+        | MediaPlayerCommand::ChannelDown
+        | MediaPlayerCommand::CursorUp
+        | MediaPlayerCommand::CursorDown
+        | MediaPlayerCommand::CursorLeft
+        | MediaPlayerCommand::CursorRight
+        | MediaPlayerCommand::CursorEnter
+        | MediaPlayerCommand::FunctionRed
+        | MediaPlayerCommand::FunctionGreen
+        | MediaPlayerCommand::FunctionYellow
+        | MediaPlayerCommand::FunctionBlue
+        | MediaPlayerCommand::Home
+        | MediaPlayerCommand::Menu
+        | MediaPlayerCommand::Back => return Err(ServiceError::BadRequest("Not supported".into())),
+        MediaPlayerCommand::SelectSource => {
+            let mut data = Map::new();
+            let params = get_required_params(msg)?;
+            if let Some(source) = params.get("source").and_then(|v| v.as_str()) {
+                data.insert("source".into(), source.into());
+            } else {
+                return Err(ServiceError::BadRequest(
+                    "Invalid or missing params.source attribute".into(),
+                ));
+            }
+            ("select_source".into(), Some(data.into()))
+        }
+        MediaPlayerCommand::SelectSoundMode => {
+            let mut data = Map::new();
+            let params = get_required_params(msg)?;
+            if let Some(mode) = params.get("sound_mode").and_then(|v| v.as_str()) {
+                data.insert("sound_mode".into(), mode.into());
+            } else {
+                return Err(ServiceError::BadRequest(
+                    "Invalid or missing params.sound_mode attribute".into(),
+                ));
+            }
+            ("select_sound_mode".into(), Some(data.into()))
+        }
     };
 
     Ok(result)

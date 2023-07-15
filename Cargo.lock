@@ -55,7 +55,7 @@ dependencies = [
  "actix-tls",
  "actix-utils",
  "ahash 0.8.3",
- "base64 0.21.2",
+ "base64",
  "bitflags 1.3.2",
  "brotli",
  "bytes",
@@ -394,7 +394,7 @@ dependencies = [
  "actix-tls",
  "actix-utils",
  "ahash 0.7.6",
- "base64 0.21.2",
+ "base64",
  "bytes",
  "cfg-if 1.0.0",
  "cookie",
@@ -430,12 +430,6 @@ dependencies = [
  "object",
  "rustc-demangle",
 ]
-
-[[package]]
-name = "base64"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
@@ -1938,7 +1932,7 @@ version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d3987094b1d07b653b7dfdc3f70ce9a1da9c51ac18c1b06b662e4f9a0e9f4b2"
 dependencies = [
- "base64 0.21.2",
+ "base64",
 ]
 
 [[package]]
@@ -2032,46 +2026,18 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "2.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07ff71d2c147a7b57362cead5e22f772cd52f6ab31cfcd9edcd7f6aeb2a0afbe"
-dependencies = [
- "base64 0.13.1",
- "chrono",
- "hex",
- "indexmap 1.9.3",
- "serde",
- "serde_json",
- "serde_with_macros 2.3.3",
- "time 0.3.23",
-]
-
-[[package]]
-name = "serde_with"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f02d8aa6e3c385bf084924f660ce2a3a6bd333ba55b35e8590b321f35d88513"
 dependencies = [
- "base64 0.21.2",
+ "base64",
  "chrono",
  "hex",
  "indexmap 1.9.3",
  "serde",
  "serde_json",
- "serde_with_macros 3.0.0",
+ "serde_with_macros",
  "time 0.3.23",
-]
-
-[[package]]
-name = "serde_with_macros"
-version = "2.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "881b6f881b17d13214e5d494c939ebab463d01264ce1811e9d4ac3a882e7695f"
-dependencies = [
- "darling 0.20.3",
- "proc-macro2",
- "quote",
- "syn 2.0.26",
 ]
 
 [[package]]
@@ -2394,7 +2360,7 @@ checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 
 [[package]]
 name = "uc-intg-hass"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "actix",
  "actix-codec",
@@ -2422,7 +2388,7 @@ dependencies = [
  "rustls-pemfile",
  "serde",
  "serde_json",
- "serde_with 3.0.0",
+ "serde_with",
  "strum",
  "strum_macros",
  "time 0.3.23",
@@ -2434,8 +2400,8 @@ dependencies = [
 
 [[package]]
 name = "uc_api"
-version = "0.7.1-alpha"
-source = "git+https://github.com/unfoldedcircle/api-model-rs?tag=v0.7.1-alpha#9a0ab587aab63589e134f0460071c58140ec2b43"
+version = "0.8.0-alpha"
+source = "git+https://github.com/unfoldedcircle/api-model-rs?tag=v0.8.0-alpha#e7a27af7ebc5d2fd52a435e263489f9271bffaa8"
 dependencies = [
  "chrono",
  "derive_more",
@@ -2443,7 +2409,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "serde_with 2.3.3",
+ "serde_with",
  "strum",
  "strum_macros",
  "validator",
