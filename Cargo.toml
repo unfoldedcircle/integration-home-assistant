@@ -45,7 +45,7 @@ zeroconf = { version = "0.10.5", optional = true }
 # JSON (de)serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_with = "2"
+serde_with = "3"
 
 rust-fsm = "0.6"
 
