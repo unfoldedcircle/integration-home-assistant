@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
 license = "MPL-2.0"
 description = "Unfolded Circle Home-Assistant integration for Remote Two"
-#repository = "https://github.com/unfoldedcircle/integration-home-assistant"
+repository = "https://github.com/unfoldedcircle/integration-home-assistant"
 
 [profile.release]
 strip = true  # Automatically strip symbols from the binary.
@@ -16,7 +16,7 @@ mdns-sd = ["dep:mdns-sd"]
 zeroconf = ["dep:zeroconf"]
 
 [dependencies]
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.8.0-alpha" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.8.1-alpha" }
 # for local development:
 #uc_api = { path = "../api-model-rs" }
 

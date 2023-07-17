@@ -8,10 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
-### Changed
-- public GitHub repository!
+### Added
+- option to use zeroconf library for mDNS advertisement instead of mdns-sd
+- new media player features:
+  - Add support for input source and sound mode selection.
+  - Propagate entity states `standby` and `buffering`.
 
 ---
+
+## v0.2.1 - 2023-05-25
+### Fixed
+- mdns-sd workaround for mDNS query flooding
 
 ## v0.2.0 - 2023-03-28
 ### Added
