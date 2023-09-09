@@ -39,18 +39,29 @@
 <body>
     <main class="container">
         <div class="intro">
-            <h1>Third Party Licenses</h1>
-            <p>This page lists the licenses of the projects used in Home-Assistant Integration for Remote Two.</p>
+            <h1>Licenses</h1>
+            <p>The Unfolded Circle Home-Assistant Integration for Remote Two is licensed under the Mozilla Public License 2.0.</p>
         </div>
     
-        <h2>Overview of licenses:</h2>
+        <h2>Overview of Third Party Licenses</h2>
+        <p>These are the licenses for the libraries we use in the Home-Assistant Integration for Remote Two:</p>
         <ul class="licenses-overview">
             {{#each overview}}
             <li><a href="#{{id}}">{{name}}</a> ({{count}})</li>
             {{/each}}
+            <li><a href="#other">Other</a> (1)</li>
         </ul>
 
-        <h2>All license text:</h2>
+        <h2>Attributions</h2>
+        <pre class="license-text">
+Copyright (c) 1998-2019 The OpenSSL Project.  All rights reserved.
+
+This product contains software developed by the OpenSSL Project for use in the OpenSSL Toolkit (www.openssl.org/).
+This product contains cryptographic software by Eric Young (eay@cryptsoft.com).
+This product contains software by Tim Hudson (tjh@cryptsoft.com).
+</pre>
+
+        <h2>All license text</h2>
         <ul class="licenses-list">
             {{#each licenses}}
             <li class="license">
@@ -64,6 +75,37 @@
                 <pre class="license-text">{{text}}</pre>
             </li>
             {{/each}}
+        </ul>
+
+        <h2 id="other">Other</h2>
+        <ul class="licenses-list">
+            <li class="license">
+                <h3>webpki</h3>
+                <ul class="license-used-by">
+                    <li><a href="https://github.com/briansmith/webpki">webpki 0.22.0</a></li>
+                </ul>
+                <pre class="license-text">
+Except as otherwise noted, this project is licensed under the following
+(ISC-style) terms:
+
+Copyright 2015 Brian Smith.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHORS DISCLAIM ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+The files under third-party/chromium are licensed as described in
+third-party/chromium/LICENSE.
+                </pre>
+            </li>
         </ul>
     </main>
 </body>
