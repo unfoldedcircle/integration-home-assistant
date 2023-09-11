@@ -121,7 +121,7 @@ async fn main() -> io::Result<()> {
     if let Some(listener) = listeners.listener_tls {
         let server_cfg =
             create_single_cert_server_config(&listeners.certs.public, &listeners.certs.private)?;
-        http_server = http_server.listen_rustls(listener, server_cfg)?;
+        http_server = http_server.listen_rustls_0_21(listener, server_cfg)?;
     }
 
     if let Some(listener) = listeners.listener {

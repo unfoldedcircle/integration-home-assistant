@@ -3,7 +3,7 @@
 
 use crate::configuration::ENV_DISABLE_CERT_VERIFICATION;
 use crate::util::bool_from_env;
-use actix_tls::connect::rustls::webpki_roots_cert_store;
+use actix_tls::connect::rustls_0_21::webpki_roots_cert_store;
 use rustls::ClientConfig;
 use std::sync::Arc;
 use std::time::Duration;
@@ -46,7 +46,7 @@ pub fn new_websocket_client(connection_timeout: Duration, tls: bool) -> awc::Cli
                 .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
         }
 
-        let connector = awc::Connector::new().rustls(Arc::new(config));
+        let connector = awc::Connector::new().rustls_021(Arc::new(config));
         awc::ClientBuilder::new()
             .timeout(connection_timeout)
             .connector(connector)

@@ -23,6 +23,7 @@ pub use ws::{json_error_handler, ws_index};
 #[cfg(not(feature = "mdns-sd"))]
 pub fn publish_service(
     _instance_name: impl AsRef<str>,
+    _service_name: impl AsRef<str>,
     _reg_type: impl Into<String>,
     _port: u16,
     _txt: Vec<String>,
