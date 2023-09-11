@@ -94,9 +94,7 @@ impl Handler<SubscribeHaEventsMsg> for Controller {
         }
         if let Some(session) = self.sessions.get_mut(&msg.0.ws_id) {
             let subscribe: SubscribeEvents = msg.0.deserialize()?;
-            session
-                .subscribed_entities
-                .extend(subscribe.entity_ids.into_iter());
+            session.subscribed_entities.extend(subscribe.entity_ids);
             Ok(())
         } else {
             Err(ServiceError::NotConnected)
