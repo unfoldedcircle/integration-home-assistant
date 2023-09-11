@@ -17,6 +17,7 @@ use serde_json::{Map, Value};
 use uc_api::intg::EntityCommand;
 use uc_api::EntityType;
 
+mod button;
 mod climate;
 mod cover;
 mod light;
@@ -41,7 +42,7 @@ impl Handler<CallService> for HomeAssistantClient {
 
         // map Remote Two command name & parameters to HA service name and service_data payload
         let (service, service_data) = match msg.command.entity_type {
-            EntityType::Button => Ok(("press".to_string(), None)),
+            EntityType::Button => button::handle_button(&msg.command),
             EntityType::Switch => switch::handle_switch(&msg.command),
             EntityType::Climate => climate::handle_climate(&msg.command),
             EntityType::Cover => cover::handle_cover(&msg.command),

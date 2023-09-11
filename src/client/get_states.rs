@@ -59,6 +59,7 @@ impl HomeAssistantClient {
                     "input_boolean" => "switch",
                     "binary_sensor" => "sensor",
                     "input_button" => "button",
+                    "script" => "button",
                     v => v,
                 },
             };
