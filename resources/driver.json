@@ -5,11 +5,11 @@
   "name": {
     "en": "Home Assistant"
   },
-  "icon": "custom:hass.png",
+  "icon": "uc:integration",
   "description": {
-    "en": "Development driver for Home Assistant. This is not yet an official release.",
-    "de": "Entwicklungstreiber für Home Assistant. Dies ist noch kein offizielles Release.",
-    "fr": "Pilote de développement pour Home Assistant. Il ne s'agit pas encore d'une version officielle."
+    "en": "Control Home Assistant entities with Remote Two.",
+    "de": "Steuere Home Assistant Entitäten mit Remote Two.",
+    "fr": "Contrôler les entités de Home Assistant avec Remote Two."
   },
   "developer": {
     "name": "Unfolded Circle ApS",
@@ -53,7 +53,8 @@
       {
         "id": "token",
         "label": {
-          "en": "Long lived access token"
+          "en": "Long lived access token",
+          "de": "Langlebiges Zugriffstoken"
         },
         "field": {
           "password": {
