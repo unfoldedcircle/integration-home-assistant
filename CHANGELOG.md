@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Changed
+- Rename media-player `select_sound_mode` command parameter
+
 ---
 
 ## v0.4.0 - 2023-09-13
