@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+- Map scenes to push buttons ([#29](https://github.com/unfoldedcircle/integration-home-assistant/issues/29)).
+
 ---
 
 ## v0.3.0 - 2023-07-17
