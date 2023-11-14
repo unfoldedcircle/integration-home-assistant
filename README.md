@@ -4,11 +4,16 @@
 
 This service application connects [Home Assistant](https://www.home-assistant.io/) with the
 [Remote Two](https://www.unfoldedcircle.com/) and allows to interact with most entities on the remote.  
-It implements the Remote Two [Integration-API](https://github.com/unfoldedcircle/core-api) which communicates with
-JSON messages over WebSocket.
+
+The integration is included in the Remote Two firmware and no external service must be run to connect Home Assistant
+with Remote Two. The standalone service can be used for development or connecting multiple Home Assistant servers.
+
+The integration implements the Remote Two [Integration-API](https://github.com/unfoldedcircle/core-api) which
+communicates with JSON messages over WebSocket.
 
 The WebSocket server and client uses [Actix Web](https://actix.rs/) with the Actix actor system for internal service
 communication.
+
 
 ## Container Image
 
@@ -65,6 +70,9 @@ cargo build --features zeroconf
 ```
 
 With pure Rust [mdns-sd](https://crates.io/crates/mdns-sd) library:
+
+⚠️ Use at own risk, this library can cause package flooding with Apple devices in the same network!
+
 ```shell
 cargo build --features mdns-sd
 ```
