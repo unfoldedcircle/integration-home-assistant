@@ -11,7 +11,14 @@ _Changes in the next release_
 ### Added
 - Map scenes to push buttons ([#29](https://github.com/unfoldedcircle/integration-home-assistant/issues/29)).
 
+### Changed
+- Rename media-player `select_sound_mode` command parameter
+
 ---
+
+## v0.4.0 - 2023-09-13
+### Added
+- Allow to use HA Scripts as Button Entity.
 
 ## v0.3.0 - 2023-07-17
 ### Added

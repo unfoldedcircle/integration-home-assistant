@@ -115,11 +115,11 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
         MediaPlayerCommand::SelectSoundMode => {
             let mut data = Map::new();
             let params = get_required_params(msg)?;
-            if let Some(mode) = params.get("sound_mode").and_then(|v| v.as_str()) {
+            if let Some(mode) = params.get("mode").and_then(|v| v.as_str()) {
                 data.insert("sound_mode".into(), mode.into());
             } else {
                 return Err(ServiceError::BadRequest(
-                    "Invalid or missing params.sound_mode attribute".into(),
+                    "Invalid or missing params.mode attribute".into(),
                 ));
             }
             ("select_sound_mode".into(), Some(data.into()))
