@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[cfg(feature = "mdns-sd")]
-pub fn my_ipv4_interfaces() -> Vec<if_addrs::Ifv4Addr> {
+pub fn my_ipv4_interfaces() -> Vec<if_addrs::IfAddr> {
     if_addrs::get_if_addrs()
         .unwrap_or_default()
         .into_iter()
@@ -18,7 +18,7 @@ pub fn my_ipv4_interfaces() -> Vec<if_addrs::Ifv4Addr> {
                 None
             } else {
                 match i.addr {
-                    if_addrs::IfAddr::V4(ifv4) => Some(ifv4),
+                    if_addrs::IfAddr::V4(_) => Some(i.addr),
                     _ => None,
                 }
             }

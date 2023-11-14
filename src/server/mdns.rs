@@ -8,7 +8,7 @@ use crate::util::my_ipv4_interfaces;
 use lazy_static::lazy_static;
 use log::{error, info};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use std::net::Ipv4Addr;
+use std::net::IpAddr;
 
 lazy_static! {
     pub static ref MDNS_SERVICE: Option<ServiceDaemon> = match ServiceDaemon::new() {
@@ -43,7 +43,7 @@ pub fn publish_service(
         if !reg_type.ends_with(".local.") {
             reg_type.push_str(".local.");
         }
-        let my_addrs: Vec<Ipv4Addr> = my_ipv4_interfaces().iter().map(|i| i.ip).collect();
+        let my_addrs: Vec<IpAddr> = my_ipv4_interfaces().iter().map(|i| i.ip()).collect();
         let hostname = hostname::get().map(|name| name.to_string_lossy().to_string())?;
 
         let properties = txt
