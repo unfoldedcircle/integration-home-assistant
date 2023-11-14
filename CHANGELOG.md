@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.4.0 - 2023-09-13
+### Added
+- Allow to use HA Scripts as Button Entity.
+
 ## v0.3.0 - 2023-07-17
 ### Added
 - option to use zeroconf library for mDNS advertisement instead of mdns-sd
