@@ -16,6 +16,7 @@ pub(crate) fn handle_button(msg: &EntityCommand) -> Result<(String, Option<Value
 
     let service_call: &str = match entity[0] {
         "script" => entity[1],
+        "scene" => "turn_on",
         &_ => "press",
     };
 
