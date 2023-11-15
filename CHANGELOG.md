@@ -8,13 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.5.0 - 2023-11-15
 ### Added
 - Map scenes to push buttons ([#29](https://github.com/unfoldedcircle/integration-home-assistant/issues/29)).
 
 ### Changed
-- Rename media-player `select_sound_mode` command parameter
-
----
+- Rename media-player `select_sound_mode` command parameter ([feature-and-bug-tracker#165](https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/165)).
+- Update dependencies, including rustls 0.21.
 
 ## v0.4.0 - 2023-09-13
 ### Added
