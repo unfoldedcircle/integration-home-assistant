@@ -96,7 +96,7 @@ pub struct Controller {
     /// HomeAssistant client actor
     ha_client: Option<Addr<HomeAssistantClient>>,
     ha_reconnect_duration: Duration,
-    ha_reconnect_attempt: u16,
+    ha_reconnect_attempt: u32,
     drv_metadata: IntegrationDriverUpdate,
     /// State machine for driver state: setup flow or running state
     machine: StateMachine<OperationMode>,
