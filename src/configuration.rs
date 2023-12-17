@@ -133,7 +133,7 @@ impl Default for HomeAssistantSettings {
 #[serde_as]
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct ReconnectSettings {
-    pub attempts: u16,
+    pub attempts: u32,
     #[serde_as(as = "DurationMilliSeconds")]
     #[serde(rename = "duration_ms")]
     pub duration: Duration,
@@ -146,7 +146,7 @@ pub struct ReconnectSettings {
 impl Default for ReconnectSettings {
     fn default() -> Self {
         Self {
-            attempts: 100,
+            attempts: 0,
             duration: Duration::from_secs(1),
             duration_max: Duration::from_secs(30),
             backoff_factor: 1.5,

@@ -107,7 +107,9 @@ impl Handler<ConnectMsg> for Controller {
                         // TODO quick and dirty: simply send Connect message as simple reconnect mechanism. Needs to be refined!
                         if act.device_state != DeviceState::Disconnected {
                             act.ha_reconnect_attempt += 1;
-                            if act.ha_reconnect_attempt > act.settings.hass.reconnect.attempts {
+                            if act.settings.hass.reconnect.attempts > 0
+                                && act.ha_reconnect_attempt > act.settings.hass.reconnect.attempts
+                            {
                                 info!(
                                     "Max reconnect attempts reached ({}). Giving up!",
                                     act.settings.hass.reconnect.attempts

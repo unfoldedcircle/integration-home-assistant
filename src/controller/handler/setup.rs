@@ -212,13 +212,13 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                             {
                                 "id": "reconnect.attempts",
                                 "label": {
-                                    "en": "Max reconnect attempts"
+                                    "en": "Max reconnect attempts (0 = unlimited)"
                                 },
                                 "field": {
                                     "number": {
                                         "value": self.settings.hass.reconnect.attempts,
-                                        "min": 1,
-                                        "max": 65536
+                                        "min": 0,
+                                        "max": 2000000
                                     }
                                 }
                             },
