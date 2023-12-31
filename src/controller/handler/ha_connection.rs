@@ -47,7 +47,10 @@ impl Handler<ConnectionEvent> for Controller {
 impl Handler<DisconnectMsg> for Controller {
     type Result = ();
 
-    fn handle(&mut self, _msg: DisconnectMsg, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: DisconnectMsg, ctx: &mut Self::Context) -> Self::Result {
+        if let Some(handle) = self.reconnect_handle.take() {
+            ctx.cancel_future(handle);
+        }
         if let Some(addr) = self.ha_client.as_ref() {
             addr.do_send(Close::default());
         }
@@ -58,6 +61,9 @@ impl Handler<ConnectMsg> for Controller {
     type Result = ResponseActFuture<Self, Result<(), Error>>;
 
     fn handle(&mut self, _msg: ConnectMsg, ctx: &mut Self::Context) -> Self::Result {
+        if let Some(handle) = self.reconnect_handle.take() {
+            ctx.cancel_future(handle);
+        }
         if !matches!(self.machine.state(), &OperationModeState::Running) {
             return Box::pin(fut::result(Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -117,7 +123,9 @@ impl Handler<ConnectMsg> for Controller {
                                 act.device_state = DeviceState::Error;
                                 act.broadcast_device_state();
                             } else {
-                                ctx.notify_later(ConnectMsg {}, act.ha_reconnect_duration);
+                                act.reconnect_handle = Some(
+                                    ctx.notify_later(ConnectMsg {}, act.ha_reconnect_duration),
+                                );
                                 act.increment_reconnect_timeout();
                             }
                         }

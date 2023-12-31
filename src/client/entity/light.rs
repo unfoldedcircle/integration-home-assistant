@@ -65,7 +65,7 @@ pub(crate) fn map_light_attributes(
                         ));
                     }
                     // hs values are returned as floats: hue: 0..360, saturation: 0..100
-                    let hue = hs.get(0).unwrap().as_f64().unwrap_or_default() as u16;
+                    let hue = hs.first().unwrap().as_f64().unwrap_or_default() as u16;
                     let saturation =
                         (hs.get(1).unwrap().as_f64().unwrap_or_default() as f32 * 2.55_f32) as u16;
                     if hue > 360 || saturation > 100 {

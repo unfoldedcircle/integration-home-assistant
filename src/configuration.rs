@@ -158,6 +158,9 @@ impl Default for ReconnectSettings {
 #[serde_as]
 #[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
 pub struct HeartbeatSettings {
+    /// Use native WebSocket ping frames instead of [API messages](https://developers.home-assistant.io/docs/api/websocket/#pings-and-pongs)
+    #[serde(default)]
+    pub ping_frames: bool,
     /// How often heartbeat pings are sent
     #[serde_as(as = "DurationSeconds")]
     #[serde(rename = "interval_sec")]
@@ -171,6 +174,7 @@ pub struct HeartbeatSettings {
 impl Default for HeartbeatSettings {
     fn default() -> Self {
         Self {
+            ping_frames: false,
             interval: Duration::from_secs(20),
             timeout: Duration::from_secs(40),
         }
@@ -181,8 +185,8 @@ impl Display for HeartbeatSettings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Heartbeat interval={:?}, timeout={:?}",
-            self.interval, self.timeout
+            "Heartbeat interval={:?}, timeout={:?}, ping frames={}",
+            self.interval, self.timeout, self.ping_frames
         )
     }
 }
