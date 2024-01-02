@@ -1,6 +1,6 @@
 [package]
 name = "uc-intg-hass"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
 license = "MPL-2.0"
@@ -28,15 +28,16 @@ actix-tls = { version = "3.1", features = ["rustls-0_21"] }
 bytestring = "1"
 rustls = { version = "0.21", features = ["dangerous_configuration"] }
 rustls-pemfile = "1"
+# rustls-pki-types = "1" # required for rustls 0.22
 # WebSockets client
 actix-codec = "0.5"
-awc = { version = "3.2", features = ["rustls-0_21"] }
+awc = { version = "3.3", features = ["rustls-0_21"] }
 bytes = "1"
 futures = "0.3"
 
 # see mdns-sd patch at the end of this file
 mdns-sd = { version = "0.9.3", optional = true }
-if-addrs = "0.10"
+if-addrs = "0.11"
 hostname = "0.3"
 zeroconf = { version = "0.12", optional = true }
 
