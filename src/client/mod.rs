@@ -16,6 +16,7 @@ use log::{debug, error, info, warn};
 use messages::Close;
 use serde::de::Error;
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicU32, Ordering};
 use url::Url;
 
 use crate::client::messages::{ConnectionEvent, ConnectionState};
@@ -33,6 +34,8 @@ pub mod messages;
 mod model;
 mod service;
 mod streamhandler;
+
+static CLIENT_SEQ: AtomicU32 = AtomicU32::new(1);
 
 pub struct HomeAssistantClient {
     /// Unique HA client id
@@ -75,7 +78,12 @@ impl HomeAssistantClient {
             let port = url.port_or_known_default().unwrap_or_default();
             let msg_tracing = env::var(ENV_HASS_MSG_TRACING).unwrap_or_default();
             HomeAssistantClient {
-                id: format!("{}:{}", host, port),
+                id: format!(
+                    "{}:{}-{}",
+                    host,
+                    port,
+                    CLIENT_SEQ.fetch_add(1, Ordering::SeqCst)
+                ),
                 server: {
                     let mut server = url.clone();
                     server

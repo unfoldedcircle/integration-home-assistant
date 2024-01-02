@@ -24,19 +24,12 @@ impl Handler<R2EventMsg> for Controller {
 
         match msg.event {
             R2Event::Connect => {
-                session.ha_connect = true;
-
                 if self.device_state != DeviceState::Connected {
-                    self.device_state = DeviceState::Connecting;
-                    self.send_device_state(&msg.ws_id);
-                    ctx.notify(ConnectMsg {});
+                    ctx.notify(ConnectMsg::default());
                 }
             }
             R2Event::Disconnect => {
-                session.ha_connect = false;
                 ctx.notify(DisconnectMsg {});
-                // this prevents automatic reconnects
-                self.set_device_state(DeviceState::Disconnected);
             }
             R2Event::EnterStandby => {
                 session.standby = true;

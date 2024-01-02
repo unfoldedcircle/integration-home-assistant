@@ -58,13 +58,13 @@ struct R2Session {
     recipient: Recipient<SendWsMessage>,
     standby: bool,
     subscribed_entities: HashSet<String>,
-    /// HomeAssistant connection mode: true = connect (& reconnect), false = disconnect (& don't reconnect)
-    ha_connect: bool,
     // TODO replace with request id map & oneshot notification
     /// quick and dirty request id mapping for get_available_entities request.
     get_available_entities_id: Option<u32>,
     /// quick and dirty request id mapping for get_entity_states request.
     get_entity_states_id: Option<u32>,
+    /// Flag if currently in setup or reconfiguration mode.
+    pub reconfiguring: Option<bool>,
 }
 
 impl R2Session {
@@ -73,9 +73,9 @@ impl R2Session {
             recipient,
             standby: false,
             subscribed_entities: Default::default(),
-            ha_connect: false,
             get_available_entities_id: None,
             get_entity_states_id: None,
+            reconfiguring: None,
         }
     }
 }
@@ -95,6 +95,8 @@ pub struct Controller {
     ws_client: awc::Client,
     /// HomeAssistant client actor
     ha_client: Option<Addr<HomeAssistantClient>>,
+    /// HomeAssistant client identifier
+    ha_client_id: Option<String>,
     ha_reconnect_duration: Duration,
     ha_reconnect_attempt: u32,
     drv_metadata: IntegrationDriverUpdate,
@@ -125,6 +127,7 @@ impl Controller {
             ha_reconnect_duration: settings.hass.reconnect.duration,
             settings,
             ha_client: None,
+            ha_client_id: None,
             ha_reconnect_attempt: 0,
             drv_metadata,
             machine,
@@ -149,6 +152,13 @@ impl Controller {
         }
     }
 
+    /// Send a `device_state` event message with the current state to the given WebSocket client identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `ws_id`: WebSocket connection identifier of a Remote Two connection.
+    ///
+    /// returns: ()
     fn send_device_state(&self, ws_id: &str) {
         self.send_r2_msg(
             WsMessage::event(
@@ -160,6 +170,7 @@ impl Controller {
         );
     }
 
+    /// Broadcast a `device_state` event message with the current state to all connected Remotes
     fn broadcast_device_state(&self) {
         for session in self.sessions.keys() {
             // TODO filter out remotes which don't require an active HA connection?
@@ -167,6 +178,13 @@ impl Controller {
         }
     }
 
+    /// Set integration device state and broadcast state to all connected Remotes
+    ///
+    /// # Arguments
+    ///
+    /// * `state`: The state to set
+    ///
+    /// returns: ()
     fn set_device_state(&mut self, state: DeviceState) {
         self.device_state = state;
         self.broadcast_device_state();

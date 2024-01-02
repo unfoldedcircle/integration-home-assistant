@@ -32,9 +32,9 @@
         "field": {
           "label": {
             "value": {
-              "en": "The driver requires WebSocket API access to communicate with Home Assistant.\nSee [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) for more information on how to create a long lived access token.",
-              "de": "Der Treiber benötigt WebSocket-API Zugriff, um mit Home Assistant zu kommunizieren.\nWeitere Informationen zur Erstellung eines langlebigen Zugriffstokens findest du in der [Home Assistant Dokumentation](https://www.home-assistant.io/docs/authentication/)",
-              "fr": "Le pilote nécessite l'accès à l'API WebSocket pour communiquer avec Home Assistant.\nVoir [Home Assistant documentation] (https://www.home-assistant.io/docs/authentication/) pour plus d'informations sur la création d'un \"long lived access token\"."
+              "en": "The driver requires WebSocket API access to communicate with Home Assistant.\nSee [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) for more information on how to create a long lived access token.\n\nThe access token is required for setting up the integration. If the integration is reconfigured, the access token can be omitted and the previously configured token is used.",
+              "de": "Der Treiber benötigt WebSocket-API Zugriff, um mit Home Assistant zu kommunizieren.\nWeitere Informationen zur Erstellung eines langlebigen Zugriffstokens findest du in der [Home Assistant Dokumentation](https://www.home-assistant.io/docs/authentication/).\n\nDas Zugriffstoken wird zum Einrichten der Integration benötigt. Wird die Integration neu konfiguriert, kann das Zugriffstoken weggelassen werden und das vorher konfigurierte Token wird verwendet.",
+              "fr": "Le pilote nécessite l'accès à l'API WebSocket pour communiquer avec Home Assistant.\nVoir [Home Assistant documentation] (https://www.home-assistant.io/docs/authentication/) pour plus d'informations sur la création d'un \"long lived access token\".\n\nLe token d'accès est requis pour configurer l'intégration. Si l'intégration est reconfigurée, le token d'accès peut être omis et le token précédemment configuré est utilisé."
             }
           }
         }
@@ -53,8 +53,8 @@
       {
         "id": "token",
         "label": {
-          "en": "Long lived access token",
-          "de": "Langlebiges Zugriffstoken"
+          "en": "Long lived access token (empty: old token)",
+          "de": "Langlebiges Zugriffstoken (leer: altes Token)"
         },
         "field": {
           "password": {

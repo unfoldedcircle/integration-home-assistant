@@ -6,7 +6,7 @@
 use std::str::FromStr;
 
 use actix::Handler;
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use serde_json::{json, Value};
 use uc_api::EntityType;
 
@@ -101,7 +101,7 @@ impl HomeAssistantClient {
                 EntityType::Sensor => convert_sensor_entity(entity_id, state, attr),
                 // internal core entities for the moment
                 EntityType::Activity | EntityType::Macro | EntityType::Remote => {
-                    warn!("[{}] skipping internal entity {entity_type}", self.id);
+                    info!("[{}] skipping internal entity {entity_type}", self.id);
                     continue;
                 }
             };

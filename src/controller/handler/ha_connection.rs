@@ -7,9 +7,9 @@ use crate::client::messages::{Close, ConnectionEvent, ConnectionState};
 use crate::client::HomeAssistantClient;
 use crate::controller::handler::{ConnectMsg, DisconnectMsg};
 use crate::controller::{Controller, OperationModeState};
-use actix::{fut, ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
+use actix::{fut, ActorFutureExt, AsyncContext, Context, Handler, ResponseActFuture, WrapFuture};
 use futures::StreamExt;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use std::io::{Error, ErrorKind};
 use uc_api::intg::DeviceState;
 
@@ -17,27 +17,35 @@ impl Handler<ConnectionEvent> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: ConnectionEvent, ctx: &mut Self::Context) -> Self::Result {
-        // TODO enhance state machine with connection & reconnection states (as in remote-core)
+        // TODO #39 state machine with connection & reconnection states (as in remote-core).
+        //      This patched-up implementation might still contain race conditions!
         match msg.state {
             ConnectionState::AuthenticationFailed => {
                 // error state prevents auto-reconnect in upcoming Closed event
                 self.set_device_state(DeviceState::Error);
             }
             ConnectionState::Connected => {
+                self.ha_client_id = Some(msg.client_id);
                 self.set_device_state(DeviceState::Connected);
             }
             ConnectionState::Closed => {
-                info!("HA client disconnected: {}", msg.client_id);
-                self.ha_client = None;
+                if Some(&msg.client_id) == self.ha_client_id.as_ref() {
+                    info!("[{}] HA client disconnected", msg.client_id);
+                    self.ha_client = None;
+                } else {
+                    info!("[{}] Old HA client disconnected: ignoring", msg.client_id);
+                    return;
+                }
 
                 if matches!(
                     self.device_state,
                     DeviceState::Connecting | DeviceState::Connected
                 ) {
-                    info!("Start reconnecting to HA: {}", msg.client_id);
+                    info!("[{}] Start reconnecting to HA", msg.client_id);
                     self.set_device_state(DeviceState::Connecting);
 
-                    ctx.notify(ConnectMsg {});
+                    self.reconnect_handle =
+                        Some(ctx.notify_later(ConnectMsg::default(), self.ha_reconnect_duration));
                 }
             }
         };
@@ -48,12 +56,24 @@ impl Handler<DisconnectMsg> for Controller {
     type Result = ();
 
     fn handle(&mut self, _msg: DisconnectMsg, ctx: &mut Self::Context) -> Self::Result {
+        self.disconnect(ctx)
+    }
+}
+
+impl Controller {
+    pub(crate) fn disconnect(&mut self, ctx: &mut Context<Controller>) {
+        // this prevents automatic reconnects. TODO #39 this should be handled with a state machine!
+        self.set_device_state(DeviceState::Disconnected);
+
         if let Some(handle) = self.reconnect_handle.take() {
             ctx.cancel_future(handle);
         }
         if let Some(addr) = self.ha_client.as_ref() {
             addr.do_send(Close::default());
         }
+        // Make sure the old connection is no longer used and doesn't interfere with reconnection
+        self.ha_client = None;
+        self.ha_client_id = None;
     }
 }
 
@@ -65,12 +85,19 @@ impl Handler<ConnectMsg> for Controller {
             ctx.cancel_future(handle);
         }
         if !matches!(self.machine.state(), &OperationModeState::Running) {
+            error!("Cannot connect in state: {:?}", self.machine.state());
             return Box::pin(fut::result(Err(Error::new(
                 ErrorKind::InvalidInput,
                 "Not in running state",
             ))));
         }
-        // TODO check if already connected
+
+        if let Some(client_id) = self.ha_client_id.as_ref() {
+            warn!("[{client_id}] Ignoring connect request: already connected to HA server");
+            return Box::pin(fut::ok(()));
+        }
+
+        self.set_device_state(DeviceState::Connecting);
 
         let ws_request = self.ws_client.ws(self.settings.hass.url.as_str());
         // align frame size to Home Assistant
@@ -110,7 +137,7 @@ impl Handler<ConnectMsg> for Controller {
                         Ok(())
                     }
                     Err(e) => {
-                        // TODO quick and dirty: simply send Connect message as simple reconnect mechanism. Needs to be refined!
+                        // TODO #39 quick and dirty: simply send Connect message as simple reconnect mechanism. Needs to be refined!
                         if act.device_state != DeviceState::Disconnected {
                             act.ha_reconnect_attempt += 1;
                             if act.settings.hass.reconnect.attempts > 0
@@ -120,12 +147,12 @@ impl Handler<ConnectMsg> for Controller {
                                     "Max reconnect attempts reached ({}). Giving up!",
                                     act.settings.hass.reconnect.attempts
                                 );
-                                act.device_state = DeviceState::Error;
-                                act.broadcast_device_state();
+                                act.set_device_state(DeviceState::Error);
                             } else {
-                                act.reconnect_handle = Some(
-                                    ctx.notify_later(ConnectMsg {}, act.ha_reconnect_duration),
-                                );
+                                act.reconnect_handle = Some(ctx.notify_later(
+                                    ConnectMsg::default(),
+                                    act.ha_reconnect_duration,
+                                ));
                                 act.increment_reconnect_timeout();
                             }
                         }

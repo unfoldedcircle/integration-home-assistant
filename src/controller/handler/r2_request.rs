@@ -45,8 +45,8 @@ impl Handler<R2RequestMsg> for Controller {
                 req_id,
                 resp_msg,
                 IntegrationVersion {
-                    api: API_VERSION.to_string(),
-                    integration: APP_VERSION.to_string(),
+                    api: Some(API_VERSION.to_string()),
+                    integration: Some(APP_VERSION.to_string()),
                 },
             )),
             R2Request::GetDriverMetadata => {

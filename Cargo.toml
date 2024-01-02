@@ -16,7 +16,7 @@ mdns-sd = ["dep:mdns-sd"]
 zeroconf = ["dep:zeroconf"]
 
 [dependencies]
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.8.1-alpha" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.8.4-beta" }
 # for local development:
 #uc_api = { path = "../api-model-rs" }
 
@@ -60,8 +60,8 @@ time = { version = "0.3", default-features = false, features = ["std", "formatti
 
 # Helpful macros for working with enums and strings
 # Attention: strum needs to be in sync with uc_api
-strum = "0.24"
-strum_macros = "0.24"
+strum = "0.25"
+strum_macros = "0.25"
 derive_more = "0.99"
 
 [build-dependencies]
