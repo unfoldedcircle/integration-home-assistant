@@ -105,9 +105,16 @@ impl HomeAssistantClient {
     }
 
     fn heartbeat(&self, ctx: &mut Context<Self>) {
+        if self.heartbeat.interval.is_zero() {
+            warn!("[{}] Websocket server heartbeat is disabled", self.id);
+            return;
+        }
+
         ctx.run_later(self.heartbeat.interval, |act, ctx| {
             // check server heartbeats
-            if Instant::now().duration_since(act.last_hb) > act.heartbeat.timeout {
+            if !act.heartbeat.timeout.is_zero()
+                && Instant::now().duration_since(act.last_hb) > act.heartbeat.timeout
+            {
                 // heartbeat timed out
                 error!(
                     "[{}] Websocket server heartbeat failed, disconnecting!",
@@ -119,10 +126,13 @@ impl HomeAssistantClient {
                 return;
             }
 
-            if act
-                .send_message(ws::Message::Ping(Bytes::new()), "Ping", ctx)
-                .is_ok()
-            {
+            let msg = if act.heartbeat.ping_frames {
+                ws::Message::Ping(Bytes::new())
+            } else {
+                let id = act.new_msg_id();
+                ws::Message::Text(json!({"id": id, "type": "ping"}).to_string().into())
+            };
+            if act.send_message(msg, "Ping", ctx).is_ok() {
                 act.heartbeat(ctx);
             }
         });
@@ -216,14 +226,28 @@ impl HomeAssistantClient {
                 }
             }
             "auth_invalid" => {
-                error!("[{}] Invalid authentication", self.id);
+                error!(
+                    "[{}] Invalid authentication! {}",
+                    self.id,
+                    object_msg
+                        .get("message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                );
                 self.controller_actor.do_send(ConnectionEvent {
                     client_id: self.id.clone(),
                     state: ConnectionState::AuthenticationFailed,
                 });
             }
             "auth_ok" => {
-                info!("[{}] Authentication OK", self.id);
+                info!(
+                    "[{}] Authentication OK. HA version: {}",
+                    self.id,
+                    object_msg
+                        .get("ha_version")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                );
 
                 if !self.subscribed_events {
                     self.subscribe_events_id = Some(self.new_msg_id());
@@ -243,6 +267,7 @@ impl HomeAssistantClient {
                     }
                 }
             }
+            "pong" => self.last_hb = Instant::now(),
             _ => {}
         }
     }

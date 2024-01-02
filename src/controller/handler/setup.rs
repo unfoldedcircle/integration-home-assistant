@@ -120,14 +120,13 @@ impl Handler<SetDriverUserDataMsg> for Controller {
                 }
             }
             if let Some(value) = parse_value(&values, "heartbeat_interval") {
-                if value >= 3 {
-                    cfg.heartbeat.interval = Duration::from_secs(value);
-                }
+                cfg.heartbeat.interval = Duration::from_secs(value);
             }
             if let Some(value) = parse_value(&values, "heartbeat_timeout") {
-                if value >= 6 {
-                    cfg.heartbeat.timeout = Duration::from_secs(value);
-                }
+                cfg.heartbeat.timeout = Duration::from_secs(value);
+            }
+            if let Some(value) = parse_value(&values, "ping_frames") {
+                cfg.heartbeat.ping_frames = value;
             }
             if let Some(value) = parse_value(&values, "reconnect.attempts") {
                 cfg.reconnect.attempts = value;
@@ -178,13 +177,15 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                 "require_user_action": {
                     "input": {
                         "title": {
-                            "en": "Expert configuration"
+                            "en": "Expert configuration",
+                            "de": "Expert Konfiguration"
                         },
                         "settings": [
                             {
                                 "id": "connection_timeout",
                                 "label": {
-                                    "en": "Connection timeout in seconds"
+                                    "en": "Connection timeout in seconds",
+                                    "en": "Verbindungstimeout in Sekunden"
                                 },
                                 "field": {
                                     "number": {
@@ -198,7 +199,8 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                             {
                                 "id": "max_frame_size_kb",
                                 "label": {
-                                    "en": "Max WebSocket frame size (kilobyte)"
+                                    "en": "Max WebSocket frame size (kilobyte)",
+                                    "de": "Max WebSocket Frame Grösse (Kilobyte)"
                                 },
                                 "field": {
                                     "number": {
@@ -212,7 +214,8 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                             {
                                 "id": "reconnect.attempts",
                                 "label": {
-                                    "en": "Max reconnect attempts (0 = unlimited)"
+                                    "en": "Max reconnect attempts (0 = unlimited)",
+                                    "de": "Max Anzahl Verbindungsversuche (0 = unlimitiert)"
                                 },
                                 "field": {
                                     "number": {
@@ -225,7 +228,8 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                             {
                                 "id": "reconnect.duration_ms",
                                 "label": {
-                                    "en": "Initial reconnect delay in milliseconds"
+                                    "en": "Initial reconnect delay in milliseconds",
+                                    "de": "Initiale Wiederverbindungsverzögerung in ms"
                                 },
                                 "field": {
                                     "number": {
@@ -239,7 +243,8 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                             {
                                 "id": "reconnect.duration_max_ms",
                                 "label": {
-                                    "en": "Max reconnect delay in milliseconds"
+                                    "en": "Max reconnect delay in milliseconds",
+                                    "de": "Max Wiederverbindungsverzögerung in ms"
                                 },
                                 "field": {
                                     "number": {
@@ -267,28 +272,42 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                             {
                                 "id": "heartbeat_interval",
                                 "label": {
-                                    "en": "Heartbeat interval in seconds"
+                                    "en": "Heartbeat interval in seconds (0 = disabled)",
+                                    "de": "Heartbeat Intervall in Sekunden (0 = deaktiviert)"
                                 },
                                 "field": {
                                     "number": {
                                         "value": self.settings.hass.heartbeat.interval.as_secs(),
-                                        "min": 3,
+                                        "min": 0,
                                         "max": 60,
-                                        "unit": { "en": "sec" }
+                                        "unit": { "en": "sec", "de": "Sek" }
                                     }
                                 }
                             },
                             {
                                 "id": "heartbeat_timeout",
                                 "label": {
-                                    "en": "Heartbeat timeout in seconds"
+                                    "en": "Heartbeat timeout in seconds (0 = disabled)",
+                                    "de": "Heartbeat Timeout in Sekunden (0 = deaktiviert)"
                                 },
                                 "field": {
                                     "number": {
                                         "value": self.settings.hass.heartbeat.timeout.as_secs(),
-                                        "min": 6,
+                                        "min": 0,
                                         "max": 300,
-                                        "unit": { "en": "sec" }
+                                        "unit": { "en": "sec", "de": "Sek" }
+                                    }
+                                }
+                            },
+                            {
+                                "id": "ping_frames",
+                                "label": {
+                                    "en": "Use WebSocket ping frames for heartbeat",
+                                    "de": "Verwende WebSocket Ping-frames für Heartbeat"
+                                },
+                                "field": {
+                                    "checkbox": {
+                                      "value": self.settings.hass.heartbeat.ping_frames
                                     }
                                 }
                             }
@@ -353,6 +372,8 @@ impl Handler<AbortDriverSetup> for Controller {
             })
         } else {
             // abort: Remote Two aborted setup flow
+            // TODO fix state if it was a reconfiguration and not a fresh setup!
+            //      Otherwise we'll always get a "setup required" when requesting entities.
             if self.sm_consume(&msg.ws_id, &AbortSetup, ctx).is_err() {
                 return;
             }

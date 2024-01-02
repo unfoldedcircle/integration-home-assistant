@@ -102,6 +102,8 @@ pub struct Controller {
     machine: StateMachine<OperationMode>,
     /// Driver setup timeout handle
     setup_timeout: Option<SpawnHandle>,
+    /// Handle to a scheduled connect message for a reconnect attempt.
+    reconnect_handle: Option<SpawnHandle>,
 }
 
 impl Controller {
@@ -127,6 +129,7 @@ impl Controller {
             drv_metadata,
             machine,
             setup_timeout: None,
+            reconnect_handle: None,
         }
     }
 
