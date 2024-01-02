@@ -4,12 +4,15 @@
 //! Driver setup flow handling.
 
 use crate::configuration::save_user_settings;
-use crate::controller::handler::{AbortDriverSetup, SetDriverUserDataMsg, SetupDriverMsg};
-use crate::controller::{Controller, OperationModeInput::*};
+use crate::controller::handler::{
+    AbortDriverSetup, ConnectMsg, SetDriverUserDataMsg, SetupDriverMsg,
+};
+use crate::controller::{Controller, OperationModeInput::*, OperationModeState};
 use crate::errors::{ServiceError, ServiceError::BadRequest};
-use actix::{AsyncContext, Handler, Message};
+use actix::clock::sleep;
+use actix::{fut, ActorFutureExt, AsyncContext, Handler, Message, ResponseActFuture, WrapFuture};
 use derive_more::Constructor;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use serde_json::json;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -67,9 +70,16 @@ impl Handler<SetupDriverMsg> for Controller {
             return Err(BadRequest("Missing field: token".into()));
         }
 
+        if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
+            session.reconfiguring = msg.data.reconfigure;
+        };
+
         save_user_settings(&cfg)?;
 
-        // TODO verify WebSocket connection to make sure user provided URL & taken are ok! #3
+        info!("Disconnecting from HA during setup-flow");
+        self.disconnect(ctx);
+
+        // TODO verify WebSocket connection to make sure user provided URL & token are ok! #3
         // Right now the core will just send a Connect request after setup...
         self.settings.hass = cfg;
 
@@ -321,7 +331,7 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
 }
 
 impl Handler<FinishSetupFlowMsg> for Controller {
-    type Result = ();
+    type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, msg: FinishSetupFlowMsg, ctx: &mut Self::Context) -> Self::Result {
         let input = if msg.error.is_none() {
@@ -330,25 +340,53 @@ impl Handler<FinishSetupFlowMsg> for Controller {
             SetupError
         };
         if self.sm_consume(&msg.ws_id, &input, ctx).is_err() {
-            return;
+            return Box::pin(fut::ready(()));
         }
 
+        let mut delay = None;
+        if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
+            if matches!(self.machine.state(), &OperationModeState::Running)
+                && session.reconfiguring == Some(true)
+            {
+                info!("Reconnecting to HA with new configuration settings");
+                ctx.notify(ConnectMsg::default());
+                // delay to notify R2 that the setup flow is finished
+                delay = Some(Duration::from_secs(2));
+            }
+
+            session.reconfiguring = None;
+        };
+
+        let state = if msg.error.is_none() {
+            IntegrationSetupState::Ok
+        } else {
+            IntegrationSetupState::Error
+        };
         let event = WsMessage::event(
             "driver_setup_change",
             EventCategory::Device,
             serde_json::to_value(DriverSetupChange {
                 event_type: SetupChangeEventType::Stop,
-                state: if msg.error.is_none() {
-                    IntegrationSetupState::Ok
-                } else {
-                    IntegrationSetupState::Error
-                },
+                state: state.clone(),
                 error: msg.error,
                 require_user_action: None,
             })
             .expect("DriverSetupChange serialize error"),
         );
-        self.send_r2_msg(event, &msg.ws_id);
+
+        Box::pin(
+            async move {
+                // quick and dirty wait for the client connection to be most likely connected
+                if let Some(delay) = delay {
+                    sleep(delay).await;
+                }
+            }
+            .into_actor(self) // converts future to ActorFuture
+            .map(move |_, act, _ctx| {
+                info!("Setup flow finished: sending driver_setup_change STOP with state {state}");
+                act.send_r2_msg(event, &msg.ws_id);
+            }),
+        )
     }
 }
 
@@ -372,10 +410,23 @@ impl Handler<AbortDriverSetup> for Controller {
             })
         } else {
             // abort: Remote Two aborted setup flow
-            // TODO fix state if it was a reconfiguration and not a fresh setup!
-            //      Otherwise we'll always get a "setup required" when requesting entities.
             if self.sm_consume(&msg.ws_id, &AbortSetup, ctx).is_err() {
                 return;
+            }
+
+            // Continue normal operation if it was a reconfiguration and not an initial setup.
+            // Otherwise we'll always get a "setup required" when requesting entities in the web-configurator.
+            if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
+                let reconfiguring = session.reconfiguring;
+                session.reconfiguring = None;
+                if matches!(self.machine.state(), &OperationModeState::RequireSetup)
+                    && reconfiguring == Some(true)
+                    && self.settings.hass.url.has_host()
+                    && !self.settings.hass.token.is_empty()
+                {
+                    let _ = self.sm_consume(&msg.ws_id, &ConfigurationAvailable, ctx);
+                    ctx.notify(ConnectMsg::default());
+                }
             }
         }
 
