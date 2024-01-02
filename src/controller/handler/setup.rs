@@ -37,6 +37,11 @@ struct FinishSetupFlowMsg {
     pub error: Option<IntegrationSetupError>,
 }
 
+/// Start integration setup flow.
+///
+/// Disconnect an active HA connection to start a new client connection with the changed data later.   
+/// Either continue with expert configuration options with [RequestExpertOptionsMsg] if selected in initial
+/// configuration screen, or finish setup with [FinishSetupFlowMsg].
 impl Handler<SetupDriverMsg> for Controller {
     type Result = Result<(), ServiceError>;
 
@@ -57,14 +62,16 @@ impl Handler<SetupDriverMsg> for Controller {
         // validate setup data
         cfg.url = validate_url(msg.data.setup_data.get("url").map(|u| u.as_str()))?;
 
-        if let Some(token) = msg.data.setup_data.get("token") {
-            if token.trim().is_empty() {
+        if let Some(token) = msg.data.setup_data.get("token").map(|t| t.trim()) {
+            if token.is_empty() && !cfg.token.is_empty() {
                 warn!(
                     "[{}] no token value provided in setup, using existing token",
                     msg.ws_id
                 )
+            } else if !token.is_empty() {
+                cfg.token = token.to_string();
             } else {
-                cfg.token = token.clone();
+                return Err(BadRequest("Missing token".into()));
             }
         } else {
             return Err(BadRequest("Missing field: token".into()));
@@ -104,6 +111,9 @@ impl Handler<SetupDriverMsg> for Controller {
     }
 }
 
+/// Handle driver setup input data from the expert configuration screen.
+///
+/// Validate and save entered data, then trigger the end of the setup flow with [FinishSetupFlowMsg].
 impl Handler<SetDriverUserDataMsg> for Controller {
     type Result = Result<(), ServiceError>;
 
@@ -170,6 +180,9 @@ impl Handler<SetDriverUserDataMsg> for Controller {
     }
 }
 
+/// Send the expert configuration data request.
+///
+/// The setup flow will continue with the [SetDriverUserDataMsg] or timeout if no response is received.
 impl Handler<RequestExpertOptionsMsg> for Controller {
     type Result = ();
 
@@ -330,6 +343,10 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
     }
 }
 
+/// Finish the setup flow.
+///
+/// For a successful setup flow, a new connection to HA is started with the new settings.  
+/// This triggers the setup flow change event with the setup state.  
 impl Handler<FinishSetupFlowMsg> for Controller {
     type Result = ResponseActFuture<Self, ()>;
 
@@ -343,19 +360,17 @@ impl Handler<FinishSetupFlowMsg> for Controller {
             return Box::pin(fut::ready(()));
         }
 
-        let mut delay = None;
         if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
-            if matches!(self.machine.state(), &OperationModeState::Running)
-                && session.reconfiguring == Some(true)
-            {
-                info!("Reconnecting to HA with new configuration settings");
-                ctx.notify(ConnectMsg::default());
-                // delay to notify R2 that the setup flow is finished
-                delay = Some(Duration::from_secs(2));
-            }
-
             session.reconfiguring = None;
         };
+
+        let mut delay = None;
+        if matches!(self.machine.state(), &OperationModeState::Running) {
+            info!("Reconnecting to HA with new configuration settings");
+            ctx.notify(ConnectMsg::default());
+            // delay to notify R2 that the setup flow is finished
+            delay = Some(Duration::from_secs(2));
+        }
 
         let state = if msg.error.is_none() {
             IntegrationSetupState::Ok
