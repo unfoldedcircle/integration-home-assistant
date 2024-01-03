@@ -10,6 +10,18 @@ _Changes in the next release_
 
 ---
 
+## v0.6.0 - 2024-01-03
+### Fixed
+- Reconnect to HA server after driver reconfiguration ([#36](https://github.com/unfoldedcircle/integration-home-assistant/issues/36)).
+- Improved reconnection logic to prevent multiple connections.
+
+### Changed
+- Use Ping-Pong API messages as defined in the HA WebSocket API by default instead of WebSocket ping frames.
+
+## v0.5.1 - 2023-12-17
+### Fixed
+- Allow unlimited reconnection ([#35](https://github.com/unfoldedcircle/integration-home-assistant/issues/35)).
+
 ## v0.5.0 - 2023-11-15
 ### Added
 - Map scenes to push buttons ([#29](https://github.com/unfoldedcircle/integration-home-assistant/issues/29)).
