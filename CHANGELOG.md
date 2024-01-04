@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.6.1 - 2024-01-04
+### Fixed
+- Reconnection logic regression introduced in v0.6.0
+
 ## v0.6.0 - 2024-01-03
 ### Fixed
 - Reconnect to HA server after driver reconfiguration ([#36](https://github.com/unfoldedcircle/integration-home-assistant/issues/36)).
