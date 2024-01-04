@@ -32,6 +32,7 @@ impl Handler<ConnectionEvent> for Controller {
                 if Some(&msg.client_id) == self.ha_client_id.as_ref() {
                     info!("[{}] HA client disconnected", msg.client_id);
                     self.ha_client = None;
+                    self.ha_client_id = None;
                 } else {
                     info!("[{}] Old HA client disconnected: ignoring", msg.client_id);
                     return;
@@ -56,6 +57,7 @@ impl Handler<DisconnectMsg> for Controller {
     type Result = ();
 
     fn handle(&mut self, _msg: DisconnectMsg, ctx: &mut Self::Context) -> Self::Result {
+        info!("Disconnect request: forcing immediate disconnect from HA server");
         self.disconnect(ctx)
     }
 }
@@ -93,8 +95,10 @@ impl Handler<ConnectMsg> for Controller {
         }
 
         if let Some(client_id) = self.ha_client_id.as_ref() {
-            warn!("[{client_id}] Ignoring connect request: already connected to HA server");
-            return Box::pin(fut::ok(()));
+            if self.ha_client.is_some() {
+                warn!("[{client_id}] Ignoring connect request: already connected to HA server");
+                return Box::pin(fut::ok(()));
+            }
         }
 
         self.set_device_state(DeviceState::Connecting);
@@ -107,10 +111,12 @@ impl Handler<ConnectMsg> for Controller {
         let client_address = ctx.address();
         let heartbeat = self.settings.hass.heartbeat;
 
+        info!(
+            "Connecting to: {url} (timeout: {}s)",
+            self.settings.hass.connection_timeout
+        );
         Box::pin(
             async move {
-                debug!("Connecting to: {url}");
-
                 let (_, framed) = match ws_request.connect().await {
                     Ok((r, f)) => (r, f),
                     Err(e) => {
@@ -128,6 +134,7 @@ impl Handler<ConnectMsg> for Controller {
             }
             .into_actor(self) // converts future to ActorFuture
             .map(move |result, act, ctx| {
+                act.ha_client_id = None; // will be set with Connected event
                 match result {
                     Ok(addr) => {
                         debug!("Successfully connected to: {}", act.settings.hass.url);
@@ -137,6 +144,7 @@ impl Handler<ConnectMsg> for Controller {
                         Ok(())
                     }
                     Err(e) => {
+                        act.ha_client = None;
                         // TODO #39 quick and dirty: simply send Connect message as simple reconnect mechanism. Needs to be refined!
                         if act.device_state != DeviceState::Disconnected {
                             act.ha_reconnect_attempt += 1;
