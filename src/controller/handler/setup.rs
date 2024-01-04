@@ -208,7 +208,7 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                                 "id": "connection_timeout",
                                 "label": {
                                     "en": "Connection timeout in seconds",
-                                    "en": "Verbindungstimeout in Sekunden"
+                                    "de": "Verbindungstimeout in Sekunden"
                                 },
                                 "field": {
                                     "number": {
