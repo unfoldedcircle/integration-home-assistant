@@ -27,6 +27,8 @@ impl Handler<R2EventMsg> for Controller {
                 if self.device_state != DeviceState::Connected {
                     ctx.notify(ConnectMsg::default());
                 }
+                // make sure client has the correct state, it might be out of sync, or not calling get_device_state
+                self.send_device_state(&msg.ws_id);
             }
             R2Event::Disconnect => {
                 ctx.notify(DisconnectMsg {});
