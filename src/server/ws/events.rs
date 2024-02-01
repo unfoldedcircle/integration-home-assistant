@@ -8,7 +8,7 @@ use crate::errors::ServiceError;
 use crate::server::ws::WsConn;
 use crate::Controller;
 use actix::Addr;
-use log::{debug, error, warn};
+use log::{error, info, warn};
 use std::str::FromStr;
 use uc_api::intg::ws::R2Event;
 use uc_api::ws::WsMessage;
@@ -25,7 +25,7 @@ impl WsConn {
             .as_deref()
             .ok_or_else(|| ServiceError::BadRequest("Missing property: msg".into()))?;
 
-        debug!("[{session_id}] Got event: {msg}");
+        info!("[{session_id}] Got event: {msg}");
 
         if let Ok(req_msg) = R2Event::from_str(msg) {
             if let Err(e) = controller_addr.try_send(R2EventMsg {

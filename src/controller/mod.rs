@@ -145,7 +145,7 @@ impl Controller {
                 return;
             }
             if let Err(e) = session.recipient.try_send(SendWsMessage(message)) {
-                error!("{ws_id} Internal message send error: {e}");
+                error!("[{ws_id}] Internal message send error: {e}");
             }
         } else {
             warn!("attempting to send message but couldn't find session: {ws_id}");
@@ -160,6 +160,7 @@ impl Controller {
     ///
     /// returns: ()
     fn send_device_state(&self, ws_id: &str) {
+        info!("[{ws_id}] sending device_state: {}", self.device_state);
         self.send_r2_msg(
             WsMessage::event(
                 "device_state",
