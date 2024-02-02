@@ -4,6 +4,7 @@
 //! Common utility functions.
 
 mod certificates;
+mod color;
 mod env;
 mod from_msg_data;
 pub mod json;
@@ -11,6 +12,7 @@ mod macros;
 mod network;
 
 pub use certificates::create_single_cert_server_config;
+pub use color::*;
 pub use env::*;
 pub use from_msg_data::DeserializeMsgData;
 pub(crate) use macros::*;

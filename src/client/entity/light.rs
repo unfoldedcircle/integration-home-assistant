@@ -6,7 +6,8 @@
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
-use log::{error, warn};
+use crate::util::{color_rgb_to_hsv, color_xy_to_hs};
+use log::{info, warn};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::AvailableIntgEntity;
@@ -23,20 +24,26 @@ pub(crate) fn map_light_attributes(
     attributes.insert("state".into(), state);
 
     if let Some(ha_attr) = ha_attr {
-        // FIXME brightness adjustment for RGB## modes #7. https://developers.home-assistant.io/docs/core/entity/light
+        info!("map_light_attributes: {ha_attr:?}");
+        // TODO #7 verify if brightness adjustment is required for RGB## modes
+        // From https://developers.home-assistant.io/docs/core/entity/light
         // Note that in color modes COLOR_MODE_RGB, COLOR_MODE_RGBW and COLOR_MODE_RGBWW there is
         // brightness information both in the light's brightness property and in the color. As an
         // example, if the light's brightness is 128 and the light's color is (192, 64, 32), the
         // overall brightness of the light is: 128/255 * max(192, 64, 32)/255 = 38%.
         ha_attr
             .remove_entry("brightness")
-            .and_then(|e| match e.1.is_u64() {
-                true => Some(e),
+            .and_then(|(key, value)| match value.is_u64() {
+                true => Some((key, value)),
                 false => None,
             })
-            .map(|e| attributes.insert(e.0, e.1));
+            .map(|(key, value)| attributes.insert(key, value));
 
+        // Color modes in HA are quite confusing...
         match ha_attr.get("color_mode").and_then(|v| v.as_str()) {
+            Some("brightness") => {
+                // simply ignore, we already got the brightness value
+            }
             Some("color_temp") => {
                 if let Some(color_temp) = ha_attr.get("color_temp").and_then(|v| v.as_u64()) {
                     let min_mireds = ha_attr
@@ -58,33 +65,32 @@ pub(crate) fn map_light_attributes(
                 }
             }
             Some("hs") => {
-                if let Some(hs) = ha_attr.get("hs_color").and_then(|v| v.as_array()) {
-                    if hs.len() != 2 {
-                        return Err(ServiceError::BadRequest(
-                            "Invalid hs_color value. Expected hue & saturation".into(),
-                        ));
-                    }
-                    // hs values are returned as floats: hue: 0..360, saturation: 0..100
-                    let hue = hs.first().unwrap().as_f64().unwrap_or_default() as u16;
-                    let saturation =
-                        (hs.get(1).unwrap().as_f64().unwrap_or_default() as f32 * 2.55_f32) as u16;
-                    if hue > 360 || saturation > 100 {
-                        return Err(ServiceError::BadRequest(format!(
-                            "Invalid hs_color values ({}, {})",
-                            hue, saturation
-                        )));
-                    }
-                    attributes.insert("hue".into(), Value::Number(hue.into()));
-                    attributes.insert(
-                        "saturation".into(),
-                        Value::Number((saturation * 255 / 100).into()),
-                    );
+                // Easiest one since R2 uses HS as well
+                extract_hs_color(ha_attr, &mut attributes)?;
+            }
+            Some("xy") => {
+                // First check if HA is so kind to provide hs values.
+                // It seems that all color models are provided, but couldn't find documentation
+                if !extract_hs_color(ha_attr, &mut attributes)? {
+                    // Nope, use xy and convert
+                    extract_xy_color(ha_attr, &mut attributes)?;
                 }
             }
+            Some("rgb") | Some("rgbw") | Some("rgbww") => {
+                // Same procedure as for xy and the assumption that HA provides converted color model
+                if !extract_hs_color(ha_attr, &mut attributes)? {
+                    extract_rgb_color(ha_attr, &mut attributes)?;
+                }
+            }
+            // Some("white") => {} // TODO #7 check white color model
+            Some("onoff") => {
+                // nothing to do, HA docs: The light can be turned on or off. This mode must be the only supported mode if supported by the light.
+            }
+            Some("unknown") => {}
             None => {}
             v => {
-                error!(
-                    "TODO {} implement color mode conversion for color_mode: {}. Probably #7",
+                warn!(
+                    "TODO {} implement color mode conversion for color_mode: {} (see #7). ha_attr: {ha_attr:?}",
                     entity_id,
                     v.unwrap()
                 );
@@ -202,6 +208,130 @@ pub(crate) fn convert_light_entity(
         options: None,
         attributes,
     })
+}
+
+/// Extract and convert `hs_color` field from the HA attributes.
+///
+/// Expects an array of two float values containing hue and saturation values.
+/// - Hue range: 0..360
+/// - Saturation range: 0..100
+///
+/// # Arguments
+///
+/// * `ha_attr`: Input Home Assistant light entity attributes
+/// * `attributes`: Output R2 light entity attributes
+///
+/// returns:
+/// - true if input value is present and was converted into the output attributes
+/// - false if the input value is not present
+/// - ServiceError::BadRequest if the input value is in an invalid format
+fn extract_hs_color(
+    ha_attr: &Map<String, Value>,
+    attributes: &mut Map<String, Value>,
+) -> Result<bool, ServiceError> {
+    if let Some(hs) = ha_attr.get("hs_color").and_then(|v| v.as_array()) {
+        if hs.len() != 2 {
+            return Err(ServiceError::BadRequest(
+                "Invalid hs_color value. Expected array with hue & saturation".into(),
+            ));
+        }
+        // hs values are returned as floats: hue: 0..360, saturation: 0..100
+        let hue = hs.first().unwrap().as_f64().unwrap_or_default().round() as u16;
+        let saturation = hs.get(1).unwrap().as_f64().unwrap_or_default().round() as f32;
+        if hue > 360 || saturation > 100.0 {
+            return Err(ServiceError::BadRequest(format!(
+                "Invalid hs_color values ({}, {})",
+                hue, saturation
+            )));
+        }
+        attributes.insert("hue".into(), Value::Number(hue.into()));
+        attributes.insert(
+            "saturation".into(),
+            Value::Number(((saturation * 255. / 100.).round() as u16).into()),
+        );
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+/// Extract and convert `xy_color` field from the HA attributes.
+///
+/// Expects an array of two float values containing x and y values (0..1).
+///
+/// # Arguments
+///
+/// * `ha_attr`: Input Home Assistant light entity attributes
+/// * `attributes`: Output R2 light entity attributes
+///
+/// returns:
+/// - true if input value is present and was converted into the output attributes
+/// - false if the input value is not present
+/// - ServiceError::BadRequest if the input value is in an invalid format
+fn extract_xy_color(
+    ha_attr: &Map<String, Value>,
+    attributes: &mut Map<String, Value>,
+) -> Result<bool, ServiceError> {
+    if let Some(xy) = ha_attr.get("xy_color").and_then(|v| v.as_array()) {
+        if xy.len() != 2 {
+            return Err(ServiceError::BadRequest(
+                "Invalid xy_color value. Expected array with x & y".into(),
+            ));
+        }
+        // xy values are returned as floats: 0..1
+        let x = xy.first().unwrap().as_f64().unwrap_or_default() as f32;
+        let y = xy.get(1).unwrap().as_f64().unwrap_or_default() as f32;
+
+        let (hue, saturation) = color_xy_to_hs(x, y, None);
+        attributes.insert("hue".into(), Value::Number((hue.round() as u16).into()));
+        attributes.insert(
+            "saturation".into(),
+            Value::Number(((saturation * 255. / 100.).round() as u16).into()),
+        );
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+/// Extract and convert `rgb_color` field from the HA attributes.
+///
+/// Expects an array of three integer values containing r, g, b values (0..255).
+///
+/// # Arguments
+///
+/// * `ha_attr`: Input Home Assistant light entity attributes
+/// * `attributes`: Output R2 light entity attributes
+///
+/// returns:
+/// - true if input value is present and was converted into the output attributes
+/// - false if the input value is not present
+/// - ServiceError::BadRequest if the input value is in an invalid format
+fn extract_rgb_color(
+    ha_attr: &Map<String, Value>,
+    attributes: &mut Map<String, Value>,
+) -> Result<bool, ServiceError> {
+    if let Some(rgb) = ha_attr.get("rgb_color").and_then(|v| v.as_array()) {
+        if rgb.len() != 3 {
+            return Err(ServiceError::BadRequest(
+                "Invalid rgb_color value. Expected array with r,g,b".into(),
+            ));
+        }
+        // rgb values are returned as u16: 0..255
+        let r = rgb.first().unwrap().as_u64().unwrap_or_default() as f32;
+        let g = rgb.get(1).unwrap().as_u64().unwrap_or_default() as f32;
+        let b = rgb.get(2).unwrap().as_u64().unwrap_or_default() as f32;
+
+        let (hue, saturation, _) = color_rgb_to_hsv(r, g, b);
+        attributes.insert("hue".into(), Value::Number((hue.round() as u16).into()));
+        attributes.insert(
+            "saturation".into(),
+            Value::Number(((saturation * 255. / 100.).round() as u16).into()),
+        );
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 #[cfg(test)]
