@@ -7,7 +7,7 @@ use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
 use crate::util::{color_rgb_to_hsv, color_xy_to_hs};
-use log::{info, warn};
+use log::warn;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::AvailableIntgEntity;
@@ -24,13 +24,6 @@ pub(crate) fn map_light_attributes(
     attributes.insert("state".into(), state);
 
     if let Some(ha_attr) = ha_attr {
-        info!("map_light_attributes: {ha_attr:?}");
-        // TODO #7 verify if brightness adjustment is required for RGB## modes
-        // From https://developers.home-assistant.io/docs/core/entity/light
-        // Note that in color modes COLOR_MODE_RGB, COLOR_MODE_RGBW and COLOR_MODE_RGBWW there is
-        // brightness information both in the light's brightness property and in the color. As an
-        // example, if the light's brightness is 128 and the light's color is (192, 64, 32), the
-        // overall brightness of the light is: 128/255 * max(192, 64, 32)/255 = 38%.
         ha_attr
             .remove_entry("brightness")
             .and_then(|(key, value)| match value.is_u64() {
@@ -82,7 +75,7 @@ pub(crate) fn map_light_attributes(
                     extract_rgb_color(ha_attr, &mut attributes)?;
                 }
             }
-            // Some("white") => {} // TODO #7 check white color model
+            // Some("white") => {} // TODO #7 check if we need to handle white color model
             Some("onoff") => {
                 // nothing to do, HA docs: The light can be turned on or off. This mode must be the only supported mode if supported by the light.
             }
@@ -90,8 +83,7 @@ pub(crate) fn map_light_attributes(
             None => {}
             v => {
                 warn!(
-                    "TODO {} implement color mode conversion for color_mode: {} (see #7). ha_attr: {ha_attr:?}",
-                    entity_id,
+                    "Unhandled color_mode '{}' in entity {entity_id}, ha_attr: {ha_attr:?}",
                     v.unwrap()
                 );
             }
