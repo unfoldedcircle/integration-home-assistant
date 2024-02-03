@@ -121,7 +121,7 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  crosscompile:
+  cross_compile:
     name: ${{ matrix.config.name }} build
     runs-on: ubuntu-22.04
     needs: test
@@ -130,14 +130,16 @@ jobs:
         config:
           - {
             name: "Remote Two", artifact: "UCR2",
+            # cross compilation target architecture
             architecture: "aarch64",
             abi: "gnu",
+            target_triple: "aarch64-none-linux-gnu",
+            # Rust target
             target: "aarch64-unknown-linux-gnu",
             target_id: "aarch64_unknown_linux_gnu",
             buildroot-sdk-base-url: "https://github.com/unfoldedcircle/ucr2-toolchain/releases/download/v1.0.0",
             buildroot-sdk-file-name: "ucr2-aarch64-toolchain-1.0.0-noqt.tar.gz",
             buildroot-sdk-name: "aarch64-buildroot-linux-gnu_sdk-buildroot",
-            target-vendor: "none",
             # linker must match ./cargo/config.toml target, otherwise the host linker is used! There's probably an easier way :-)
             linker: "ucr2-aarch64-none-linux-gnu-gcc"
           }
@@ -165,12 +167,10 @@ jobs:
           incremental: ${{ env.INCREMENTAL_BUILD }} && !contains(github.ref, 'tags/v')
 
       - name: "Cross compile: install target ${{ matrix.config.target }}"
-        if: matrix.config.target != 'default'
         run: |
           rustup target add ${{ matrix.config.target }}
 
       - name: "Cross compile: install ${{ matrix.config.name }} Buildroot SDK"
-        if: matrix.config.target != 'default'
         run: |
           wget -qO- ${{ matrix.config.buildroot-sdk-base-url }}/${{ matrix.config.buildroot-sdk-file-name }} | tar -xz
           
@@ -181,24 +181,23 @@ jobs:
           rm ./${{ matrix.config.buildroot-sdk-name }}/usr
 
       - name: "Cross compile: configure Rust target for ${{ matrix.config.name }} Buildroot SDK"
-        if: matrix.config.target != 'default'
         # there should be an easier way without a wrapper file, and there most likely is, but it's good enough for now...
         run: |
           mkdir -p ~/.cargo/bin/
           cat >~/.cargo/bin/${{ matrix.config.linker }} <<EOL
           #!/bin/bash
-          \$GITHUB_WORKSPACE/${{ matrix.config.buildroot-sdk-name }}/bin/${{ matrix.config.architecture }}-${{ matrix.config.target-vendor }}-linux-${{ matrix.config.abi }}-gcc --sysroot=\$GITHUB_WORKSPACE/${{ matrix.config.buildroot-sdk-name }}/${{ matrix.config.architecture }}-buildroot-linux-${{ matrix.config.abi }}/sysroot "\$@"
+          \$GITHUB_WORKSPACE/${{ matrix.config.buildroot-sdk-name }}/bin/${{ matrix.config.target_triple }}-gcc --sysroot=\$GITHUB_WORKSPACE/${{ matrix.config.buildroot-sdk-name }}/${{ matrix.config.architecture }}-buildroot-linux-${{ matrix.config.abi }}/sysroot "\$@"
           EOL
           chmod +x ~/.cargo/bin/${{ matrix.config.linker }}
           cat ~/.cargo/bin/${{ matrix.config.linker }}
           ${{ matrix.config.linker }} --version
+
       - name: "Cross compile: build"
-        if: matrix.config.target != 'default'
         run: |
           export UCR2_SDK=$GITHUB_WORKSPACE/${{ matrix.config.buildroot-sdk-name }}
-          export CC_${{ matrix.config.target_id }}=$UCR2_SDK/bin/${{ matrix.config.architecture }}-${{ matrix.config.target-vendor }}-linux-${{ matrix.config.abi }}-gcc
-          export CXX_${{ matrix.config.target_id }}=$UCR2_SDK/bin/${{ matrix.config.architecture }}-${{ matrix.config.target-vendor }}-linux-${{ matrix.config.abi }}-g++
-          export AR_${{ matrix.config.target_id }}=$UCR2_SDK/bin/${{ matrix.config.architecture }}-${{ matrix.config.target-vendor }}-linux-${{ matrix.config.abi }}-ar
+          export CC_${{ matrix.config.target_id }}=$UCR2_SDK/bin/${{ matrix.config.target_triple }}-gcc
+          export CXX_${{ matrix.config.target_id }}=$UCR2_SDK/bin/${{ matrix.config.target_triple }}-g++
+          export AR_${{ matrix.config.target_id }}=$UCR2_SDK/bin/${{ matrix.config.target_triple }}-ar
           export PKG_CONFIG_PATH=$UCR2_SDK/${{ matrix.config.architecture }}-buildroot-linux-${{ matrix.config.abi }}/sysroot/usr/lib/pkgconfig
           export PKG_CONFIG_SYSROOT_DIR=$UCR2_SDK/${{ matrix.config.architecture }}-buildroot-linux-${{ matrix.config.abi }}/sysroot
           export BINDGEN_EXTRA_CLANG_ARGS=--sysroot="$PKG_CONFIG_SYSROOT_DIR"
@@ -230,10 +229,26 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+  test-download:
+    name: Test download artifact
+    runs-on: ubuntu-latest
+    needs: [build, cross_compile]
+
+    steps:
+      - name: Download Linux build artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-${{ env.LINUX_ARTIFACT_SUFFIX }}*"
+      - name: Log
+        shell: bash
+        run: |
+          ls -lah
+          ls *${{ env.LINUX_ARTIFACT_SUFFIX }}
+
   release:
     name: GitHub release
     if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
-    needs: build
+    needs: [build, cross_compile]
     runs-on: ubuntu-22.04
 
     steps:
@@ -315,6 +330,8 @@ jobs:
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
+        with:
+          pattern: "*-${{ env.LINUX_ARTIFACT_SUFFIX }}*"
 
       - name: Log
         if: env.DEBUG_OUTPUT == 'true'
