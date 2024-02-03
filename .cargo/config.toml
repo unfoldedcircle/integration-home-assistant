@@ -1,0 +1,7 @@
+[target.aarch64-unknown-linux-gnu]
+linker = "ucr2-aarch64-none-linux-gnu-gcc"
+rustflags = "-C target-cpu=cortex-a55"
+
+[target.arm-unknown-linux-gnueabihf]
+linker = "yio-arm-buildroot-linux-gnueabihf-gcc"
+rustflags = "-C target-cpu=arm1176jzf-s"

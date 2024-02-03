@@ -138,7 +138,7 @@ jobs:
             buildroot-sdk-file-name: "ucr2-aarch64-toolchain-1.0.0-noqt.tar.gz",
             buildroot-sdk-name: "aarch64-buildroot-linux-gnu_sdk-buildroot",
             target-vendor: "none",
-            # linker must match ./cargo/config target
+            # linker must match ./cargo/config.toml target, otherwise the host linker is used! There's probably an easier way :-)
             linker: "ucr2-aarch64-none-linux-gnu-gcc"
           }
 
@@ -154,7 +154,7 @@ jobs:
           git fetch origin +refs/tags/*:refs/tags/*
           APP_VERSION=$(git describe --match "v[0-9]*" --tags HEAD --always)
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          echo "ARTIFACT_NAME${{ env.APP_NAME }}-$APP_VERSION-=${{ matrix.config.artifact }}" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=${{ env.APP_NAME }}-$APP_VERSION-${{ matrix.config.artifact }}" >> $GITHUB_ENV
 
       - id: setup
         uses: ./.github/actions/rust-setup
