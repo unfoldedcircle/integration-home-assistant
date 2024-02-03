@@ -229,22 +229,6 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  test-download:
-    name: Test download artifact
-    runs-on: ubuntu-latest
-    needs: [build, cross_compile]
-
-    steps:
-      - name: Download Linux build artifact
-        uses: actions/download-artifact@v4
-        with:
-          pattern: "*-${{ env.LINUX_ARTIFACT_SUFFIX }}*"
-      - name: Log
-        shell: bash
-        run: |
-          ls -lah
-          ls *${{ env.LINUX_ARTIFACT_SUFFIX }}
-
   release:
     name: GitHub release
     if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
