@@ -1,16 +1,50 @@
 name: 'Rust setup'
 description: 'Install all required tools to build uc-intg-hass'
 inputs:
+  toolchain_components:
+    description: 'Comma-separated string of additional components to install e.g. clippy, rustfmt'
+    required: true
+    default: ''
   target:
+    description: 'Rust target. Only required for cross compiling'
+    required: true
+    default: 'default'
+  build:
     description: 'Target build (release or debug). Only used for caching key.'
     required: true
     default: 'default'
+  # parameter & boolean handling is a major PITA!!! Stick to string compare, everything else just asks for trouble!
+  use_gh_cache:
+    description: |
+      Use GitHub cache for cargo dependencies and target artifacts. Significantly speeds up GitHub runners, but has
+      a huge negative impact on self-hosted runners! Caches are around 2.3 GB and transfer speed to self-hosted
+      runners is max 1 MB/s.
+    required: true
+    default: 'true'
+  incremental:
+    description: Enable rust incremental build
+    required: true
+    default: 'false'
+
 runs:
   using: "composite"
   steps:
+    - name: GH cache is active
+      if: inputs.use_gh_cache == 'true'
+      shell: bash
+      run: |
+        echo "GitHub cache is active"
+
+    - name: GH cache is NOT active
+      if: inputs.use_gh_cache == 'false'
+      shell: bash
+      run: |
+        echo "GitHub cache is NOT active"
+
     - name: Cache dependencies
+      if: inputs.use_gh_cache == 'true'
       id: cache-dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -18,12 +52,30 @@ runs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache target
+      if: inputs.use_gh_cache == 'true'
       id: cache-target
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ inputs.target }}
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ inputs.target }}-${{ inputs.build }}
 
-    # add any cargo tools, toolchains and system libs required for the build
-    # --> not yet used
+    - name: Set incremental build
+      if: inputs.incremental == 'true'
+      shell: bash
+      run: |
+        echo "Enabling Rust incremental build with CARGO_INCREMENTAL=1"
+        echo "CARGO_INCREMENTAL=1" >> $GITHUB_ENV
+
+    - name: Install toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: ${{ inputs.toolchain_components }}
+
+#    - name: Install required libraries
+#      # only required for default host target. Crosscompile targets must include libraries in required toolchain.
+#      if: inputs.target == 'default'
+#      run: |
+#        sudo apt-get update
+#        sudo apt-get install libdbus-1-dev libavahi-client-dev libsystemd-dev -y
+#      shell: bash
