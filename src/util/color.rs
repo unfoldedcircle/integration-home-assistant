@@ -92,9 +92,9 @@ pub fn color_xy_brightness_to_rgb(
 
 /// Convert an rgb color to its hsv representation.
 ///
-///     Hue is scaled 0-360
-///     Sat is scaled 0-100
-///     Val is scaled 0-100
+/// - Hue is scaled 0-360
+/// - Sat is scaled 0-100
+/// - Val is scaled 0-100
 pub fn color_rgb_to_hsv(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let (h, s, v) = rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0);
     (round(h * 360., 3), round(s * 100., 3), round(v * 100., 3))

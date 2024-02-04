@@ -122,6 +122,7 @@ impl Controller {
             device_state: DeviceState::Disconnected,
             ws_client: new_websocket_client(
                 Duration::from_secs(settings.hass.connection_timeout as u64),
+                Duration::from_secs(settings.hass.request_timeout as u64),
                 matches!(settings.hass.url.scheme(), "wss" | "https"),
             ),
             ha_reconnect_duration: settings.hass.reconnect.duration,

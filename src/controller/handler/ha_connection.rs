@@ -112,8 +112,9 @@ impl Handler<ConnectMsg> for Controller {
         let heartbeat = self.settings.hass.heartbeat;
 
         info!(
-            "Connecting to: {url} (timeout: {}s)",
-            self.settings.hass.connection_timeout
+            "Connecting to: {url} (timeout: {}s, request_timeout: {}s)",
+            self.settings.hass.connection_timeout,
+            self.settings.hass.request_timeout
         );
         Box::pin(
             async move {
