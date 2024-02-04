@@ -1,0 +1,20 @@
+{
+  "hass": {
+    "url": "ws://homeassistant.local:8123/api/websocket",
+    "token": "",
+    "connection_timeout": 6,
+    "request_timeout": 6,
+    "max_frame_size_kb": 5120,
+    "reconnect": {
+      "attempts": 0,
+      "duration_ms": 300,
+      "duration_max_ms": 30000,
+      "backoff_factor": 1.5
+    },
+    "heartbeat": {
+      "ping_frames": false,
+      "interval_sec": 5,
+      "timeout_sec": 20
+    }
+  }
+}
