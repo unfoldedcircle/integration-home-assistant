@@ -39,7 +39,7 @@ futures = "0.3"
 mdns-sd = { version = "0.9.3", optional = true }
 if-addrs = "0.11"
 hostname = "0.3"
-zeroconf = { version = "0.12", optional = true }
+zeroconf = { version = "0.14", optional = true }
 
 # JSON (de)serialization
 serde = { version = "1", features = ["derive"] }
@@ -49,9 +49,9 @@ serde_with = "3"
 rust-fsm = "0.6"
 
 clap = "3"
-config = { version = "0.13", default-features = false, features = ["yaml", "json"] }
+config = { version = "0.14", default-features = false, features = ["yaml", "json"] }
 const_format = "0.2"
-env_logger = "0.10"
+env_logger = "0.11"
 lazy_static = "1.4"
 log = "0.4"
 
