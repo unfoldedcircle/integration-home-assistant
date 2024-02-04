@@ -1,9 +1,9 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="All Tests" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="test --bin uc-intg-hass" />
+  <configuration default="false" name="Run ha-test" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+    <option name="command" value="run --bin ha-test" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs />
-    <option name="emulateTerminal" value="false" />
+    <option name="emulateTerminal" value="true" />
     <option name="channel" value="DEFAULT" />
     <option name="requiredFeatures" value="true" />
     <option name="allFeatures" value="false" />

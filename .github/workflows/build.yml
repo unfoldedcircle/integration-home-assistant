@@ -58,7 +58,7 @@ jobs:
           use_gh_cache: ${{ env.USE_GH_CACHE }}
           incremental: ${{ env.INCREMENTAL_BUILD }}
 
-      - run: cargo test --features mdns-sd
+      - run: cargo test --features mdns-sd --bin uc-intg-hass
 
       - name: Run clippy
         run: cargo clippy --features mdns-sd -- -D warnings
@@ -315,7 +315,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: "*-${{ env.LINUX_ARTIFACT_SUFFIX }}*"
+          pattern: "uc-intg-hass-*-${{ env.LINUX_ARTIFACT_SUFFIX }}*"
 
       - name: Log
         if: env.DEBUG_OUTPUT == 'true'
