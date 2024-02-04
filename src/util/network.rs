@@ -26,7 +26,11 @@ pub fn my_ipv4_interfaces() -> Vec<if_addrs::IfAddr> {
         .collect()
 }
 
-pub fn new_websocket_client(connection_timeout: Duration, tls: bool) -> awc::Client {
+pub fn new_websocket_client(
+    connection_timeout: Duration,
+    request_timeout: Duration,
+    tls: bool,
+) -> awc::Client {
     if tls {
         // TLS configuration: https://github.com/actix/actix-web/blob/master/awc/tests/test_rustls_client.rs
         // TODO self-signed certificate handling #4
@@ -46,14 +50,17 @@ pub fn new_websocket_client(connection_timeout: Duration, tls: bool) -> awc::Cli
                 .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
         }
 
-        let connector = awc::Connector::new().rustls_021(Arc::new(config));
+        let connector = awc::Connector::new()
+            .rustls_021(Arc::new(config))
+            .timeout(connection_timeout);
         awc::ClientBuilder::new()
-            .timeout(connection_timeout)
+            .timeout(request_timeout)
             .connector(connector)
             .finish()
     } else {
         awc::ClientBuilder::new()
-            .timeout(connection_timeout)
+            .timeout(request_timeout)
+            .connector(awc::Connector::new().timeout(connection_timeout))
             .finish()
     }
 }

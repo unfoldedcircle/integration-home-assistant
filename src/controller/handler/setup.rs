@@ -134,6 +134,11 @@ impl Handler<SetDriverUserDataMsg> for Controller {
                     cfg.connection_timeout = value;
                 }
             }
+            if let Some(value) = parse_value(&values, "request_timeout") {
+                if value >= 3 {
+                    cfg.request_timeout = value;
+                }
+            }
             if let Some(value) = parse_value(&values, "max_frame_size_kb") {
                 if value >= 1024 {
                     cfg.max_frame_size_kb = value;
@@ -207,8 +212,8 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                             {
                                 "id": "connection_timeout",
                                 "label": {
-                                    "en": "Connection timeout in seconds",
-                                    "de": "Verbindungstimeout in Sekunden"
+                                    "en": "TCP connection timeout in seconds",
+                                    "de": "TCP Verbindungs-Timeout in Sekunden"
                                 },
                                 "field": {
                                     "number": {
@@ -216,6 +221,21 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                                         "min": 3,
                                         "max": 30,
                                         "unit": { "en": "sec" } // not yet working in web-configurator
+                                    }
+                                }
+                            },
+                            {
+                                "id": "request_timeout",
+                                "label": {
+                                    "en": "Request timeout in seconds",
+                                    "de": "Anfrage-Timeout in Sekunden"
+                                },
+                                "field": {
+                                    "number": {
+                                        "value": self.settings.hass.request_timeout,
+                                        "min": 3,
+                                        "max": 30,
+                                        "unit": { "en": "sec" }
                                     }
                                 }
                             },

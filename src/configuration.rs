@@ -110,8 +110,15 @@ pub struct WebSocketSettings {
 pub struct HomeAssistantSettings {
     pub url: Url,
     pub token: String,
-    /// WebSocket connection timeout in seconds
+    /// WebSocket connection timeout in seconds.
+    /// This is the max time allowed to connect to the remote host, including DNS name resolution.
+    /// Make sure that `request_timeout` >= `connection_timeout`.
     pub connection_timeout: u8,
+    /// WebSocket request timeout in seconds.
+    /// This is the total time before a response must be received. Should be equal or greater than `connection_timeout`.
+    // simplifies data migration: missing value in existing configuration will be set with a default!
+    #[serde(default = "default_request_timeout")]
+    pub request_timeout: u8,
     pub max_frame_size_kb: usize,
     pub reconnect: ReconnectSettings,
     pub heartbeat: HeartbeatSettings,
@@ -122,12 +129,17 @@ impl Default for HomeAssistantSettings {
         Self {
             url: Url::parse("ws://homeassistant.local:8123/api/websocket").unwrap(),
             token: "".to_string(),
-            connection_timeout: 3,
+            connection_timeout: 6,
+            request_timeout: default_request_timeout(),
             max_frame_size_kb: 5120,
             reconnect: Default::default(),
             heartbeat: Default::default(),
         }
     }
+}
+
+fn default_request_timeout() -> u8 {
+    6
 }
 
 #[serde_as]
