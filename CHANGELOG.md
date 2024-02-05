@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+## v0.7.0 - 2024-02-05
 ### Added
 - Home Assistant WebSocket API connection test tool.
 ### Fixed
@@ -16,8 +18,6 @@ _Changes in the next release_
 - Connection state handling in initial setup to avoid restart ([#43](https://github.com/unfoldedcircle/integration-home-assistant/issues/43)).
 ### Changed
 - Immediately close HA WS connection in case of a protocol error.
-
----
 
 ## v0.6.1 - 2024-01-04
 ### Fixed
