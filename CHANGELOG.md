@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+- Home Assistant WebSocket API connection test tool.
+### Fixed
+- Extract and convert color information from received HA light entities to follow external color changes. Supported color models: xy, hs, rgb ([#7](https://github.com/unfoldedcircle/integration-home-assistant/issues/7)).
+- Connection timeout setting was used as request timeout. TCP connection timeout was always set to 5 seconds ([#47](https://github.com/unfoldedcircle/integration-home-assistant/issues/47)).
+- Connection state handling in initial setup to avoid restart ([#43](https://github.com/unfoldedcircle/integration-home-assistant/issues/43)).
+### Changed
+- Immediately close HA WS connection in case of a protocol error.
+
 ---
 
 ## v0.6.1 - 2024-01-04
