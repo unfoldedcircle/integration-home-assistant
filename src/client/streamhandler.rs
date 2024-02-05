@@ -4,7 +4,7 @@
 //! StreamHandler trait implementation to receive WebSocket frames.
 
 use actix::{ActorContext, AsyncContext, Context, StreamHandler};
-use actix_web_actors::ws::{CloseCode, Frame, ProtocolError as WsProtocolError};
+use actix_web_actors::ws::{Frame, ProtocolError as WsProtocolError};
 use log::{debug, error, info};
 
 use crate::client::messages::Close;
@@ -14,11 +14,10 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for HomeAssistantClient {
     fn handle(&mut self, msg: Result<Frame, WsProtocolError>, ctx: &mut Self::Context) {
         let msg = match msg {
             Err(e) => {
-                error!("[{}] Protocol error: {e}", self.id);
-                ctx.notify(Close {
-                    code: CloseCode::Protocol,
-                    description: Some(e.to_string()),
-                });
+                error!("[{}] Protocol error, terminating connection: {e}", self.id);
+                // immediately close connection in case of a protocol error
+                self.sink.close();
+                ctx.stop();
                 return;
             }
             Ok(msg) => msg,
