@@ -219,13 +219,14 @@ impl Controller {
         input: &OperationModeInput,
         ctx: &mut Context<Controller>,
     ) -> Result<(), ServiceError> {
-        debug!(
-            "State machine input: {input:?}, state: {:?}",
-            self.machine.state()
-        );
+        let old_state = format!("{:?}", self.machine.state());
+        debug!("State machine input: {input:?}, state: {old_state}",);
         match self.machine.consume(input) {
             Ok(None) => {
-                info!("State machine transition: {:?}", self.machine.state());
+                let state = format!("{:?}", self.machine.state());
+                if state != old_state {
+                    info!("State machine transition: {old_state} -> {state}");
+                }
                 Ok(())
             }
             Ok(Some(OperationModeOutput::SetupFlowTimer)) => {

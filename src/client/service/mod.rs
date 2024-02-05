@@ -38,8 +38,6 @@ impl Handler<CallService> for HomeAssistantClient {
     ///
     /// returns: Result<(), ServiceError>
     fn handle(&mut self, msg: CallService, ctx: &mut Self::Context) -> Self::Result {
-        info!("[{}] Calling service in HomeAssistant", self.id);
-
         // map Remote Two command name & parameters to HA service name and service_data payload
         let (service, service_data) = match msg.command.entity_type {
             EntityType::Button => button::handle_button(&msg.command),
@@ -58,6 +56,11 @@ impl Handler<CallService> for HomeAssistantClient {
                 )))
             }
         }?;
+        info!(
+            "[{}] Calling {} service '{service}'",
+            self.id, msg.command.entity_id
+        );
+
         let domain = match msg.command.entity_id.split_once('.') {
             None => return Err(ServiceError::BadRequest("Invalid entity_id format".into())),
             Some((l, _)) => l.to_string(),
