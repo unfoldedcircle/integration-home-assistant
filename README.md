@@ -85,6 +85,52 @@ To start the integration driver:
 cargo run
 ```
 
+## Home Assistant WebSocket API test tool
+
+The [bin/ha_test.rs](src/bin/ha_test.rs) tool is a simple CLI tool to test the Home Assistant WebSocket API connectivity
+with the exact same code & logic as the HA integration for Remote Two.
+
+The main purpose of this tool is to troubleshoot connectivity issues from a PC. Linux, macOS and Windows x86 binaries
+are automatically built with a GitHub action and attached to [GitHub releases](https://github.com/unfoldedcircle/integration-home-assistant/releases).
+
+### Functionality
+
+1. Connect to the HA server and authenticate with the token
+2. Subscribe to entity state events: `subscribe_events`
+3. Request the entity states: `get_states`
+4. Disconnect
+
+The debug log including HA message communication is printed to the console.
+
+### Required parameters
+
+- HA long-lived access token.
+- HA WebSocket URL. Default if not provided: `ws://homeassistant.local:8123/api/websocket`
+
+The configuration can either be provided in a `home-assistant.json` file in the current directory
+(see [./resources/home-assistant.json](resources/home-assistant.json) template), or through command line parameters.
+
+
+### Usage
+
+```
+./ha-test --help
+Home Assistant server communication test
+
+Usage: ha-test [OPTIONS]
+
+Options:
+  -u <url>                     Home Assistant WebSocket API URL (overrides home-assistant.json)
+                               [default: ws://homeassistant.local:8123/api/websocket]
+  -t <token>                   Home Assistant long lived access token (overrides home-assistant.json)
+  -c <connection_timeout>      TCP connection timeout in seconds (overrides home-assistant.json)
+  -r <request_timeout>         Request timeout in seconds (overrides home-assistant.json)
+      --trace <MESSAGES>       Message tracing for HA server communication
+                               [default: all] [possible values: in, out, all, none]
+  -h, --help                   Print help
+  -V, --version                Print version
+```
+
 ## Contributing
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute and submit pull requests to us.
