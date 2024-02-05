@@ -5,3 +5,6 @@ rustflags = "-C target-cpu=cortex-a55"
 [target.arm-unknown-linux-gnueabihf]
 linker = "yio-arm-buildroot-linux-gnueabihf-gcc"
 rustflags = "-C target-cpu=arm1176jzf-s"
+
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
