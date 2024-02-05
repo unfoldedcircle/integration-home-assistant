@@ -58,13 +58,13 @@ jobs:
           use_gh_cache: ${{ env.USE_GH_CACHE }}
           incremental: ${{ env.INCREMENTAL_BUILD }}
 
-      - run: cargo test --features mdns-sd
+      - run: cargo test --features mdns-sd --bin uc-intg-hass
 
       - name: Run clippy
         run: cargo clippy --features mdns-sd -- -D warnings
 
   build:
-    name: Build release
+    name: Linux-x64 build
     needs: test
     runs-on: ubuntu-22.04
     steps:
@@ -229,10 +229,85 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+  tools:
+    name: ${{ matrix.config.name }} build
+    runs-on: ${{ matrix.config.os }}
+    needs: test
+    strategy:
+      matrix:
+        config:
+          - {
+            name: "ha-test Linux-x64",
+            target: "Linux-x64",
+            os: "ubuntu-latest",
+            artifact: "ha-test",
+            archive: "ha-test_Linux-x64.tar.gz"
+            }
+          - {
+            name: "ha-test Windows-x64",
+            target: "Windows-x64",
+            os: "windows-latest",
+            artifact: "ha-test.exe",
+            archive: "ha-test_Windows-x64.zip"
+            }
+          - {
+            name: "ha-test macOS-x64",
+            target: "macOS-x64",
+            os: "macos-latest",
+            artifact: "ha-test",
+            archive: "ha-test_macOS-x64.tar.gz"
+            }
+
+    steps:
+      - name: Checkout ${{ env.PROJECT_NAME}}
+        uses: actions/checkout@v4
+
+      - id: setup
+        uses: ./.github/actions/rust-setup
+        with:
+          build: release
+          use_gh_cache: ${{ env.USE_GH_CACHE }}
+          incremental: ${{ env.INCREMENTAL_BUILD }} && !contains(github.ref, 'tags/v')
+
+      - name: Release build
+        run: cargo build --release --bin ha-test
+
+      # Archive is required to preserve file permissions
+      - name: Prepare upload artifact
+        shell: bash
+        run: |
+          ls -la target/release
+          mkdir -p ${{env.BIN_OUTPUT_PATH }}
+          cp target/release/${{ matrix.config.artifact }} ${{ env.BIN_OUTPUT_PATH }}
+          cp resources/home-assistant.json ${{ env.BIN_OUTPUT_PATH }}
+          ls -la ${{ env.BIN_OUTPUT_PATH }}
+
+      - name: Create zip upload artifact for Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd ${{ env.BIN_OUTPUT_PATH }}
+          7z a -tzip ../target/release/${{ matrix.config.archive }} *
+
+      - name: Create tar.gz upload artifact
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          tar czvf target/release/${{ matrix.config.archive }} -C ${{ env.BIN_OUTPUT_PATH }} .
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        id: upload_artifact
+        with:
+          name: ha-test-${{ matrix.config.target }}
+          path: target/release/${{ matrix.config.archive }}
+          if-no-files-found: error
+          retention-days: 3
+
   release:
     name: GitHub release
     if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
-    needs: [build, cross_compile]
+    needs: [build, cross_compile, tools]
     runs-on: ubuntu-22.04
 
     steps:
@@ -253,7 +328,7 @@ jobs:
         run: |
           echo "TIMESTAMP=$(date +"%Y%m%d_%H%M%S")" >> $GITHUB_ENV
 
-      - name: Extract tar.gz build archives from downloaded artifacts
+      - name: Extract archives from downloaded artifacts
         run: |
           # Files are wrapped in tar from actions/upload-artifact, then extracted into a directory by actions/download-artifact
           ls -lah
@@ -272,8 +347,9 @@ jobs:
         run: |
           echo "append timestamp for development builds"
           for filename in *.tar.gz; do mv $filename "$(basename $filename .tar.gz)-${{ env.TIMESTAMP }}.tar.gz"; done;
+          for filename in *.zip; do mv $filename "$(basename $filename .zip)-${{ env.TIMESTAMP }}.zip"; done;
           echo "create hashes"
-          for filename in *.tar.gz; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
+          for filename in *.{tar.gz,zip}; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
           ls -lah
 
       - name: Create Pre-Release
@@ -286,13 +362,14 @@ jobs:
           title: "Development Build"
           files: |
             *.tar.gz
+            *.zip
             ${{ env.HASH_FILENAME }}
 
       - name: Create GitHub release archives
         if: "contains(github.ref, 'tags/v')"
         run: |
           echo "create hashes"
-          for filename in *.tar.gz; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
+          for filename in *.{tar.gz,zip}; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
           ls -lah
 
       - name: Create Release
@@ -303,6 +380,7 @@ jobs:
           prerelease: false
           files: |
             *.tar.gz
+            *.zip
             ${{ env.HASH_FILENAME }}
 
   container:
@@ -312,10 +390,10 @@ jobs:
     needs: release
 
     steps:
-      - name: Download build artifacts
+      - name: Download Linux-x64 build artifact
         uses: actions/download-artifact@v4
         with:
-          pattern: "*-${{ env.LINUX_ARTIFACT_SUFFIX }}*"
+          pattern: "uc-intg-hass-*-${{ env.LINUX_ARTIFACT_SUFFIX }}*"
 
       - name: Log
         if: env.DEBUG_OUTPUT == 'true'

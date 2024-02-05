@@ -4,7 +4,7 @@
 //! Configuration file handling.
 
 use crate::errors::ServiceError;
-use crate::{APP_VERSION, DRIVER_METADATA};
+use crate::APP_VERSION;
 use config::Config;
 use log::{error, info, warn};
 use serde_with::{serde_as, DurationMilliSeconds, DurationSeconds};
@@ -15,6 +15,11 @@ use std::time::Duration;
 use std::{env, fs, io};
 use uc_api::intg::IntegrationDriverUpdate;
 use url::Url;
+
+/// Default configuration file.
+pub const DEF_CONFIG_FILE: &str = "configuration.yaml";
+
+pub const DEF_HA_URL: &str = "ws://homeassistant.local:8123/api/websocket";
 
 pub const ENV_SETUP_TIMEOUT: &str = "UC_SETUP_TIMEOUT";
 pub const DEF_SETUP_TIMEOUT_SEC: u64 = 300;
@@ -54,6 +59,9 @@ pub const ENV_API_MSG_TRACING: &str = "UC_API_MSG_TRACING";
 
 /// Environment variable to disable TLS verification to the Home Assistant server.
 pub const ENV_DISABLE_CERT_VERIFICATION: &str = "UC_DISABLE_CERT_VERIFICATION";
+
+/// Compiled-in driver metadata in json format.
+const DRIVER_METADATA: &str = include_str!("../resources/driver.json");
 
 #[derive(Default, serde::Deserialize, serde::Serialize)]
 pub struct Settings {
@@ -127,7 +135,7 @@ pub struct HomeAssistantSettings {
 impl Default for HomeAssistantSettings {
     fn default() -> Self {
         Self {
-            url: Url::parse("ws://homeassistant.local:8123/api/websocket").unwrap(),
+            url: Url::parse(DEF_HA_URL).unwrap(),
             token: "".to_string(),
             connection_timeout: 6,
             request_timeout: default_request_timeout(),

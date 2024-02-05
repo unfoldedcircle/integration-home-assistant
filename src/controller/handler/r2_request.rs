@@ -3,6 +3,7 @@
 
 //! Actix message handler for [R2RequestMsg].
 
+use crate::built_info;
 use crate::client::messages::{CallService, GetStates};
 use crate::controller::handler::{
     SetDriverUserDataMsg, SetupDriverMsg, SubscribeHaEventsMsg, UnsubscribeHaEventsMsg,
@@ -10,14 +11,24 @@ use crate::controller::handler::{
 use crate::controller::{Controller, OperationModeInput, R2RequestMsg};
 use crate::errors::ServiceError;
 use crate::util::{return_fut_err, return_fut_ok, DeserializeMsgData};
-use crate::{API_VERSION, APP_VERSION};
+use crate::APP_VERSION;
 use actix::{fut, AsyncContext, Handler, ResponseFuture};
+use lazy_static::lazy_static;
 use log::{debug, error};
 use serde_json::{json, Value};
 use strum::EnumMessage;
 use uc_api::intg::ws::R2Request;
 use uc_api::intg::{EntityCommand, IntegrationVersion};
 use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
+
+lazy_static! {
+    /// Integration-API version.
+    pub static ref API_VERSION: &'static str = built_info::DEPENDENCIES
+        .iter()
+        .find(|p| p.0 == "uc_api")
+        .map(|v| v.1)
+        .unwrap_or("?");
+}
 
 impl Handler<R2RequestMsg> for Controller {
     type Result = ResponseFuture<Result<Option<WsMessage>, ServiceError>>;

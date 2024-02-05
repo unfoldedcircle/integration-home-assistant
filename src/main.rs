@@ -24,14 +24,14 @@ use crate::util::{bool_from_env, create_single_cert_server_config};
 use actix::Actor;
 use actix_web::{middleware, web, App, HttpServer};
 use clap::{arg, Command};
-use const_format::formatcp;
-use lazy_static::lazy_static;
+use configuration::DEF_CONFIG_FILE;
 use log::{error, info};
 use std::io;
 use std::net::TcpListener;
 use std::path::Path;
 use uc_api::intg::IntegrationDriverUpdate;
 use uc_api::util::text_from_language_map;
+use uc_intg_hass::{built_info, APP_VERSION};
 
 mod client;
 mod configuration;
@@ -39,38 +39,6 @@ mod controller;
 mod errors;
 mod server;
 mod util;
-
-/// Default configuration file.
-const DEF_CONFIG_FILE: &str = "configuration.yaml";
-/// Compiled-in driver metadata in json format.
-const DRIVER_METADATA: &str = include_str!("../resources/driver.json");
-
-/// Build information like timestamp, git hash, etc.
-pub mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
-}
-
-/// Application version built from git version information.
-pub const APP_VERSION: &str = formatcp!(
-    "{}{}",
-    match built_info::GIT_VERSION {
-        Some(v) => v,
-        None => formatcp!("{}-non-git", built_info::PKG_VERSION),
-    },
-    match built_info::GIT_DIRTY {
-        Some(_) => "-dirty",
-        None => "",
-    }
-);
-
-lazy_static! {
-    /// Integration-API version.
-    pub static ref API_VERSION: &'static str = built_info::DEPENDENCIES
-        .iter()
-        .find(|p| p.0 == "uc_api")
-        .map(|v| v.1)
-        .unwrap_or("?");
-}
 
 #[actix_web::main]
 async fn main() -> io::Result<()> {
@@ -83,17 +51,18 @@ async fn main() -> io::Result<()> {
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    let cfg_file = match args.value_of("config") {
-        None => {
-            if Path::new(DEF_CONFIG_FILE).exists() {
-                info!("Loading default configuration file: {}", DEF_CONFIG_FILE);
-                Some(DEF_CONFIG_FILE)
-            } else {
-                None
-            }
-        }
-        Some(c) => Some(c),
-    };
+    let cfg_file: Option<&str> =
+        args.get_one("config")
+            .map(|c: &String| c.as_str())
+            .or_else(|| {
+                if Path::new(DEF_CONFIG_FILE).exists() {
+                    info!("Loading default configuration file: {}", DEF_CONFIG_FILE);
+                    Some(DEF_CONFIG_FILE)
+                } else {
+                    None
+                }
+            });
+
     let cfg = get_configuration(cfg_file).expect("Failed to read configuration");
 
     let listeners = create_tcp_listeners(&cfg.integration)?;

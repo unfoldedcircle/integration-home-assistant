@@ -6,9 +6,21 @@ authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
 license = "MPL-2.0"
 description = "Unfolded Circle Home-Assistant integration for Remote Two"
 repository = "https://github.com/unfoldedcircle/integration-home-assistant"
+default-run = "uc-intg-hass"
 
 [profile.release]
 strip = true  # Automatically strip symbols from the binary.
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "uc-intg-hass"
+path = "src/main.rs"
+
+[[bin]]
+name = "ha-test"
+path = "src/bin/ha_test.rs"
 
 [features]
 default = []
@@ -48,7 +60,7 @@ serde_with = "3"
 
 rust-fsm = "0.6"
 
-clap = "3"
+clap = "4"
 config = { version = "0.14", default-features = false, features = ["yaml", "json"] }
 const_format = "0.2"
 env_logger = "0.11"
@@ -64,6 +76,8 @@ time = { version = "0.3", default-features = false, features = ["std", "formatti
 strum = "0.25"
 strum_macros = "0.25"
 derive_more = "0.99"
+
+anyhow = { version = "1", features = [] }
 
 [build-dependencies]
 built = { version = "0.7", features = ["git2", "chrono", "dependency-tree", "semver"] }
