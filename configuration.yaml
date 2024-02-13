@@ -28,3 +28,4 @@ integration:
 #  heartbeat:
 #    interval_sec: 20
 #    timeout_sec: 40
+#  disconnect_in_standby: true

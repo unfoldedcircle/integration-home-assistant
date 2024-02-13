@@ -142,7 +142,6 @@ impl Controller {
         if let Some(session) = self.sessions.get(ws_id) {
             if session.standby {
                 debug!("Remote is in standby, not sending message: {:?}", message);
-                // TODO queue entity update events? #5
                 return;
             }
             if let Err(e) = session.recipient.try_send(SendWsMessage(message)) {

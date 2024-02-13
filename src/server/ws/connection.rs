@@ -175,7 +175,6 @@ impl Handler<SendWsMessage> for WsConn {
 impl WsConn {
     fn start_heartbeat(&self, ctx: &mut WebsocketContext<Self>) {
         ctx.run_interval(self.heartbeat.interval, |act, ctx| {
-            // TODO check if we got standby event from remote: suspend until out of standby and then test connection #5
             if Instant::now().duration_since(act.hb) > act.heartbeat.timeout {
                 info!("[{}] Closing connection due to failed heartbeat", act.id);
                 // remove WebSocket connection from our handler

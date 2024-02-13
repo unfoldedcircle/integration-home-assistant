@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+- Option to disconnect from HA when device enters standby ([#50](https://github.com/unfoldedcircle/integration-home-assistant/issues/50)).
+### Changed
+- Update Rust crates.
+
 ---
 ## v0.7.0 - 2024-02-05
 ### Added

@@ -130,6 +130,11 @@ pub struct HomeAssistantSettings {
     pub max_frame_size_kb: usize,
     pub reconnect: ReconnectSettings,
     pub heartbeat: HeartbeatSettings,
+    /// Disconnect WebSocket connection when remote enters standby.
+    /// Should be enabled if running on the device, disabled for an external integration.
+    // for data migration of existing configurations
+    #[serde(default = "default_disconnect_in_standby")]
+    pub disconnect_in_standby: bool,
 }
 
 impl Default for HomeAssistantSettings {
@@ -142,12 +147,16 @@ impl Default for HomeAssistantSettings {
             max_frame_size_kb: 5120,
             reconnect: Default::default(),
             heartbeat: Default::default(),
+            disconnect_in_standby: default_disconnect_in_standby(),
         }
     }
 }
 
 fn default_request_timeout() -> u8 {
     6
+}
+fn default_disconnect_in_standby() -> bool {
+    true
 }
 
 #[serde_as]
