@@ -35,10 +35,16 @@ impl Handler<R2EventMsg> for Controller {
             }
             R2Event::EnterStandby => {
                 session.standby = true;
+                if self.settings.hass.disconnect_in_standby {
+                    ctx.notify(DisconnectMsg {});
+                }
             }
             R2Event::ExitStandby => {
                 session.standby = false;
-                // TODO send updates #5
+                if self.settings.hass.disconnect_in_standby {
+                    ctx.notify(ConnectMsg::default());
+                    self.send_device_state(&msg.ws_id);
+                }
             }
             R2Event::AbortDriverSetup => {
                 ctx.notify(AbortDriverSetup {

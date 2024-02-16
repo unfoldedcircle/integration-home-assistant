@@ -139,6 +139,9 @@ impl Handler<SetDriverUserDataMsg> for Controller {
                     cfg.request_timeout = value;
                 }
             }
+            if let Some(value) = parse_value(&values, "disconnect_in_standby") {
+                cfg.disconnect_in_standby = value;
+            }
             if let Some(value) = parse_value(&values, "max_frame_size_kb") {
                 if value >= 1024 {
                     cfg.max_frame_size_kb = value;
@@ -236,6 +239,18 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                                         "min": 3,
                                         "max": 30,
                                         "unit": { "en": "sec" }
+                                    }
+                                }
+                            },
+                            {
+                                "id": "disconnect_in_standby",
+                                "label": {
+                                    "en": "Disconnect when entering standby",
+                                    "de": "Trennen der Verbindung im Standby-Modus"
+                                },
+                                "field": {
+                                    "checkbox": {
+                                      "value": self.settings.hass.disconnect_in_standby
                                     }
                                 }
                             },
