@@ -1,6 +1,6 @@
 [package]
 name = "uc-intg-hass"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
 license = "MPL-2.0"
