@@ -5,6 +5,7 @@
 
 use crate::built_info;
 use crate::client::messages::{CallService, GetStates};
+use crate::configuration::get_driver_metadata;
 use crate::controller::handler::{
     SetDriverUserDataMsg, SetupDriverMsg, SubscribeHaEventsMsg, UnsubscribeHaEventsMsg,
 };
@@ -17,7 +18,7 @@ use lazy_static::lazy_static;
 use log::{debug, error};
 use serde_json::{json, Value};
 use strum::EnumMessage;
-use uc_api::intg::ws::R2Request;
+use uc_api::intg::ws::{DriverVersionMsgData, R2Request};
 use uc_api::intg::{EntityCommand, IntegrationVersion};
 use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
 
@@ -55,9 +56,15 @@ impl Handler<R2RequestMsg> for Controller {
             R2Request::GetDriverVersion => Some(WsMessage::response(
                 req_id,
                 resp_msg,
-                IntegrationVersion {
-                    api: Some(API_VERSION.to_string()),
-                    integration: Some(APP_VERSION.to_string()),
+                DriverVersionMsgData {
+                    name: get_driver_metadata()
+                        .ok()
+                        .and_then(|drv| drv.name)
+                        .and_then(|name| name.get("en").cloned()),
+                    version: Some(IntegrationVersion {
+                        api: Some(API_VERSION.to_string()),
+                        driver: Some(APP_VERSION.to_string()),
+                    }),
                 },
             )),
             R2Request::GetDriverMetadata => {

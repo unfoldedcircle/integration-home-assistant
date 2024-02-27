@@ -99,7 +99,28 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
         | MediaPlayerCommand::FunctionBlue
         | MediaPlayerCommand::Home
         | MediaPlayerCommand::Menu
-        | MediaPlayerCommand::Back => return Err(ServiceError::BadRequest("Not supported".into())),
+        | MediaPlayerCommand::Back
+        | MediaPlayerCommand::Digit_0
+        | MediaPlayerCommand::Digit_1
+        | MediaPlayerCommand::Digit_2
+        | MediaPlayerCommand::Digit_3
+        | MediaPlayerCommand::Digit_4
+        | MediaPlayerCommand::Digit_5
+        | MediaPlayerCommand::Digit_6
+        | MediaPlayerCommand::Digit_7
+        | MediaPlayerCommand::Digit_8
+        | MediaPlayerCommand::Digit_9
+        | MediaPlayerCommand::Guide
+        | MediaPlayerCommand::Info
+        | MediaPlayerCommand::Record
+        | MediaPlayerCommand::MyRecordings
+        | MediaPlayerCommand::Live
+        | MediaPlayerCommand::Eject
+        | MediaPlayerCommand::OpenClose
+        | MediaPlayerCommand::AudioTrack
+        | MediaPlayerCommand::Subtitle => {
+            return Err(ServiceError::BadRequest("Not supported".into()))
+        }
         MediaPlayerCommand::SelectSource => {
             let mut data = Map::new();
             let params = get_required_params(msg)?;
