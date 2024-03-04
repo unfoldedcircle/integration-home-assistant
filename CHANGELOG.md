@@ -10,12 +10,13 @@ _Changes in the next release_
 
 ### Changed
 - Update uc-api to 0.9.3 for new media-player features (currently not used for Home Assistant).
+- Update Rust crates.
 
 ---
 
 ## v0.8.1 - 2024-02-27
 ### Fixed
-- driver_version response field
+- driver_version response field.
 
 ## v0.8.0 - 2024-02-16
 ### Added
