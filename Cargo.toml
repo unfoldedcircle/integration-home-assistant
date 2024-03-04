@@ -28,7 +28,7 @@ mdns-sd = ["dep:mdns-sd"]
 zeroconf = ["dep:zeroconf"]
 
 [dependencies]
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.9.1-beta" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.9.3-beta" }
 # for local development:
 #uc_api = { path = "../api-model-rs" }
 

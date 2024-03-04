@@ -118,7 +118,9 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
         | MediaPlayerCommand::Eject
         | MediaPlayerCommand::OpenClose
         | MediaPlayerCommand::AudioTrack
-        | MediaPlayerCommand::Subtitle => {
+        | MediaPlayerCommand::Subtitle
+        | MediaPlayerCommand::ContextMenu
+        | MediaPlayerCommand::Settings => {
             return Err(ServiceError::BadRequest("Not supported".into()))
         }
         MediaPlayerCommand::SelectSource => {
