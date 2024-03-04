@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 _Changes in the next release_
 
 ---
+
+## v0.8.2 - 2024-03-04
+### Changed
+- Update uc-api to 0.9.3 for new media-player features (currently not used for Home Assistant).
+- Update Rust crates.
+
+## v0.8.1 - 2024-02-27
+### Fixed
+- driver_version response field.
+
 ## v0.8.0 - 2024-02-16
 ### Added
 - Option to disconnect from HA when device enters standby ([#50](https://github.com/unfoldedcircle/integration-home-assistant/issues/50)).
