@@ -51,6 +51,7 @@ impl HomeAssistantClient {
             "binary_sensor" => binary_sensor_event_to_entity_change(event.data),
             "climate" => climate_event_to_entity_change(event.data),
             "media_player" => media_player_event_to_entity_change(&self.server, event.data),
+            "remote" => remote_event_to_entity_change(event.data),
             &_ => {
                 debug!("[{}] Unsupported entity: {}", self.id, entity_type);
                 return Ok(()); // it's not really an error, so it's ok ;-)
