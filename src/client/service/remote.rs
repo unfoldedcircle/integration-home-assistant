@@ -6,19 +6,17 @@
 use crate::client::service::{cmd_from_str, get_required_params};
 use crate::errors::ServiceError;
 use serde_json::{Map, Value};
-use uc_api::intg::EntityCommand;
-use uc_api::RemoteCommand;
+use uc_api::intg::{EntityCommand, IntgRemoteCommand};
 
 pub(crate) fn handle_remote(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
-    let cmd: RemoteCommand = cmd_from_str(&msg.cmd_id)?;
+    let cmd: IntgRemoteCommand = cmd_from_str(&msg.cmd_id)?;
 
     let result = match cmd {
-        RemoteCommand::On => ("turn_on".into(), None),
-        RemoteCommand::Off => ("turn_off".into(), None),
-        RemoteCommand::Toggle => ("toggle".into(), None),
-        RemoteCommand::Send => create_command(msg, "command")?,
-        RemoteCommand::SendSequence => create_command(msg, "sequence")?,
-        RemoteCommand::StopSend => return Err(ServiceError::NotYetImplemented),
+        IntgRemoteCommand::On => ("turn_on".into(), None),
+        IntgRemoteCommand::Off => ("turn_off".into(), None),
+        IntgRemoteCommand::Toggle => ("toggle".into(), None),
+        IntgRemoteCommand::SendCmd => create_command(msg, "command")?,
+        IntgRemoteCommand::SendCmdSequence => create_command(msg, "sequence")?,
     };
 
     Ok(result)

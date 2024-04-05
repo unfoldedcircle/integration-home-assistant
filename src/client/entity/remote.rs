@@ -8,8 +8,8 @@ use crate::client::model::EventData;
 use crate::errors::ServiceError;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
-use uc_api::intg::{AvailableIntgEntity, EntityChange};
-use uc_api::{EntityType, RemoteFeature};
+use uc_api::intg::{AvailableIntgEntity, EntityChange, IntgRemoteFeature};
+use uc_api::EntityType;
 
 pub(crate) fn remote_event_to_entity_change(
     mut data: EventData,
@@ -45,9 +45,9 @@ pub(crate) fn convert_remote_entity(
         name,
         // toggle, on and off seem to be fixed features in HA
         features: Some(vec![
-            RemoteFeature::Send.to_string(),
-            RemoteFeature::OnOff.to_string(),
-            RemoteFeature::Toggle.to_string(),
+            IntgRemoteFeature::SendCmd.to_string(),
+            IntgRemoteFeature::OnOff.to_string(),
+            IntgRemoteFeature::Toggle.to_string(),
         ]),
         area: None,
         // Available commands are not retrievable from HA :-(

@@ -32,7 +32,7 @@ zeroconf = ["dep:zeroconf"]
 # for local development:
 #uc_api = { path = "../api-model-rs" }
 # Using a GitHub revision:
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "af6697550c4d05ab5fcb2734d6c9e126415eec79" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "2424dc4cef1025b681c7db221ad39baea260ce8c" }
 
 # WebSockets server
 actix-web = { version = "4.4", features = ["rustls-0_21"] }
