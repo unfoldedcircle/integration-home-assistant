@@ -2430,7 +2430,7 @@ dependencies = [
 [[package]]
 name = "uc_api"
 version = "0.9.3-beta"
-source = "git+https://github.com/unfoldedcircle/api-model-rs?rev=2424dc4cef1025b681c7db221ad39baea260ce8c#2424dc4cef1025b681c7db221ad39baea260ce8c"
+source = "git+https://github.com/unfoldedcircle/api-model-rs?rev=7b700c7dfff34b64a7e9e9101f2eb2226d61a35f#7b700c7dfff34b64a7e9e9101f2eb2226d61a35f"
 dependencies = [
  "chrono",
  "derive_more",
