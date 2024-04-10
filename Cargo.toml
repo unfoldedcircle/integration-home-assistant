@@ -28,11 +28,11 @@ mdns-sd = ["dep:mdns-sd"]
 zeroconf = ["dep:zeroconf"]
 
 [dependencies]
-#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.9.3-beta" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.10.0" }
 # for local development:
 #uc_api = { path = "../api-model-rs" }
 # Using a GitHub revision:
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "7b700c7dfff34b64a7e9e9101f2eb2226d61a35f" }
+#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "1650ada3e11bb90318cef173811b6c475fa1d782" }
 
 # WebSockets server
 actix-web = { version = "4.4", features = ["rustls-0_21"] }
