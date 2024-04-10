@@ -9,7 +9,7 @@ use crate::errors::ServiceError;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::AvailableIntgEntity;
-use uc_api::{intg::EntityChange, EntityType, SensorOption};
+use uc_api::{intg::EntityChange, EntityType, SensorOptionField};
 
 pub(crate) fn map_sensor_attributes(
     _entity_id: &str,
@@ -82,11 +82,14 @@ pub(crate) fn convert_sensor_entity(
         v => {
             if let Some(v) = v {
                 if let Some(label) = device_class_to_label(v) {
-                    options.insert(SensorOption::CustomLabel.to_string(), Value::String(label));
+                    options.insert(
+                        SensorOptionField::CustomLabel.to_string(),
+                        Value::String(label),
+                    );
                 }
             }
             if let Some(v) = ha_attr.get("unit_of_measurement") {
-                options.insert(SensorOption::CustomUnit.to_string(), v.clone());
+                options.insert(SensorOptionField::CustomUnit.to_string(), v.clone());
             }
             Some("custom".into())
         }

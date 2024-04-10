@@ -11,7 +11,7 @@ use log::warn;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::{AvailableIntgEntity, EntityChange};
-use uc_api::{ClimateFeature, ClimateOption, EntityType};
+use uc_api::{ClimateFeature, ClimateOptionField, EntityType};
 
 // https://developers.home-assistant.io/docs/core/entity/climate#supported-features
 pub const SUPPORT_TARGET_TEMPERATURE: u32 = 1;
@@ -129,17 +129,17 @@ pub(crate) fn convert_climate_entity(
     // handle options. TODO untested! Only based on some GitHub issue logs :-) #12
     let mut options = serde_json::Map::new();
     if let Some(v) = number_value(ha_attr, "min_temp") {
-        options.insert(ClimateOption::MinTemperature.to_string(), v);
+        options.insert(ClimateOptionField::MinTemperature.to_string(), v);
     }
     if let Some(v) = number_value(ha_attr, "max_temp") {
-        options.insert(ClimateOption::MaxTemperature.to_string(), v);
+        options.insert(ClimateOptionField::MaxTemperature.to_string(), v);
     }
     if let Some(v) = number_value(ha_attr, "target_temp_step") {
-        options.insert(ClimateOption::TargetTemperatureStep.to_string(), v);
+        options.insert(ClimateOptionField::TargetTemperatureStep.to_string(), v);
     }
     // TODO how do we get the HA temperature_unit attribute? Couldn't find an example... #10
     if let Some(v) = ha_attr.get("temperature_unit") {
-        options.insert(ClimateOption::TemperatureUnit.to_string(), v.clone());
+        options.insert(ClimateOptionField::TemperatureUnit.to_string(), v.clone());
     }
 
     // convert attributes

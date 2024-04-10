@@ -22,6 +22,7 @@ mod climate;
 mod cover;
 mod light;
 mod media_player;
+mod remote;
 mod switch;
 
 impl Handler<CallService> for HomeAssistantClient {
@@ -46,15 +47,14 @@ impl Handler<CallService> for HomeAssistantClient {
             EntityType::Cover => cover::handle_cover(&msg.command),
             EntityType::Light => light::handle_light(&msg.command),
             EntityType::MediaPlayer => media_player::handle_media_player(&msg.command),
+            EntityType::Remote => remote::handle_remote(&msg.command),
             EntityType::Sensor => Err(ServiceError::BadRequest(
                 "Sensor doesn't support sending commands to! Ignoring call".to_string(),
             )),
-            EntityType::Activity | EntityType::Macro | EntityType::Remote => {
-                Err(ServiceError::BadRequest(format!(
-                    "{} is an internal remote-core entity",
-                    msg.command.entity_type
-                )))
-            }
+            EntityType::Activity | EntityType::Macro => Err(ServiceError::BadRequest(format!(
+                "{} is an internal remote-core entity",
+                msg.command.entity_type
+            ))),
         }?;
         info!(
             "[{}] Calling {} service '{service}'",
