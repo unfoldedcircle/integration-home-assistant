@@ -3,6 +3,7 @@
 
 //! Actix Actor message definitions for HomeAssistantClient
 
+use std::collections::HashSet;
 use actix::prelude::Message;
 use awc::ws::CloseCode;
 
@@ -29,6 +30,15 @@ pub struct GetStates;
 pub struct AvailableEntities {
     pub client_id: String,
     pub entities: Vec<AvailableIntgEntity>,
+}
+
+
+/// Sent by controller when subscribed entities change
+/// TODO : identifier necessary for multiple remotes ?
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SubscribedEntities {
+    pub entity_ids: HashSet<String>,
 }
 
 /// HA client connection states

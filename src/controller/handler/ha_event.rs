@@ -3,7 +3,7 @@
 
 //! Actix message handler for Home Assistant events.
 
-use crate::client::messages::{AvailableEntities, EntityEvent};
+use crate::client::messages::{AvailableEntities, EntityEvent, SubscribedEntities};
 use crate::controller::handler::{SubscribeHaEventsMsg, UnsubscribeHaEventsMsg};
 use crate::controller::{Controller, OperationModeState, SendWsMessage};
 use crate::errors::ServiceError;
@@ -92,9 +92,16 @@ impl Handler<SubscribeHaEventsMsg> for Controller {
         if !matches!(self.machine.state(), &OperationModeState::Running) {
             return Err(ServiceError::ServiceUnavailable("Setup required".into()));
         }
+
         if let Some(session) = self.sessions.get_mut(&msg.0.ws_id) {
             let subscribe: SubscribeEvents = msg.0.deserialize()?;
             session.subscribed_entities.extend(subscribe.entity_ids);
+
+            if let Some(ha_client) = &self.ha_client {
+                ha_client.try_send(SubscribedEntities {
+                    entity_ids: session.subscribed_entities.clone()
+                })?;
+            }
             Ok(())
         } else {
             Err(ServiceError::NotConnected)
@@ -113,6 +120,11 @@ impl Handler<UnsubscribeHaEventsMsg> for Controller {
             let unsubscribe: SubscribeEvents = msg.0.deserialize()?;
             for i in unsubscribe.entity_ids {
                 session.subscribed_entities.remove(&i);
+            }
+            if let Some(ha_client) = &self.ha_client {
+                ha_client.try_send(SubscribedEntities {
+                    entity_ids: session.subscribed_entities.clone()
+                })?;
             }
             Ok(())
         } else {

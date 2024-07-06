@@ -3,6 +3,7 @@
 
 //! Home Assistant client WebSocket API implementation with Actix actors.
 
+use std::collections::HashSet;
 use std::env;
 use std::time::Instant;
 
@@ -34,6 +35,7 @@ pub mod messages;
 mod model;
 mod service;
 mod streamhandler;
+mod subscribed_entities;
 
 static CLIENT_SEQ: AtomicU32 = AtomicU32::new(1);
 
@@ -64,6 +66,7 @@ pub struct HomeAssistantClient {
     /// Enable outgoing websocket message tracing: log every message, except messages with key
     /// `access_token`.
     msg_tracing_out: bool,
+    subscribed_entities: HashSet<String>,
 }
 
 impl HomeAssistantClient {
@@ -109,6 +112,7 @@ impl HomeAssistantClient {
                 msg_tracing_out: msg_tracing == "all" || msg_tracing == "out",
                 uc_ha_component: false,
                 uc_ha_component_info_id: None,
+                subscribed_entities: HashSet::new(),
             }
         })
     }
@@ -227,8 +231,28 @@ impl HomeAssistantClient {
                         return;
                     }
                     self.uc_ha_component = true;
+
                     //TODO subscribe events for each subscribed entities
                     //TODO : 1 subscribe event per entity of group subscriptions ?
+                    if self.subscribed_entities.len() > 0 {
+                        debug!("[{}] {}", self.id, "Initialize subscribed entities");
+                        let id = Some(self.new_msg_id());
+                        if let Err(e) = self.send_json(
+                            json!({
+                            "id": id,
+                            "type": "uc/event/subscribed_entities",
+                            "result": {
+                                "entities": self.subscribed_entities
+                            }
+                            }), ctx)
+                        {
+                            error!(
+                                "[{}] Error sending uc/event/subscribed_entities to HA: {:?}",
+                                self.id, e
+                            );
+                            ctx.notify(Close::invalid());
+                        }
+                    }
                     //Better to group subscriptions and each modification of subscribed entities
                     //will erase and recreate subscription
                 } else if Some(id) == self.subscribe_events_id {
