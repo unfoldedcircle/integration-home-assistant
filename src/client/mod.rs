@@ -45,6 +45,10 @@ pub struct HomeAssistantClient {
     /// HA request message id
     ws_id: u32,
     access_token: String,
+    uc_ha_component: bool,
+    /// True if custom HA component is detected and will use optimized workflows
+    uc_ha_component_info_id: Option<u32>,
+    /// request id of the last `subscribe_events` request. This id will be used in the result and event messages.
     subscribed_events: bool,
     /// request id of the last `subscribe_events` request. This id will be used in the result and event messages.
     subscribe_events_id: Option<u32>,
@@ -103,6 +107,8 @@ impl HomeAssistantClient {
                 heartbeat,
                 msg_tracing_in: msg_tracing == "all" || msg_tracing == "in",
                 msg_tracing_out: msg_tracing == "all" || msg_tracing == "out",
+                uc_ha_component: false,
+                uc_ha_component_info_id: None,
             }
         })
     }
@@ -196,7 +202,36 @@ impl HomeAssistantClient {
                     .get("success")
                     .and_then(|v| v.as_bool())
                     .unwrap_or_default();
-                if Some(id) == self.subscribe_events_id {
+
+                if Some(id) == self.uc_ha_component_info_id {
+                    // If the uc/info message type is unknown, the UC HA component is not
+                    // installed then we switch back to standard HA events
+                    if !success {
+                        if !self.subscribed_events {
+                            self.subscribe_events_id = Some(self.new_msg_id());
+                            if let Err(e) = self.send_json(
+                                json!({
+                          "id": self.subscribe_events_id.unwrap(),
+                          "type": "subscribe_events",
+                          "event_type": "state_changed"
+                        }),
+                                ctx,
+                            ) {
+                                error!(
+                            "[{}] Error sending subscribe_events to HA: {:?}",
+                            self.id, e
+                        );
+                                ctx.notify(Close::invalid());
+                            }
+                        }
+                        return;
+                    }
+                    self.uc_ha_component = true;
+                    //TODO subscribe events for each subscribed entities
+                    //TODO : 1 subscribe event per entity of group subscriptions ?
+                    //Better to group subscriptions and each modification of subscribed entities
+                    //will erase and recreate subscription
+                } else if Some(id) == self.subscribe_events_id {
                     self.subscribed_events = success;
                     if self.subscribed_events {
                         debug!("[{}] Subscribed to state changes", self.id);
@@ -257,21 +292,21 @@ impl HomeAssistantClient {
                         .unwrap_or_default()
                 );
 
-                if !self.subscribed_events {
-                    self.subscribe_events_id = Some(self.new_msg_id());
+                // Instead of subscribing to standard events which sends events from all entities
+                // we check after the UC HA component then fall back to standard HA events
+                if !self.uc_ha_component {
+                    self.uc_ha_component_info_id = Some(self.new_msg_id());
                     if let Err(e) = self.send_json(
                         json!({
-                          "id": self.subscribe_events_id.unwrap(),
-                          "type": "subscribe_events",
-                          "event_type": "state_changed"
+                          "id": self.uc_ha_component_info_id,
+                          "type": "uc/info"
                         }),
                         ctx,
                     ) {
-                        error!(
-                            "[{}] Error sending subscribe_events to HA: {:?}",
+                        debug!(
+                            "[{}] UC Home assistant component not installed. Switching to standard HA: {:?}",
                             self.id, e
                         );
-                        ctx.notify(Close::invalid());
                     }
                 }
             }
