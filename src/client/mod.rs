@@ -67,6 +67,7 @@ pub struct HomeAssistantClient {
     /// `access_token`.
     msg_tracing_out: bool,
     subscribed_entities: HashSet<String>,
+    authenticated: bool,
 }
 
 impl HomeAssistantClient {
@@ -113,6 +114,7 @@ impl HomeAssistantClient {
                 uc_ha_component: false,
                 uc_ha_component_info_id: None,
                 subscribed_entities: HashSet::new(),
+                authenticated: false
             }
         })
     }
@@ -200,6 +202,25 @@ impl HomeAssistantClient {
                         );
                     }
                 }
+                // TODO : improve this, test for UC HA component availability
+                // Custom events are not available after HA restart, so we try again
+                // when a new event is received. It should rather retried after a while
+                // This problem won't occur after remote wake from standby
+                if !self.uc_ha_component {
+                    self.uc_ha_component_info_id = Some(self.new_msg_id());
+                    if let Err(e) = self.send_json(
+                        json!({
+                          "id": self.uc_ha_component_info_id,
+                          "type": "uc/info"
+                        }),
+                        ctx,
+                    ) {
+                        error!(
+                            "[{}] Error sending uc/info request to HA: {:?}",
+                            self.id, e
+                        );
+                    }
+                }
             }
             "result" => {
                 let success = object_msg
@@ -210,6 +231,7 @@ impl HomeAssistantClient {
                 if Some(id) == self.uc_ha_component_info_id {
                     // If the uc/info message type is unknown, the UC HA component is not
                     // installed then we switch back to standard HA events
+                    debug!("[{}] {}", self.id, "Received HA response for uc/info custom event");
                     if !success {
                         if !self.subscribed_events {
                             self.subscribe_events_id = Some(self.new_msg_id());
@@ -231,17 +253,47 @@ impl HomeAssistantClient {
                         return;
                     }
                     self.uc_ha_component = true;
+                    if self.subscribed_events { // If standard events have been subscribed, unsubscribe them
+                        debug!("[{}] {}", self.id, "Unsubscribe standard events get_states");
+                        let id = Some(self.new_msg_id());
+                        if let Err(e) = self.send_json(
+                            json!({
+                          "id": id,
+                          "type": "unsubscribe_events",
+                          "subscription": self.subscribe_events_id.unwrap(),
+                        }),
+                            ctx,
+                        ) {
+                            error!(
+                            "[{}] Error unsubscribing standard events to HA (to switch to UC HA) : {:?}",
+                            self.id, e
+                        );
+                        }
+                        else {
+                            self.subscribed_events = false;
+                            self.subscribe_events_id = None;
+                        }
+                    }
 
                     //TODO subscribe events for each subscribed entities
                     //TODO : 1 subscribe event per entity of group subscriptions ?
                     if self.subscribed_entities.len() > 0 {
-                        debug!("[{}] {}", self.id, "Initialize subscribed entities");
-                        let id = Some(self.new_msg_id());
+                        debug!("[{}] {} : {}", self.id, "Initialize subscribed entities",
+                            itertools::join(&self.subscribed_entities, ","));
+                        if let Some(id) = self.subscribe_events_id {
+                            self.send_json(
+                                json!({
+                                "id": id,
+                                "type": "uc/event/unsubscribe",
+                                }), ctx
+                            ).expect("Error during unsubscription")
+                        }
+                        self.subscribe_events_id = Some(self.new_msg_id());
                         if let Err(e) = self.send_json(
                             json!({
-                            "id": id,
+                            "id": self.subscribe_events_id,
                             "type": "uc/event/subscribed_entities",
-                            "result": {
+                            "data": {
                                 "entities": self.subscribed_entities
                             }
                             }), ctx)
@@ -307,6 +359,7 @@ impl HomeAssistantClient {
                 });
             }
             "auth_ok" => {
+                self.authenticated = true;
                 info!(
                     "[{}] Authentication OK. HA version: {}",
                     self.id,
@@ -318,6 +371,8 @@ impl HomeAssistantClient {
 
                 // Instead of subscribing to standard events which sends events from all entities
                 // we check after the UC HA component then fall back to standard HA events
+                // However the custom messages won't be available right after HA restart so
+                // we will have to try again
                 if !self.uc_ha_component {
                     self.uc_ha_component_info_id = Some(self.new_msg_id());
                     if let Err(e) = self.send_json(
@@ -342,6 +397,7 @@ impl HomeAssistantClient {
     fn on_binary_message(&mut self, _: Bytes, ctx: &mut Context<HomeAssistantClient>) {
         error!("[{}] Binary messages not supported! Disconnecting", self.id);
         ctx.notify(Close::unsupported());
+        self.authenticated = false;
     }
 
     fn on_ping_message(&mut self, bytes: Bytes, ctx: &mut Context<HomeAssistantClient>) {

@@ -3,7 +3,7 @@
 
 //! Actix message handler for Home Assistant client connection messages.
 
-use crate::client::messages::{Close, ConnectionEvent, ConnectionState};
+use crate::client::messages::{Close, ConnectionEvent, ConnectionState, SubscribedEntities};
 use crate::client::HomeAssistantClient;
 use crate::controller::handler::{ConnectMsg, DisconnectMsg};
 use crate::controller::{Controller, OperationModeState};
@@ -129,10 +129,26 @@ impl Handler<ConnectMsg> for Controller {
                 let (sink, stream) = framed.split();
                 let addr =
                     HomeAssistantClient::start(url, client_address, token, sink, stream, heartbeat);
-
                 Ok(addr)
             }
             .into_actor(self) // converts future to ActorFuture
+                /*.then(|result, act, ctx| {
+
+                    debug!("Sending subscribed entities to client for events subscriptions");
+                    if let Some(ha_client) = &self.ha_client {
+                        for (ws_id, session) in self.sessions.iter() {
+                            if let Err(e) = ha_client.try_send(SubscribedEntities {
+                                entity_ids: session.subscribed_entities.clone()
+                            }) {
+                                error!(
+                                        "[{}] Error updating subscribed entities to client : {:?}",
+                                        ws_id, e
+                                    );
+                            }
+                        }
+                    }
+
+                })*/
             .map(move |result, act, ctx| {
                 act.ha_client_id = None; // will be set with Connected event
                 match result {
@@ -141,6 +157,16 @@ impl Handler<ConnectMsg> for Controller {
                         act.ha_client = Some(addr);
                         act.ha_reconnect_duration = act.settings.hass.reconnect.duration;
                         act.ha_reconnect_attempt = 0;
+                        debug!("Sending subscribed entities to client for events subscriptions");
+                        if let Some(session) = act.sessions.values().next() {
+                            let entities = session.subscribed_entities.clone();
+                            if let Some(ha_client) = &act.ha_client {
+                                ha_client.try_send(SubscribedEntities {
+                                    entity_ids: entities
+                                }).expect("Error updating subscribed entities to client")
+
+                            }
+                        }
                         Ok(())
                     }
                     Err(e) => {
