@@ -212,19 +212,19 @@ impl HomeAssistantClient {
                     if let Err(e) = self.send_json(
                         json!({
                           "id": self.uc_ha_component_info_id,
-                          "type": "uc/info"
+                          "type": "unfoldedcircle/info"
                         }),
                         ctx,
                     ) {
                         error!(
-                            "[{}] Error sending uc/info request to HA: {:?}",
+                            "[{}] Error sending unfoldedcircle/info request to HA: {:?}",
                             self.id, e
                         );
                     }
                 }
             }
             // result messages : sent by HA in response of a previous request, including :
-            // - Check for UC HA component (id=uc_ha_component_info_id) with uc/info,
+            // - Check for UC HA component (id=uc_ha_component_info_id) with unfoldedcircle/info,
             // - Subscription to standard HA events (id=subscribe_events_id) with subscribe_events
             // - Request for all entity states (id=entity_states_id) with get_states
             "result" => {
@@ -234,9 +234,9 @@ impl HomeAssistantClient {
                     .unwrap_or_default();
 
                 if Some(id) == self.uc_ha_component_info_id {
-                    // If the uc/info message type is unknown, the UC HA component is not
+                    // If the unfoldedcircle/info message type is unknown, the UC HA component is not
                     // installed then we switch back to standard HA events
-                    debug!("[{}] {}", self.id, "Received HA response for uc/info custom event");
+                    debug!("[{}] {}", self.id, "Received HA response for unfoldedcircle/info custom event");
                     if !success {
                         if !self.subscribed_events {
                             self.subscribe_standard_events(ctx);
@@ -329,7 +329,7 @@ impl HomeAssistantClient {
                     if let Err(e) = self.send_json(
                         json!({
                           "id": self.uc_ha_component_info_id,
-                          "type": "uc/info"
+                          "type": "unfoldedcircle/info"
                         }),
                         ctx,
                     ) {
@@ -460,7 +460,7 @@ impl HomeAssistantClient {
         if let Err(e) = self.send_json(
             json!({
                 "id": self.subscribe_events_id,
-                "type": "uc/event/subscribed_entities",
+                "type": "unfoldedcircle/event/subscribed_entities",
                 "data": {
                     "entities": self.subscribed_entities,
                     "client_id": self.id
@@ -468,7 +468,7 @@ impl HomeAssistantClient {
             }), _ctx)
         {
             error!(
-                "[{}] Error sending uc/event/subscribed_entities to HA: {:?}",
+                "[{}] Error sending unfoldedcircle/event/subscribed_entities to HA: {:?}",
                 self.id, e
             );
             _ctx.notify(Close::invalid());
@@ -482,7 +482,7 @@ impl HomeAssistantClient {
             self.send_json(
                 json!({
                 "id": id,
-                "type": "uc/event/unsubscribe",
+                "type": "unfoldedcircle/event/unsubscribe",
                 }), _ctx
             ).expect("Error during unsubscription of HA events");
             self.subscribe_events_id = None;
