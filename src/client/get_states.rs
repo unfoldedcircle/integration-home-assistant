@@ -18,11 +18,12 @@ use crate::errors::ServiceError;
 impl Handler<GetStates> for HomeAssistantClient {
     type Result = Result<(), ServiceError>;
 
-    fn handle(&mut self, _: GetStates, ctx: &mut Self::Context) -> Self::Result {
-        debug!("[{}] GetStates", self.id);
-
+    fn handle(&mut self, msg: GetStates, ctx: &mut Self::Context) -> Self::Result {
+        debug!("[{}] GetStates from {}", self.id, msg.remote_id);
+        self.remote_id = msg.remote_id;
         let id = self.new_msg_id();
         self.entity_states_id = Some(id);
+
         self.send_json(
             json!(
                 {"id": id, "type": "get_states"}

@@ -150,7 +150,9 @@ impl Handler<R2RequestMsg> for Controller {
                     // get states from Home Assistant. Response from HA will call AvailableEntities handler
                     if let Some(ha_client) = ha_client {
                         debug!("[{}] Requesting available entities from HA", msg.ws_id);
-                        ha_client.send(GetStates).await??;
+                        ha_client.send(GetStates{
+                            remote_id: msg.ws_id
+                        }).await??;
                         Ok(None) // asynchronous response message. TODO check if GetStates could return the response
                     } else {
                         error!(

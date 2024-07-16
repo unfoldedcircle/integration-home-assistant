@@ -22,7 +22,9 @@ pub struct CallService {
 /// Fetch all states from Home Assistant
 #[derive(Message)]
 #[rtype(result = "Result<(), ServiceError>")]
-pub struct GetStates;
+pub struct GetStates {
+    pub remote_id: String
+}
 
 /// Asynchronous HA response from `GetStates`
 #[derive(Message)]

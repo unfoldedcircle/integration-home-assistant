@@ -54,6 +54,8 @@ pub struct HomeAssistantClient {
     subscribed_events: bool,
     /// request id of the last `subscribe_events` request. This id will be used in the result and event messages.
     subscribe_events_id: Option<u32>,
+    /// request id of the last `/unfoldedcircle/event/configure` request. This id will be used in the result and event messages.
+    subscribe_configure_id: Option<u32>,
     /// request id of the last `subscribe_events` request. This id will be used the result message.
     entity_states_id: Option<u32>,
     sink: SinkWrite<ws::Message, SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>>,
@@ -68,6 +70,7 @@ pub struct HomeAssistantClient {
     msg_tracing_out: bool,
     subscribed_entities: HashSet<String>,
     authenticated: bool,
+    remote_id: String
 }
 
 impl HomeAssistantClient {
@@ -105,6 +108,7 @@ impl HomeAssistantClient {
                 subscribed_events: false,
                 subscribe_events_id: None,
                 entity_states_id: None,
+                subscribe_configure_id: None,
                 sink: SinkWrite::new(sink, ctx),
                 controller_actor,
                 last_hb: Instant::now(),
@@ -114,7 +118,8 @@ impl HomeAssistantClient {
                 uc_ha_component: false,
                 uc_ha_component_info_id: None,
                 subscribed_entities: HashSet::new(),
-                authenticated: false
+                authenticated: false,
+                remote_id: "".to_string(),
             }
         })
     }
@@ -184,13 +189,29 @@ impl HomeAssistantClient {
         {
             "event" => {
                 // TODO should we only check Event.event_type == "state_changed"? The id check worked well though in YIO v1
-                if Some(id) != self.subscribe_events_id {
+                if Some(id) != self.subscribe_events_id && Some(id) != self.subscribe_configure_id {
                     debug!(
                         "[{}] Ignoring event with non matching event subscription id",
                         self.id
                     );
                     return;
                 }
+                if Some(id) == self.subscribe_configure_id {
+                    debug!("[{}] {}", self.id, "Received request for subscribe_configure event");
+                    if let Some(entities) =
+                        object_msg.get_mut("data").and_then(|v| v.as_array_mut())
+                    {
+                        // this looks ugly! Is there a better way to get ownership of the array?
+                        //let entities: Vec<String> = entities.iter_mut().map(|v| v.take()).collect();
+                        debug!("[{}] {} : {}", self.id, "Received new list of subscribed entities",
+                            itertools::join(entities, ","));
+                        // if let Err(e) = self.handle_get_states_result(entities) {
+                        //     error!("[{}] Error handling HA get_states result: {:?}", self.id, e);
+                        // }
+                    }
+                    return;
+                }
+
                 let event = serde_json::from_value::<Event>(
                     object_msg.remove("event").unwrap_or(Value::Null),
                 );
@@ -207,20 +228,18 @@ impl HomeAssistantClient {
                 // when a new (standard) event is received. It should rather be
                 // retried after a while ?
                 // This problem won't occur after remote wake from standby
-                if !self.uc_ha_component {
-                    self.uc_ha_component_info_id = Some(self.new_msg_id());
-                    if let Err(e) = self.send_json(
-                        json!({
-                          "id": self.uc_ha_component_info_id,
-                          "type": "unfoldedcircle/info"
-                        }),
-                        ctx,
-                    ) {
-                        error!(
-                            "[{}] Error sending unfoldedcircle/info request to HA: {:?}",
-                            self.id, e
-                        );
-                    }
+                self.uc_ha_component_info_id = Some(self.new_msg_id());
+                if let Err(e) = self.send_json(
+                    json!({
+                      "id": self.uc_ha_component_info_id,
+                      "type": "unfoldedcircle/info"
+                    }),
+                    ctx,
+                ) {
+                    error!(
+                        "[{}] Error sending unfoldedcircle/info request to HA: {:?}",
+                        self.id, e
+                    );
                 }
             }
             // result messages : sent by HA in response of a previous request, including :
@@ -236,7 +255,9 @@ impl HomeAssistantClient {
                 if Some(id) == self.uc_ha_component_info_id {
                     // If the unfoldedcircle/info message type is unknown, the UC HA component is not
                     // installed then we switch back to standard HA events
-                    debug!("[{}] {}", self.id, "Received HA response for unfoldedcircle/info custom event");
+                    debug!("[{}] {} ({})", self.id,
+                        "Received HA response for unfoldedcircle/info custom event",
+                        success);
                     if !success {
                         if !self.subscribed_events {
                             self.subscribe_standard_events(ctx);
@@ -250,13 +271,28 @@ impl HomeAssistantClient {
                         self.unsubscribe_standard_events(ctx);
                     }
 
+                    // Subscribe to configuration change events (new entities to subscribe)
+                    // from Home Assistant
+                    self.subscribe_uc_configuration(ctx);
+
+                    // If subscribed entities are defined, send them to HA for events
                     if self.subscribed_entities.len() > 0 {
                         debug!("[{}] {} : {}", self.id, "Initialize subscribed entities",
                             itertools::join(&self.subscribed_entities, ","));
                         self.unsubscribe_uc_events(ctx);
                         self.subscribe_uc_events(ctx);
                     }
-                } else if Some(id) == self.subscribe_events_id {
+
+                } else if Some(id) == self.subscribe_configure_id {
+                    debug!("[{}] {} ({})", self.id,
+                        "Received HA response for /unfoldedcircle/event/configure event",
+                        success);
+                    if !success {
+                        error!("[{}] /unfoldedcircle/event/configure subscription event failed", self.id);
+                        self.subscribe_configure_id = None
+                    }
+                }
+                else if Some(id) == self.subscribe_events_id {
                     self.subscribed_events = success;
                     if self.subscribed_events {
                         debug!("[{}] Subscribed to state changes", self.id);
@@ -453,6 +489,28 @@ impl HomeAssistantClient {
         }
     }
 
+    /// Subscribe to configuration events handled by UC HA component
+    /// This event is raised when the entities list to subscribe to change from HA side
+    fn subscribe_uc_configuration(&mut self,
+                           _ctx: &mut Context<HomeAssistantClient>) {
+        self.subscribe_configure_id = Some(self.new_msg_id());
+        if let Err(e) = self.send_json(
+            json!({
+                "id": self.subscribe_configure_id,
+                "type": "unfoldedcircle/event/configure",
+                "data": {
+                    "client_id": self.remote_id
+                }
+            }), _ctx)
+        {
+            error!(
+                "[{}] Error sending unfoldedcircle/event/configure to HA: {:?}",
+                self.id, e
+            );
+            _ctx.notify(Close::invalid());
+        }
+    }
+
     /// Subscribe to custom events handled by UC HA component
     fn subscribe_uc_events(&mut self,
                            _ctx: &mut Context<HomeAssistantClient>) {
@@ -463,7 +521,7 @@ impl HomeAssistantClient {
                 "type": "unfoldedcircle/event/subscribed_entities",
                 "data": {
                     "entities": self.subscribed_entities,
-                    "client_id": self.id
+                    "client_id": self.remote_id
                 }
             }), _ctx)
         {
@@ -483,6 +541,9 @@ impl HomeAssistantClient {
                 json!({
                 "id": id,
                 "type": "unfoldedcircle/event/unsubscribe",
+                "data": {
+                    "client_id": self.remote_id
+                }
                 }), _ctx
             ).expect("Error during unsubscription of HA events");
             self.subscribe_events_id = None;

@@ -132,23 +132,6 @@ impl Handler<ConnectMsg> for Controller {
                 Ok(addr)
             }
             .into_actor(self) // converts future to ActorFuture
-                /*.then(|result, act, ctx| {
-
-                    debug!("Sending subscribed entities to client for events subscriptions");
-                    if let Some(ha_client) = &self.ha_client {
-                        for (ws_id, session) in self.sessions.iter() {
-                            if let Err(e) = ha_client.try_send(SubscribedEntities {
-                                entity_ids: session.subscribed_entities.clone()
-                            }) {
-                                error!(
-                                        "[{}] Error updating subscribed entities to client : {:?}",
-                                        ws_id, e
-                                    );
-                            }
-                        }
-                    }
-
-                })*/
             .map(move |result, act, ctx| {
                 act.ha_client_id = None; // will be set with Connected event
                 match result {
