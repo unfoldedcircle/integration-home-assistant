@@ -129,6 +129,7 @@ impl Handler<ConnectMsg> for Controller {
                 let (sink, stream) = framed.split();
                 let addr =
                     HomeAssistantClient::start(url, client_address, token, sink, stream, heartbeat);
+
                 Ok(addr)
             }
             .into_actor(self) // converts future to ActorFuture

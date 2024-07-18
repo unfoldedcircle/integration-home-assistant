@@ -177,8 +177,8 @@ impl HomeAssistantClient {
                 return;
             }
         };
-        let object_msg = msg.as_object_mut().unwrap(); // is_object() checked in json_object_from_text_msg!
 
+        let object_msg = msg.as_object_mut().unwrap(); // is_object() checked in json_object_from_text_msg!
 
         let id = object_msg
             .get("id")
@@ -233,28 +233,6 @@ impl HomeAssistantClient {
                         );
                     }
                 }
-
-                // TODO : improve this, test for UC HA component availability
-                // Try again to check after UC HA component
-                /*if !self.uc_ha_component {
-                    // Custom events are not available after HA restart, so we try again
-                    // when a new (standard) event is received. It should rather be
-                    // retried after a while ?
-                    // This problem won't occur after remote wake from standby
-                    self.uc_ha_component_info_id = Some(self.new_msg_id());
-                    if let Err(e) = self.send_json(
-                        json!({
-                          "id": self.uc_ha_component_info_id,
-                          "type": "unfoldedcircle/info"
-                        }),
-                        ctx,
-                    ) {
-                        error!(
-                            "[{}] Error sending unfoldedcircle/info request to HA: {:?}",
-                            self.id, e
-                        );
-                    }
-                }*/
             }
             // result messages : sent by HA in response of a previous request, including :
             // - Check for UC HA component (id=uc_ha_component_info_id) with unfoldedcircle/info,
@@ -266,7 +244,6 @@ impl HomeAssistantClient {
                     .get("success")
                     .and_then(|v| v.as_bool())
                     .unwrap_or_default();
-
                 if Some(id) == self.uc_ha_component_info_id {
                     debug!("[{}] {} ({})", self.id,
                         "Received HA response for unfoldedcircle/info custom event",
@@ -314,6 +291,12 @@ impl HomeAssistantClient {
                     if !success {
                         error!("[{}] unfoldedcircle/event/entities/subscribe subscription event failed", self.id);
                         self.subscribe_uc_events_id = None
+                    }
+                    else {
+                        self.controller_actor.do_send(ConnectionEvent {
+                            client_id: self.id.clone(),
+                            state: ConnectionState::Connected,
+                        });
                     }
                 }
                 else if Some(id) == self.subscribe_standard_events_id {
@@ -382,23 +365,7 @@ impl HomeAssistantClient {
                 // we check after the UC HA component then fall back to standard HA events
                 // However the custom messages won't be available right after HA restart so
                 // we will have to try again
-                // TODO : to improve (?)-> subscription to custom events will occur again after
-                //  the reception of each following standard events
-                if !self.uc_ha_component {
-                    self.uc_ha_component_info_id = Some(self.new_msg_id());
-                    if let Err(e) = self.send_json(
-                        json!({
-                          "id": self.uc_ha_component_info_id,
-                          "type": "unfoldedcircle/info"
-                        }),
-                        ctx,
-                    ) {
-                        debug!(
-                            "[{}] UC Home assistant component not installed. Switching to standard HA: {:?}",
-                            self.id, e
-                        );
-                    }
-                }
+                self.send_uc_info_command(ctx);
             }
             "pong" => self.last_hb = Instant::now(),
             _ => {}
@@ -470,6 +437,24 @@ impl HomeAssistantClient {
             return Err(ServiceError::NotConnected);
         }
         Ok(())
+    }
+
+    fn send_uc_info_command(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
+        if !self.uc_ha_component {
+            self.uc_ha_component_info_id = Some(self.new_msg_id());
+            if let Err(e) = self.send_json(
+                json!({
+                          "id": self.uc_ha_component_info_id,
+                          "type": "unfoldedcircle/info"
+                        }),
+                _ctx,
+            ) {
+                debug!(
+                    "[{}] UC Home assistant component not installed. Switching to standard HA: {:?}",
+                    self.id, e
+                );
+            }
+        }
     }
 
     /// Unsubscribe to standard HA events
@@ -547,24 +532,6 @@ impl HomeAssistantClient {
         }
     }
 
-    /// Unsubscribe to configuration events handled by UC HA component
-    /// This event is raised when the entities list to subscribe to change from HA side
-    /*fn unsubscribe_uc_configuration(&mut self,
-                                  _ctx: &mut Context<HomeAssistantClient>) {
-        if let Some(id) = self.subscribe_configure_id {
-            self.send_json(
-                json!({
-                "id": id,
-                "type": "unfoldedcircle/event/configure/unsubscribe",
-                "data": {
-                    "client_id": self.remote_id
-                }
-                }), _ctx
-            ).expect("Error during unsubscription of HA events");
-        }
-        self.subscribe_configure_id = None;
-    }*/
-
     /// Subscribe to custom events handled by UC HA component
     fn subscribe_uc_events(&mut self,
                            _ctx: &mut Context<HomeAssistantClient>) {
@@ -595,18 +562,22 @@ impl HomeAssistantClient {
     /// Unsubscribe to custom events handled by UC HA component
     fn unsubscribe_uc_events(&mut self,
                              _ctx: &mut Context<HomeAssistantClient>) {
-        if let Some(id) = self.subscribe_uc_events_id {
-            self.send_json(
-                json!({
+        let id = Some(self.new_msg_id());
+        if let Err(e) = self.send_json(
+            json!({
                 "id": id,
                 "type": "unfoldedcircle/event/entities/unsubscribe",
                 "data": {
                     "client_id": self.remote_id
                 }
                 }), _ctx
-            ).expect("Error during unsubscription of HA events");
-            self.subscribe_standard_events_id = None;
+        ) {
+            error!(
+                "[{}] Error during unsubscription of HA events : {:?}",
+                self.id, e
+            );
         }
+        self.subscribe_standard_events_id = None;
     }
 }
 
