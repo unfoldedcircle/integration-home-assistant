@@ -206,16 +206,17 @@ impl HomeAssistantClient {
                     if let Some(entities) =
                         object_msg.get_mut("event")
                             .and_then(|v| v.as_object_mut())
-                            //.get_mut("data").and_then(|v| v.as_array_mut())
                     {
-                        // this looks ugly! Is there a better way to get ownership of the array?
-                        //let entities: Vec<String> = entities.iter_mut().map(|v| v.take()).collect();
-                        // debug!("[{}] {} : {}", self.id, "Received new list of subscribed entities",
-                        //     itertools::join(entities, ","));
-                        // TODO : update the available entities and send them to the controller
-                        // if let Err(e) = self.handle_get_states_result(entities) {
-                        //     error!("[{}] Error handling HA get_states result: {:?}", self.id, e);
-                        // }
+                        if let Some(entities) =
+                            entities.get_mut("data").and_then(|v| v.as_array_mut())
+                        {
+                            debug!("[{}] {}", self.id, "Sending new entities to subscribe to");
+                            // this looks ugly! Is there a better way to get ownership of the array?
+                            let entities: Vec<Value> = entities.iter_mut().map(|v| v.take()).collect();
+                            if let Err(e) = self.handle_get_states_result(entities) {
+                                error!("[{}] Error handling HA custom get_states result: {:?}", self.id, e);
+                            }
+                        }
                     }
                     return;
                 }
