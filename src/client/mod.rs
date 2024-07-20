@@ -207,6 +207,16 @@ impl HomeAssistantClient {
                         object_msg.get_mut("event")
                             .and_then(|v| v.as_object_mut())
                     {
+                        // TODO : not sure about how it should be done => for @Markus
+                        //  - We send here a get_state_result notification to the controller in order to update available entities
+                        //  - But this request is at the initiative of the client, not the result of the "reload" entities request
+                        //  - Maybe this list should be stored on the client and sent when requested by the controller
+                        //  - But in that case how to reset the list of available entities to the full list from HA ?
+                        //    ex : after configuring entities from HA, the user may want to add an entity from the remote
+                        //         but in that case he won't have the full list (only the subscribed ones)
+                        //  Obviously the research of entities in the remote's form on HA integration page should be dynamic
+                        //  after each keypress/filter applied, a request should be done to the client then to HA to
+                        //  get corresponding results
                         if let Some(entities) =
                             entities.get_mut("data").and_then(|v| v.as_array_mut())
                         {
