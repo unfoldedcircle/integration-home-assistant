@@ -36,6 +36,7 @@ mod model;
 mod service;
 mod streamhandler;
 mod subscribed_entities;
+mod get_entities;
 
 static CLIENT_SEQ: AtomicU32 = AtomicU32::new(1);
 

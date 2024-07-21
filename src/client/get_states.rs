@@ -21,17 +21,36 @@ impl Handler<GetStates> for HomeAssistantClient {
     fn handle(&mut self, msg: GetStates, ctx: &mut Self::Context) -> Self::Result {
         debug!("[{}] GetStates from {}", self.id, msg.remote_id);
         self.remote_id = msg.remote_id;
+        let entity_ids = msg.entity_ids;
         let id = self.new_msg_id();
+        // Use the same message id for get states and get available entities (same result format)
         self.entity_states_id = Some(id);
         // Try to subsscribe again to custom events if not already done when GetStates command
         // is received from the remote
         self.send_uc_info_command(ctx);
-        self.send_json(
-            json!(
+        // If UC HA component available, get states only on given (subscribed) entities
+        if self.uc_ha_component {
+            self.send_json(
+                json!(
+                {
+                    "id": id,
+                    "type": "unfolded_circle/entities/states",
+                    "data": {
+                        "entity_ids": entity_ids.clone()
+                    }
+                }
+            ),
+                ctx,
+            )
+        } else {
+            self.send_json(
+                json!(
                 {"id": id, "type": "get_states"}
             ),
-            ctx,
-        )
+                ctx,
+            )
+        }
+
     }
 }
 
