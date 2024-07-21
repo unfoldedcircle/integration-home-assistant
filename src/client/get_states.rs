@@ -34,7 +34,7 @@ impl Handler<GetStates> for HomeAssistantClient {
                 json!(
                 {
                     "id": id,
-                    "type": "unfolded_circle/entities/states",
+                    "type": "unfoldedcircle/entities/states",
                     "data": {
                         "entity_ids": entity_ids.clone()
                     }

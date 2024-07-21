@@ -267,6 +267,11 @@ impl HomeAssistantClient {
                             self.subscribe_standard_events(ctx);
                         }
                         return;
+                    } else {
+                        self.controller_actor.do_send(ConnectionEvent {
+                            client_id: self.id.clone(),
+                            state: ConnectionState::Connected,
+                        });
                     }
                     // else subscribe to UC events :
                     self.uc_ha_component = true;
@@ -574,13 +579,18 @@ impl HomeAssistantClient {
     /// Unsubscribe to custom events handled by UC HA component
     fn unsubscribe_uc_events(&mut self,
                              _ctx: &mut Context<HomeAssistantClient>) {
+        //let id = Some(self.new_msg_id());
+        if self.subscribe_uc_events_id == None  {
+            return;
+        }
         let id = Some(self.new_msg_id());
         if let Err(e) = self.send_json(
             json!({
                 "id": id,
                 "type": "unfoldedcircle/event/entities/unsubscribe",
                 "data": {
-                    "client_id": self.remote_id
+                    "client_id": self.remote_id,
+                    "subscription_id": self.subscribe_uc_events_id
                 }
                 }), _ctx
         ) {
@@ -589,7 +599,7 @@ impl HomeAssistantClient {
                 self.id, e
             );
         }
-        self.subscribe_standard_events_id = None;
+        self.subscribe_uc_events_id = None;
     }
 }
 
