@@ -80,6 +80,7 @@ strum_macros = "0.26"
 derive_more = "0.99"
 
 anyhow = { version = "1", features = [] }
+itertools = "0.13.0"
 
 [build-dependencies]
 built = { version = "0.7", features = ["git2", "chrono", "dependency-tree", "semver"] }
