@@ -3,7 +3,7 @@
 
 //! Actix message handler for Home Assistant events.
 
-use crate::client::messages::{AvailableEntities, EntityEvent, SubscribedEntities};
+use crate::client::messages::{AvailableEntities, EntityEvent, SetAvailableEntities, SubscribedEntities};
 use crate::controller::handler::{SubscribeHaEventsMsg, UnsubscribeHaEventsMsg};
 use crate::controller::{Controller, OperationModeState, SendWsMessage};
 use crate::errors::ServiceError;
@@ -84,6 +84,29 @@ impl Handler<AvailableEntities> for Controller {
         }
     }
 }
+
+
+impl Handler<SetAvailableEntities> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: SetAvailableEntities, _ctx: &mut Self::Context) -> Self::Result {
+        for (ws_id, session) in self.sessions.iter_mut() {
+            if session.standby {
+                debug!("[{ws_id}] Remote is in standby, not handling set_available_entities from HASS");
+                continue;
+            }
+            let mut entity_ids = Vec::with_capacity(msg.entities.len());
+            for entity in msg.entities.clone() {
+                entity_ids.push(entity.entity_id);
+            }
+            debug!("[{}] {} : {}", ws_id, "Received new available entities to send to remote",
+                itertools::join(entity_ids, ","));
+            // Store the list for next call to get_available_entities
+            self.susbcribed_entity_ids = Option::from(msg.entities.clone());
+        }
+    }
+}
+
 
 impl Handler<SubscribeHaEventsMsg> for Controller {
     type Result = Result<(), ServiceError>;

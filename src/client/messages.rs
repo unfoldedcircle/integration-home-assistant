@@ -43,6 +43,15 @@ pub struct AvailableEntities {
 }
 
 
+/// Asynchronous HA response from `GetStates`
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SetAvailableEntities {
+    pub client_id: String,
+    pub entities: Vec<AvailableIntgEntity>,
+}
+
+
 /// Sent by controller when subscribed entities change
 /// TODO : identifier necessary for multiple remotes ?
 #[derive(Message)]

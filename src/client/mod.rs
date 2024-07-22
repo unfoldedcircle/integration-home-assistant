@@ -20,7 +20,7 @@ use serde_json::{json, Value};
 use std::sync::atomic::{AtomicU32, Ordering};
 use url::Url;
 
-use crate::client::messages::{ConnectionEvent, ConnectionState};
+use crate::client::messages::{AvailableEntities, ConnectionEvent, ConnectionState, SetAvailableEntities};
 use crate::client::model::Event;
 use crate::configuration::{HeartbeatSettings, ENV_HASS_MSG_TRACING};
 use crate::errors::ServiceError;
@@ -224,8 +224,18 @@ impl HomeAssistantClient {
                             debug!("[{}] {}", self.id, "Sending new entities to subscribe to");
                             // this looks ugly! Is there a better way to get ownership of the array?
                             let entities: Vec<Value> = entities.iter_mut().map(|v| v.take()).collect();
-                            if let Err(e) = self.handle_get_states_result(entities) {
-                                error!("[{}] Error handling HA custom get_states result: {:?}", self.id, e);
+                            match self.handle_get_states_result(entities) {
+                                Ok(entities) => {
+                                    if let Err(e) = self.controller_actor.try_send(SetAvailableEntities {
+                                        client_id: self.id.clone(),
+                                        entities,
+                                    }) {
+                                        error!("[{}] Error handling HA set available entities result: {:?}", self.id, e);
+                                    }
+                                },
+                                Err(e) => {
+                                    error!("[{}] Error handling HA set available entities result: {:?}", self.id, e);
+                                },
                             }
                         }
                     }
@@ -338,8 +348,18 @@ impl HomeAssistantClient {
                     {
                         // this looks ugly! Is there a better way to get ownership of the array?
                         let entities: Vec<Value> = entities.iter_mut().map(|v| v.take()).collect();
-                        if let Err(e) = self.handle_get_states_result(entities) {
-                            error!("[{}] Error handling HA get_states result: {:?}", self.id, e);
+                        match self.handle_get_states_result(entities) {
+                            Ok(entities) => {
+                                if let Err(e) = self.controller_actor.try_send(AvailableEntities {
+                                    client_id: self.id.clone(),
+                                    entities,
+                                }) {
+                                    error!("[{}] Error handling HA get_states result: {:?}", self.id, e);
+                                }
+                            },
+                            Err(e) => {
+                                error!("[{}] Error handling HA get_states result: {:?}", self.id, e);
+                            }
                         }
                     }
                 }
@@ -592,8 +612,7 @@ impl HomeAssistantClient {
                     "client_id": self.remote_id,
                     "subscription_id": self.subscribe_uc_events_id
                 }
-                }), _ctx
-        ) {
+                }), _ctx) {
             error!(
                 "[{}] Error during unsubscription of HA events : {:?}",
                 self.id, e

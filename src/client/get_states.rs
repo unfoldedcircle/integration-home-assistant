@@ -9,9 +9,9 @@ use actix::Handler;
 use log::{debug, error, info, warn};
 use serde_json::{json, Value};
 use uc_api::EntityType;
-
+use uc_api::intg::AvailableIntgEntity;
 use crate::client::entity::*;
-use crate::client::messages::{AvailableEntities, GetStates};
+use crate::client::messages::GetStates;
 use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
 
@@ -58,7 +58,7 @@ impl HomeAssistantClient {
     pub(crate) fn handle_get_states_result(
         &mut self,
         entities: Vec<Value>,
-    ) -> Result<(), ServiceError> {
+    ) -> Result<Vec<AvailableIntgEntity>, ServiceError> {
         let mut available = Vec::with_capacity(32);
 
         for mut entity in entities {
@@ -138,11 +138,6 @@ impl HomeAssistantClient {
             }
         }
 
-        self.controller_actor.try_send(AvailableEntities {
-            client_id: self.id.clone(),
-            entities: available,
-        })?;
-
-        Ok(())
+        Ok(available)
     }
 }
