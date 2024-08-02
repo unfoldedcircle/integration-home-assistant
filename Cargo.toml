@@ -82,7 +82,8 @@ derive_more = "0.99"
 anyhow = { version = "1", features = [] }
 
 [build-dependencies]
-built = { version = "0.7", features = ["git2", "chrono", "dependency-tree", "semver"] }
+# Warning! Using built 0.7.1 upgrades git2 0.18.3 to 0.19.0 and libgit2-sys 0.16.2+1.7.2 to 0.17.0+1.8.1 which breaks cross compilation!
+built = { version = "0.7.1", features = ["git2", "chrono", "dependency-tree", "semver"] }
 
 [dev-dependencies]
 rstest = "0.21"
