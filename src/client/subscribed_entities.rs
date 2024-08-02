@@ -1,7 +1,7 @@
-use actix::Handler;
-use log::{debug};
-use crate::client::HomeAssistantClient;
 use crate::client::messages::SubscribedEntities;
+use crate::client::HomeAssistantClient;
+use actix::Handler;
+use log::debug;
 
 impl Handler<SubscribedEntities> for HomeAssistantClient {
     type Result = ();
@@ -10,8 +10,12 @@ impl Handler<SubscribedEntities> for HomeAssistantClient {
     /// The custom HA component has to be updated then (if used)
     /// msg contains the new entity ids to subscribe
     fn handle(&mut self, msg: SubscribedEntities, _ctx: &mut Self::Context) {
-        debug!("[{}] {} : {}", self.id, "Updated subscribed entities",
-            itertools::join(&msg.entity_ids, ","));
+        debug!(
+            "[{}] {} : {}",
+            self.id,
+            "Updated subscribed entities",
+            itertools::join(&msg.entity_ids, ",")
+        );
         self.subscribed_entities = msg.entity_ids;
         if !self.authenticated {
             return;
@@ -22,5 +26,4 @@ impl Handler<SubscribedEntities> for HomeAssistantClient {
         self.unsubscribe_uc_events(_ctx);
         self.subscribe_uc_events(_ctx);
     }
-
 }

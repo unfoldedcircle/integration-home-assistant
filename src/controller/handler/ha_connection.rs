@@ -145,10 +145,11 @@ impl Handler<ConnectMsg> for Controller {
                         if let Some(session) = act.sessions.values().next() {
                             let entities = session.subscribed_entities.clone();
                             if let Some(ha_client) = &act.ha_client {
-                                ha_client.try_send(SubscribedEntities {
-                                    entity_ids: entities
-                                }).expect("Error updating subscribed entities to client")
-
+                                ha_client
+                                    .try_send(SubscribedEntities {
+                                        entity_ids: entities,
+                                    })
+                                    .expect("Error updating subscribed entities to client")
                             }
                         }
                         Ok(())

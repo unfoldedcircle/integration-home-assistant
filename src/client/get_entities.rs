@@ -3,12 +3,12 @@
 
 //! Actix actor handler implementation for the `GetStates` message
 
-use actix::Handler;
-use log::{debug};
-use serde_json::{json};
-use crate::client::messages::{GetAvailableEntities};
+use crate::client::messages::GetAvailableEntities;
 use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
+use actix::Handler;
+use log::debug;
+use serde_json::json;
 
 impl Handler<GetAvailableEntities> for HomeAssistantClient {
     type Result = Result<(), ServiceError>;
@@ -24,8 +24,8 @@ impl Handler<GetAvailableEntities> for HomeAssistantClient {
         self.send_uc_info_command(ctx);
         self.send_json(
             json!(
-            {"id": id, "type": "get_states"}
-        ),
+                {"id": id, "type": "get_states"}
+            ),
             ctx,
         )
     }

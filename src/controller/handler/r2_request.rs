@@ -126,27 +126,27 @@ impl Handler<R2RequestMsg> for Controller {
                 session.get_available_entities_id = Some(msg.req_id);
                 // Check if available entities have been set (through a previous push from client)
                 // let id = Some(session.get_available_entities_id);
-                if let (Some(available_entities), Some(id)) =
-                    (&self.susbcribed_entity_ids, session.get_available_entities_id) {
+                if let (Some(available_entities), Some(id)) = (
+                    &self.susbcribed_entity_ids,
+                    session.get_available_entities_id,
+                ) {
                     let msg_data = AvailableEntitiesMsgData {
                         filter: None,
                         available_entities: available_entities.clone(),
                     };
                     if let Ok(msg_data_json) = serde_json::to_value(msg_data) {
-                        let message = WsMessage::response(
-                            id,
-                            "available_entities",
-                            msg_data_json.clone(),
-                        );
-                        match session
-                            .recipient
-                            .try_send(SendWsMessage(message.clone())) {
+                        let message =
+                            WsMessage::response(id, "available_entities", msg_data_json.clone());
+                        match session.recipient.try_send(SendWsMessage(message.clone())) {
                             Ok(_) => {
                                 session.get_available_entities_id = None;
                                 self.susbcribed_entity_ids = None;
                                 return_fut_ok!(Some(message));
-                            },
-                            Err(e) => error!("[{}] Error sending set available_entities: {e:?}",msg.ws_id),
+                            }
+                            Err(e) => error!(
+                                "[{}] Error sending set available_entities: {e:?}",
+                                msg.ws_id
+                            ),
                         }
                     }
                 }
@@ -155,7 +155,6 @@ impl Handler<R2RequestMsg> for Controller {
                 entitiy_ids = session.subscribed_entities.clone();
             }
         }
-
 
         Box::pin(async move {
             match msg.request {
@@ -180,12 +179,17 @@ impl Handler<R2RequestMsg> for Controller {
                     // or call custom UC HA component command if available
                     // to get entity states on subscribed entities only
                     if let Some(ha_client) = ha_client {
-                        debug!("[{}] Requesting subscribed entities states from HA {}", msg.ws_id,
-                            itertools::join(entitiy_ids.clone(), ","));
-                        ha_client.send(GetStates{
-                            remote_id: msg.ws_id,
-                            entity_ids: entitiy_ids.clone()
-                        }).await??;
+                        debug!(
+                            "[{}] Requesting subscribed entities states from HA {}",
+                            msg.ws_id,
+                            itertools::join(entitiy_ids.clone(), ",")
+                        );
+                        ha_client
+                            .send(GetStates {
+                                remote_id: msg.ws_id,
+                                entity_ids: entitiy_ids.clone(),
+                            })
+                            .await??;
                         Ok(None) // asynchronous response message. TODO check if GetStates could return the response
                     } else {
                         error!(
@@ -202,9 +206,11 @@ impl Handler<R2RequestMsg> for Controller {
                     // get states from Home Assistant. Response from HA will call AvailableEntities handler
                     if let Some(ha_client) = ha_client {
                         debug!("[{}] Requesting available entities from HA", msg.ws_id);
-                        ha_client.send(GetAvailableEntities{
-                            remote_id: msg.ws_id
-                        }).await??;
+                        ha_client
+                            .send(GetAvailableEntities {
+                                remote_id: msg.ws_id,
+                            })
+                            .await??;
                         Ok(None) // asynchronous response message. TODO check if GetStates could return the response
                     } else {
                         error!(

@@ -5,15 +5,15 @@
 
 use std::str::FromStr;
 
-use actix::Handler;
-use log::{debug, error, info, warn};
-use serde_json::{json, Value};
-use uc_api::EntityType;
-use uc_api::intg::AvailableIntgEntity;
 use crate::client::entity::*;
 use crate::client::messages::GetStates;
 use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
+use actix::Handler;
+use log::{debug, error, info, warn};
+use serde_json::{json, Value};
+use uc_api::intg::AvailableIntgEntity;
+use uc_api::EntityType;
 
 impl Handler<GetStates> for HomeAssistantClient {
     type Result = Result<(), ServiceError>;
@@ -32,25 +32,24 @@ impl Handler<GetStates> for HomeAssistantClient {
         if self.uc_ha_component {
             self.send_json(
                 json!(
-                {
-                    "id": id,
-                    "type": "unfoldedcircle/entities/states",
-                    "data": {
-                        "entity_ids": entity_ids.clone()
+                    {
+                        "id": id,
+                        "type": "unfoldedcircle/entities/states",
+                        "data": {
+                            "entity_ids": entity_ids.clone()
+                        }
                     }
-                }
-            ),
+                ),
                 ctx,
             )
         } else {
             self.send_json(
                 json!(
-                {"id": id, "type": "get_states"}
-            ),
+                    {"id": id, "type": "get_states"}
+                ),
                 ctx,
             )
         }
-
     }
 }
 
