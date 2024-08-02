@@ -51,8 +51,8 @@ futures = "0.3"
 
 # see mdns-sd patch at the end of this file
 mdns-sd = { version = "0.9.3", optional = true }
-if-addrs = "0.11"
-hostname = "0.3"
+if-addrs = "0.13"
+hostname = "0.4"
 zeroconf = { version = "0.14", optional = true }
 
 # JSON (de)serialization
@@ -85,7 +85,7 @@ anyhow = { version = "1", features = [] }
 built = { version = "0.7", features = ["git2", "chrono", "dependency-tree", "semver"] }
 
 [dev-dependencies]
-rstest = "0.18"
+rstest = "0.21"
 
 [patch.crates-io]
 mdns-sd = { git = "https://github.com/zehnm/mdns-sd", rev = "aa95af75e21f40ee9ea74d117ca31e0672d722fb" }
