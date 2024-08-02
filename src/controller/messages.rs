@@ -62,6 +62,7 @@ pub struct R2RequestMsg {
 /// Actor message for a Remote Two response.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
+#[allow(dead_code)] // response not used
 pub struct R2ResponseMsg {
     pub ws_id: String,
     pub msg: R2Response,
@@ -85,6 +86,7 @@ impl DeserializeMsgData for R2RequestMsg {}
 /// Pass an integration API event message fom a connected integration client to the [`Controller`].
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
+#[allow(dead_code)] // msg_data not used
 pub struct R2EventMsg {
     pub ws_id: String,
     pub event: R2Event,
