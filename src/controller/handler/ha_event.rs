@@ -98,16 +98,8 @@ impl Handler<SetAvailableEntities> for Controller {
                 );
                 continue;
             }
-            let mut entity_ids = Vec::with_capacity(msg.entities.len());
-            for entity in msg.entities.clone() {
-                entity_ids.push(entity.entity_id);
-            }
-            debug!(
-                "[{}] {} : {}",
-                ws_id,
-                "Received new available entities to send to remote",
-                itertools::join(entity_ids, ",")
-            );
+            let entity_ids: Vec<&String> = msg.entities.iter().map(|x| &x.entity_id).collect();
+            debug!("[{ws_id}] Received new available entities to send to remote: {entity_ids:?}");
             // Store the list for next call to get_available_entities
             self.susbcribed_entity_ids = Option::from(msg.entities.clone());
         }

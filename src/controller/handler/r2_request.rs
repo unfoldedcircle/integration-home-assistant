@@ -120,7 +120,7 @@ impl Handler<R2RequestMsg> for Controller {
         let ha_client = self.ha_client.clone();
 
         // FIXME quick & dirty request id "mapping". This requires a rewrite with proper callback & timeout handling!
-        let mut entitiy_ids = Default::default();
+        let mut entity_ids = Default::default();
         if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
             if msg.request == R2Request::GetAvailableEntities {
                 session.get_available_entities_id = Some(msg.req_id);
@@ -152,7 +152,7 @@ impl Handler<R2RequestMsg> for Controller {
                 }
             } else if msg.request == R2Request::GetEntityStates {
                 session.get_entity_states_id = Some(msg.req_id);
-                entitiy_ids = session.subscribed_entities.clone();
+                entity_ids = session.subscribed_entities.clone();
             }
         }
 
@@ -180,14 +180,13 @@ impl Handler<R2RequestMsg> for Controller {
                     // to get entity states on subscribed entities only
                     if let Some(ha_client) = ha_client {
                         debug!(
-                            "[{}] Requesting subscribed entities states from HA {}",
-                            msg.ws_id,
-                            itertools::join(entitiy_ids.clone(), ",")
+                            "[{}] Requesting subscribed entities states from HA: {entity_ids:?}",
+                            msg.ws_id
                         );
                         ha_client
                             .send(GetStates {
                                 remote_id: msg.ws_id,
-                                entity_ids: entitiy_ids.clone(),
+                                entity_ids,
                             })
                             .await??;
                         Ok(None) // asynchronous response message. TODO check if GetStates could return the response

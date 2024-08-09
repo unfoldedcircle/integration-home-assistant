@@ -207,8 +207,8 @@ impl HomeAssistantClient {
                 }
                 if Some(id) == self.subscribe_configure_id {
                     debug!(
-                        "[{}] {}",
-                        self.id, "Received request from HA for configuring subscribed entities"
+                        "[{}] Received request from HA for configuring subscribed entities",
+                        self.id
                     );
                     if let Some(entities) =
                         object_msg.get_mut("event").and_then(|v| v.as_object_mut())
@@ -276,10 +276,8 @@ impl HomeAssistantClient {
                     .unwrap_or_default();
                 if Some(id) == self.uc_ha_component_info_id {
                     debug!(
-                        "[{}] {} ({})",
-                        self.id,
-                        "Received HA response for unfoldedcircle/info custom event",
-                        success
+                        "[{}] Received HA response for unfoldedcircle/info custom event ({})",
+                        self.id, success
                     );
                     // If the unfoldedcircle/info message type is unknown, the UC HA component is not
                     // installed then we switch back to standard HA events
@@ -309,9 +307,8 @@ impl HomeAssistantClient {
                     // If subscribed entities are defined, send them to HA for events
                     if self.subscribed_entities.len() > 0 {
                         debug!(
-                            "[{}] {} : {}",
+                            "[{}] Initialize subscribed entities : {}",
                             self.id,
-                            "Initialize subscribed entities",
                             itertools::join(&self.subscribed_entities, ",")
                         );
                         self.unsubscribe_uc_events(ctx);
@@ -319,9 +316,8 @@ impl HomeAssistantClient {
                     }
                 } else if Some(id) == self.subscribe_configure_id {
                     debug!(
-                        "[{}] {} ({})",
+                        "[{}] Received HA response for unfoldedcircle/event/configure/subscribe event ({})",
                         self.id,
-                        "Received HA response for unfoldedcircle/event/configure/subscribe event",
                         success
                     );
                     if !success {
@@ -330,9 +326,8 @@ impl HomeAssistantClient {
                     }
                 } else if Some(id) == self.subscribe_uc_events_id {
                     debug!(
-                        "[{}] {} ({})",
+                        "[{}] Received HA response for unfoldedcircle/event/entities/subscribe ({})",
                         self.id,
-                        "Received HA response for unfoldedcircle/event/entities/subscribe",
                         success
                     );
                     if !success {

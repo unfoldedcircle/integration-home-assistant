@@ -11,10 +11,8 @@ impl Handler<SubscribedEntities> for HomeAssistantClient {
     /// msg contains the new entity ids to subscribe
     fn handle(&mut self, msg: SubscribedEntities, _ctx: &mut Self::Context) {
         debug!(
-            "[{}] {} : {}",
-            self.id,
-            "Updated subscribed entities",
-            itertools::join(&msg.entity_ids, ",")
+            "[{}] Updated subscribed entities: {:?}",
+            self.id, msg.entity_ids
         );
         self.subscribed_entities = msg.entity_ids;
         if !self.authenticated {
