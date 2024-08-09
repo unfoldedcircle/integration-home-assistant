@@ -5,6 +5,7 @@ use serde::de::{DeserializeOwned, Error};
 use serde_json::Value;
 
 /// Deserialize a serde json value from a generic message to a typed message struct.
+#[allow(dead_code)]
 pub trait DeserializeMsgData: Into<Option<Value>> {
     fn deserialize<T: DeserializeOwned>(self) -> Result<T, serde_json::Error> {
         match self.into() {

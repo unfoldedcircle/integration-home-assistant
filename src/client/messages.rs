@@ -37,6 +37,7 @@ pub struct GetAvailableEntities {
 /// Asynchronous HA response from `GetStates`
 #[derive(Message)]
 #[rtype(result = "()")]
+#[allow(dead_code)] // client_id not used
 pub struct AvailableEntities {
     pub client_id: String,
     pub entities: Vec<AvailableIntgEntity>,
@@ -76,6 +77,7 @@ pub struct ConnectionEvent {
 /// HA entity events
 #[derive(Message)]
 #[rtype(result = "()")]
+#[allow(dead_code)] // client_id not used
 pub struct EntityEvent {
     pub client_id: String,
     pub entity_change: EntityChange,
