@@ -135,11 +135,7 @@ fn get_closest_point_to_line(a: XYPoint, b: XYPoint, p: XYPoint) -> XYPoint {
     let ap_ab = ap.x * ab.x + ap.y * ab.y;
     let mut t = ap_ab / ab2;
 
-    if t < 0.0 {
-        t = 0.0
-    } else if t > 1.0 {
-        t = 1.0
-    }
+    t = t.clamp(0.0, 1.0);
 
     XYPoint::new(a.x + ab.x * t, a.y + ab.y * t)
 }
