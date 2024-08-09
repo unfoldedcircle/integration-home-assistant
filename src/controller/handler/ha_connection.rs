@@ -146,11 +146,11 @@ impl Handler<ConnectMsg> for Controller {
                             let entities = session.subscribed_entities.clone();
                             if let Some(ha_client) = &act.ha_client
                             {
-                                if !ha_client.try_send(SubscribedEntities {
+                                if let Err(e) = ha_client.try_send(SubscribedEntities {
                                     entity_ids: entities,
                                 })
                                 {
-                                    error!("Error updating subscribed entities to client");
+                                    error!("Error updating subscribed entities to client : {:?}", e);
                                 }
                             }
                         }
