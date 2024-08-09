@@ -4,12 +4,12 @@
 //! Actix message handler for [R2RequestMsg].
 
 use crate::built_info;
-use crate::client::messages::{CallService, GetStates};
+use crate::client::messages::{CallService, GetAvailableEntities, GetStates};
 use crate::configuration::get_driver_metadata;
 use crate::controller::handler::{
     SetDriverUserDataMsg, SetupDriverMsg, SubscribeHaEventsMsg, UnsubscribeHaEventsMsg,
 };
-use crate::controller::{Controller, OperationModeInput, R2RequestMsg};
+use crate::controller::{Controller, OperationModeInput, R2RequestMsg, SendWsMessage};
 use crate::errors::ServiceError;
 use crate::util::{return_fut_err, return_fut_ok, DeserializeMsgData};
 use crate::APP_VERSION;
@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 use log::{debug, error};
 use serde_json::{json, Value};
 use strum::EnumMessage;
-use uc_api::intg::ws::{DriverVersionMsgData, R2Request};
+use uc_api::intg::ws::{AvailableEntitiesMsgData, DriverVersionMsgData, R2Request};
 use uc_api::intg::{EntityCommand, IntegrationVersion};
 use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
 
@@ -120,11 +120,39 @@ impl Handler<R2RequestMsg> for Controller {
         let ha_client = self.ha_client.clone();
 
         // FIXME quick & dirty request id "mapping". This requires a rewrite with proper callback & timeout handling!
+        let mut entity_ids = Default::default();
         if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
             if msg.request == R2Request::GetAvailableEntities {
                 session.get_available_entities_id = Some(msg.req_id);
+                // Check if available entities have been set (through a previous push from client)
+                // let id = Some(session.get_available_entities_id);
+                if let (Some(available_entities), Some(id)) = (
+                    &self.susbcribed_entity_ids,
+                    session.get_available_entities_id,
+                ) {
+                    let msg_data = AvailableEntitiesMsgData {
+                        filter: None,
+                        available_entities: available_entities.clone(),
+                    };
+                    if let Ok(msg_data_json) = serde_json::to_value(msg_data) {
+                        let message =
+                            WsMessage::response(id, "available_entities", msg_data_json.clone());
+                        match session.recipient.try_send(SendWsMessage(message.clone())) {
+                            Ok(_) => {
+                                session.get_available_entities_id = None;
+                                self.susbcribed_entity_ids = None;
+                                return_fut_ok!(Some(message));
+                            }
+                            Err(e) => error!(
+                                "[{}] Error sending set available_entities: {e:?}",
+                                msg.ws_id
+                            ),
+                        }
+                    }
+                }
             } else if msg.request == R2Request::GetEntityStates {
                 session.get_entity_states_id = Some(msg.req_id);
+                entity_ids = session.subscribed_entities.clone();
             }
         }
 
@@ -142,7 +170,34 @@ impl Handler<R2RequestMsg> for Controller {
                         msg.request
                     );
                 }
-                R2Request::GetEntityStates | R2Request::GetAvailableEntities => {
+                R2Request::GetEntityStates => {
+                    // We don't cache entities in this integration so we have to request them from HASS.
+                    // I'm not aware of a different way to just retrieve the attributes. The get_states
+                    // call returns everything, so we have to filter our response to UCR2.
+
+                    // get states from Home Assistant. Response from HA will call AvailableEntities handler
+                    // or call custom UC HA component command if available
+                    // to get entity states on subscribed entities only
+                    if let Some(ha_client) = ha_client {
+                        debug!(
+                            "[{}] Requesting subscribed entities states from HA: {entity_ids:?}",
+                            msg.ws_id
+                        );
+                        ha_client
+                            .send(GetStates {
+                                remote_id: msg.ws_id,
+                                entity_ids,
+                            })
+                            .await??;
+                        Ok(None) // asynchronous response message. TODO check if GetStates could return the response
+                    } else {
+                        error!(
+                            "Unable to request available entities: HA client connection not available!"
+                        );
+                        Err(ServiceError::NotConnected)
+                    }
+                }
+                R2Request::GetAvailableEntities => {
                     // We don't cache entities in this integration so we have to request them from HASS.
                     // I'm not aware of a different way to just retrieve the attributes. The get_states
                     // call returns everything, so we have to filter our response to UCR2.
@@ -150,12 +205,16 @@ impl Handler<R2RequestMsg> for Controller {
                     // get states from Home Assistant. Response from HA will call AvailableEntities handler
                     if let Some(ha_client) = ha_client {
                         debug!("[{}] Requesting available entities from HA", msg.ws_id);
-                        ha_client.send(GetStates).await??;
+                        ha_client
+                            .send(GetAvailableEntities {
+                                remote_id: msg.ws_id,
+                            })
+                            .await??;
                         Ok(None) // asynchronous response message. TODO check if GetStates could return the response
                     } else {
                         error!(
-                        "Unable to request available entities: HA client connection not available!"
-                    );
+                            "Unable to request available entities: HA client connection not available!"
+                        );
                         Err(ServiceError::NotConnected)
                     }
                 }

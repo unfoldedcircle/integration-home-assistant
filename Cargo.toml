@@ -80,6 +80,7 @@ strum_macros = "0.26"
 derive_more = "0.99"
 
 anyhow = { version = "1", features = [] }
+itertools = "0.13.0"
 
 [build-dependencies]
 # Warning! Using built 0.7.1 upgrades git2 0.18.3 to 0.19.0 and libgit2-sys 0.16.2+1.7.2 to 0.17.0+1.8.1 which breaks cross compilation!
