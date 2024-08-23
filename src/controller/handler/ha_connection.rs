@@ -144,13 +144,14 @@ impl Handler<ConnectMsg> for Controller {
                         debug!("Sending subscribed entities to client for events subscriptions");
                         if let Some(session) = act.sessions.values().next() {
                             let entities = session.subscribed_entities.clone();
-                            if let Some(ha_client) = &act.ha_client
-                            {
+                            if let Some(ha_client) = &act.ha_client {
                                 if let Err(e) = ha_client.try_send(SubscribedEntities {
                                     entity_ids: entities,
-                                })
-                                {
-                                    error!("Error updating subscribed entities to client : {:?}", e);
+                                }) {
+                                    error!(
+                                        "Error updating subscribed entities to client : {:?}",
+                                        e
+                                    );
                                 }
                             }
                         }
