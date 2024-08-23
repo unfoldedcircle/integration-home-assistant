@@ -5,6 +5,7 @@
 
 use actix::prelude::Message;
 use awc::ws::CloseCode;
+use std::collections::HashSet;
 
 use uc_api::intg::{AvailableIntgEntity, EntityChange, EntityCommand};
 
@@ -21,7 +22,17 @@ pub struct CallService {
 /// Fetch all states from Home Assistant
 #[derive(Message)]
 #[rtype(result = "Result<(), ServiceError>")]
-pub struct GetStates;
+pub struct GetStates {
+    pub remote_id: String,
+    pub entity_ids: HashSet<String>,
+}
+
+/// Get available entities from Home Assistant
+#[derive(Message)]
+#[rtype(result = "Result<(), ServiceError>")]
+pub struct GetAvailableEntities {
+    pub remote_id: String,
+}
 
 /// Asynchronous HA response from `GetStates`
 #[derive(Message)]
@@ -30,6 +41,23 @@ pub struct GetStates;
 pub struct AvailableEntities {
     pub client_id: String,
     pub entities: Vec<AvailableIntgEntity>,
+}
+
+/// Asynchronous HA response from `GetStates`
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SetAvailableEntities {
+    #[allow(dead_code)]
+    pub client_id: String,
+    pub entities: Vec<AvailableIntgEntity>,
+}
+
+/// Sent by controller when subscribed entities change
+/// TODO : identifier necessary for multiple remotes ?
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SubscribedEntities {
+    pub entity_ids: HashSet<String>,
 }
 
 /// HA client connection states

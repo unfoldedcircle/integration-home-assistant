@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::str::FromStr;
 use std::time::Duration;
-use uc_api::intg::{DeviceState, IntegrationDriverUpdate};
+use uc_api::intg::{AvailableIntgEntity, DeviceState, IntegrationDriverUpdate};
 use uc_api::ws::{EventCategory, WsMessage};
 
 state_machine! {
@@ -106,6 +106,8 @@ pub struct Controller {
     setup_timeout: Option<SpawnHandle>,
     /// Handle to a scheduled connect message for a reconnect attempt.
     reconnect_handle: Option<SpawnHandle>,
+    /// List of subscribed entities sent by HA component
+    susbcribed_entity_ids: Option<Vec<AvailableIntgEntity>>,
 }
 
 impl Controller {
@@ -134,6 +136,7 @@ impl Controller {
             machine,
             setup_timeout: None,
             reconnect_handle: None,
+            susbcribed_entity_ids: None,
         }
     }
 

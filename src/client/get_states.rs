@@ -5,30 +5,51 @@
 
 use std::str::FromStr;
 
+use crate::client::entity::*;
+use crate::client::messages::GetStates;
+use crate::client::HomeAssistantClient;
+use crate::errors::ServiceError;
 use actix::Handler;
 use log::{debug, error, info, warn};
 use serde_json::{json, Value};
+use uc_api::intg::AvailableIntgEntity;
 use uc_api::EntityType;
-
-use crate::client::entity::*;
-use crate::client::messages::{AvailableEntities, GetStates};
-use crate::client::HomeAssistantClient;
-use crate::errors::ServiceError;
 
 impl Handler<GetStates> for HomeAssistantClient {
     type Result = Result<(), ServiceError>;
 
-    fn handle(&mut self, _: GetStates, ctx: &mut Self::Context) -> Self::Result {
-        debug!("[{}] GetStates", self.id);
-
+    fn handle(&mut self, msg: GetStates, ctx: &mut Self::Context) -> Self::Result {
+        debug!("[{}] GetStates from {}", self.id, msg.remote_id);
+        self.remote_id = msg.remote_id;
+        let entity_ids = msg.entity_ids;
         let id = self.new_msg_id();
+        // Use the same message id for get states and get available entities (same result format)
         self.entity_states_id = Some(id);
-        self.send_json(
-            json!(
-                {"id": id, "type": "get_states"}
-            ),
-            ctx,
-        )
+        // Try to subsscribe again to custom events if not already done when GetStates command
+        // is received from the remote
+        self.send_uc_info_command(ctx);
+        // If UC HA component available, get states only on given (subscribed) entities
+        if self.uc_ha_component {
+            self.send_json(
+                json!(
+                    {
+                        "id": id,
+                        "type": "unfoldedcircle/entities/states",
+                        "data": {
+                            "entity_ids": entity_ids.clone()
+                        }
+                    }
+                ),
+                ctx,
+            )
+        } else {
+            self.send_json(
+                json!(
+                    {"id": id, "type": "get_states"}
+                ),
+                ctx,
+            )
+        }
     }
 }
 
@@ -36,7 +57,7 @@ impl HomeAssistantClient {
     pub(crate) fn handle_get_states_result(
         &mut self,
         entities: Vec<Value>,
-    ) -> Result<(), ServiceError> {
+    ) -> Result<Vec<AvailableIntgEntity>, ServiceError> {
         let mut available = Vec::with_capacity(32);
 
         for mut entity in entities {
@@ -116,11 +137,6 @@ impl HomeAssistantClient {
             }
         }
 
-        self.controller_actor.try_send(AvailableEntities {
-            client_id: self.id.clone(),
-            entities: available,
-        })?;
-
-        Ok(())
+        Ok(available)
     }
 }

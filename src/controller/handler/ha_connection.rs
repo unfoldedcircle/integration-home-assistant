@@ -3,7 +3,7 @@
 
 //! Actix message handler for Home Assistant client connection messages.
 
-use crate::client::messages::{Close, ConnectionEvent, ConnectionState};
+use crate::client::messages::{Close, ConnectionEvent, ConnectionState, SubscribedEntities};
 use crate::client::HomeAssistantClient;
 use crate::controller::handler::{ConnectMsg, DisconnectMsg};
 use crate::controller::{Controller, OperationModeState};
@@ -141,6 +141,20 @@ impl Handler<ConnectMsg> for Controller {
                         act.ha_client = Some(addr);
                         act.ha_reconnect_duration = act.settings.hass.reconnect.duration;
                         act.ha_reconnect_attempt = 0;
+                        debug!("Sending subscribed entities to client for events subscriptions");
+                        if let Some(session) = act.sessions.values().next() {
+                            let entities = session.subscribed_entities.clone();
+                            if let Some(ha_client) = &act.ha_client {
+                                if let Err(e) = ha_client.try_send(SubscribedEntities {
+                                    entity_ids: entities,
+                                }) {
+                                    error!(
+                                        "Error updating subscribed entities to client : {:?}",
+                                        e
+                                    );
+                                }
+                            }
+                        }
                         Ok(())
                     }
                     Err(e) => {

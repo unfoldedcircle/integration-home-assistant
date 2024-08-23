@@ -3,7 +3,9 @@
 
 //! Actix message handler for Home Assistant events.
 
-use crate::client::messages::{AvailableEntities, EntityEvent};
+use crate::client::messages::{
+    AvailableEntities, EntityEvent, SetAvailableEntities, SubscribedEntities,
+};
 use crate::controller::handler::{SubscribeHaEventsMsg, UnsubscribeHaEventsMsg};
 use crate::controller::{Controller, OperationModeState, SendWsMessage};
 use crate::errors::ServiceError;
@@ -85,6 +87,25 @@ impl Handler<AvailableEntities> for Controller {
     }
 }
 
+impl Handler<SetAvailableEntities> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: SetAvailableEntities, _ctx: &mut Self::Context) -> Self::Result {
+        for (ws_id, session) in self.sessions.iter_mut() {
+            if session.standby {
+                debug!(
+                    "[{ws_id}] Remote is in standby, not handling set_available_entities from HASS"
+                );
+                continue;
+            }
+            let entity_ids: Vec<&String> = msg.entities.iter().map(|x| &x.entity_id).collect();
+            debug!("[{ws_id}] Received new available entities to send to remote: {entity_ids:?}");
+            // Store the list for next call to get_available_entities
+            self.susbcribed_entity_ids = Option::from(msg.entities.clone());
+        }
+    }
+}
+
 impl Handler<SubscribeHaEventsMsg> for Controller {
     type Result = Result<(), ServiceError>;
 
@@ -92,9 +113,16 @@ impl Handler<SubscribeHaEventsMsg> for Controller {
         if !matches!(self.machine.state(), &OperationModeState::Running) {
             return Err(ServiceError::ServiceUnavailable("Setup required".into()));
         }
+
         if let Some(session) = self.sessions.get_mut(&msg.0.ws_id) {
             let subscribe: SubscribeEvents = msg.0.deserialize()?;
             session.subscribed_entities.extend(subscribe.entity_ids);
+            debug!("Sending updated subscribed entities to client for events subscriptions");
+            if let Some(ha_client) = &self.ha_client {
+                ha_client.try_send(SubscribedEntities {
+                    entity_ids: session.subscribed_entities.clone(),
+                })?;
+            }
             Ok(())
         } else {
             Err(ServiceError::NotConnected)
@@ -113,6 +141,11 @@ impl Handler<UnsubscribeHaEventsMsg> for Controller {
             let unsubscribe: SubscribeEvents = msg.0.deserialize()?;
             for i in unsubscribe.entity_ids {
                 session.subscribed_entities.remove(&i);
+            }
+            if let Some(ha_client) = &self.ha_client {
+                ha_client.try_send(SubscribedEntities {
+                    entity_ids: session.subscribed_entities.clone(),
+                })?;
             }
             Ok(())
         } else {
