@@ -47,6 +47,7 @@ pub struct AvailableEntities {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct SetAvailableEntities {
+    #[allow(dead_code)]
     pub client_id: String,
     pub entities: Vec<AvailableIntgEntity>,
 }

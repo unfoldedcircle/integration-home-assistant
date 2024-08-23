@@ -305,7 +305,7 @@ impl HomeAssistantClient {
                     self.subscribe_uc_configuration(ctx);
 
                     // If subscribed entities are defined, send them to HA for events
-                    if self.subscribed_entities.len() > 0 {
+                    if !self.subscribed_entities.is_empty() {
                         debug!(
                             "[{}] Initialize subscribed entities : {}",
                             self.id,
@@ -559,7 +559,7 @@ impl HomeAssistantClient {
     /// This event is raised when the entities list to subscribe to change from HA side
     fn subscribe_uc_configuration(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
         // Don't subscribe again to the same event
-        if self.subscribe_configure_id != None {
+        if self.subscribe_configure_id.is_some() {
             return;
         }
         self.subscribe_configure_id = Some(self.new_msg_id());
@@ -585,7 +585,7 @@ impl HomeAssistantClient {
     /// Subscribe to custom events handled by UC HA component
     fn subscribe_uc_events(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
         // Don't subscribe again to the same event
-        if self.subscribe_uc_events_id != None {
+        if self.subscribe_uc_events_id.is_some() {
             return;
         }
         self.subscribe_uc_events_id = Some(self.new_msg_id());
@@ -612,7 +612,7 @@ impl HomeAssistantClient {
     /// Unsubscribe to custom events handled by UC HA component
     fn unsubscribe_uc_events(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
         //let id = Some(self.new_msg_id());
-        if self.subscribe_uc_events_id == None {
+        if self.subscribe_uc_events_id.is_none() {
             return;
         }
         let id = Some(self.new_msg_id());
