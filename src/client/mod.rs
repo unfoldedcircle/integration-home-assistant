@@ -563,7 +563,6 @@ impl HomeAssistantClient {
             return;
         }
         self.subscribe_configure_id = Some(self.new_msg_id());
-        if self.remote_id == "" {}
         if let Err(e) = self.send_json(
             json!({
                 "id": self.subscribe_configure_id,
