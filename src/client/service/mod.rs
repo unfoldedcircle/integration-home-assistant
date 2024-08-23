@@ -55,6 +55,9 @@ impl Handler<CallService> for HomeAssistantClient {
                 "{} is an internal remote-core entity",
                 msg.command.entity_type
             ))),
+            EntityType::IrEmitter => Err(ServiceError::BadRequest(
+                "IR-emitter not supported! Ignoring call".to_string(),
+            )),
         }?;
         info!(
             "[{}] Calling {} service '{service}'",

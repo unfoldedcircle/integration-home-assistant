@@ -417,7 +417,7 @@ impl Handler<FinishSetupFlowMsg> for Controller {
             EventCategory::Device,
             serde_json::to_value(DriverSetupChange {
                 event_type: SetupChangeEventType::Stop,
-                state: state.clone(),
+                state,
                 error: msg.error,
                 require_user_action: None,
             })

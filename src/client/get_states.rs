@@ -121,6 +121,10 @@ impl HomeAssistantClient {
                 }
                 EntityType::Remote => convert_remote_entity(entity_id, state, attr),
                 EntityType::Sensor => convert_sensor_entity(entity_id, state, attr),
+                EntityType::IrEmitter => {
+                    // no related HA entity
+                    continue;
+                }
                 // internal core entities for the moment
                 EntityType::Activity | EntityType::Macro => {
                     info!("[{}] skipping internal entity {entity_type}", self.id);

@@ -64,7 +64,7 @@ impl Handler<AvailableEntities> for Controller {
                 for entity in &msg.entities {
                     msg_data.push(EntityChange {
                         device_id: entity.device_id.clone(),
-                        entity_type: entity.entity_type.clone(),
+                        entity_type: entity.entity_type,
                         entity_id: entity.entity_id.clone(),
                         attributes: entity.attributes.clone().unwrap_or_default(),
                     });
