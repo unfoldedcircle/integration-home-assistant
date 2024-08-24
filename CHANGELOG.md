@@ -8,13 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+
+---
+
+## v0.10.0 - 2024-08-24
 ### Added
 - Initial support for the UC unified integration in Home Assistant for optimized message communication. Contributed by @albaintor, thanks! ([#58](https://github.com/unfoldedcircle/integration-home-assistant/pull/58))
 
 ### Changed
 - Update uc_api crate to latest 0.12.0 version.
-
----
 
 ## v0.9.0 - 2024-04-10
 ### Added
