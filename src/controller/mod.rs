@@ -113,8 +113,9 @@ pub struct Controller {
 impl Controller {
     pub fn new(settings: Settings, drv_metadata: IntegrationDriverUpdate) -> Self {
         let mut machine = StateMachine::new();
+        let url = settings.hass.get_url();
         // if we have all required HA connection settings, we can skip driver setup
-        if settings.hass.url.has_host() && !settings.hass.token.is_empty() {
+        if url.has_host() && !settings.hass.get_token().is_empty() {
             let _ = machine.consume(&OperationModeInput::ConfigurationAvailable);
         } else {
             info!("Home Assistant connection requires setup");
@@ -125,7 +126,7 @@ impl Controller {
             ws_client: new_websocket_client(
                 Duration::from_secs(settings.hass.connection_timeout as u64),
                 Duration::from_secs(settings.hass.request_timeout as u64),
-                matches!(settings.hass.url.scheme(), "wss" | "https"),
+                matches!(url.scheme(), "wss" | "https"),
             ),
             ha_reconnect_duration: settings.hass.reconnect.duration,
             settings,

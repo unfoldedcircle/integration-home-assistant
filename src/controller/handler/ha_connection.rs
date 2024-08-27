@@ -103,11 +103,11 @@ impl Handler<ConnectMsg> for Controller {
 
         self.set_device_state(DeviceState::Connecting);
 
-        let ws_request = self.ws_client.ws(self.settings.hass.url.as_str());
+        let url = self.settings.hass.get_url();
+        let ws_request = self.ws_client.ws(url.as_str());
         // align frame size to Home Assistant
         let ws_request = ws_request.max_frame_size(self.settings.hass.max_frame_size_kb * 1024);
-        let url = self.settings.hass.url.clone();
-        let token = self.settings.hass.token.clone();
+        let token = self.settings.hass.get_token();
         let client_address = ctx.address();
         let heartbeat = self.settings.hass.heartbeat;
 
@@ -137,7 +137,7 @@ impl Handler<ConnectMsg> for Controller {
                 act.ha_client_id = None; // will be set with Connected event
                 match result {
                     Ok(addr) => {
-                        debug!("Successfully connected to: {}", act.settings.hass.url);
+                        debug!("Successfully connected to: {}", act.settings.hass.get_url());
                         act.ha_client = Some(addr);
                         act.ha_reconnect_duration = act.settings.hass.reconnect.duration;
                         act.ha_reconnect_attempt = 0;

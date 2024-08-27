@@ -94,10 +94,10 @@ fn parse_args_load_cfg() -> anyhow::Result<Settings> {
     let cfg_file = None;
     let mut cfg = get_configuration(cfg_file).expect("Failed to read configuration");
     if let Some(url) = args.get_one::<String>("url") {
-        cfg.hass.url = Url::parse(url)?;
+        cfg.hass.set_url(Url::parse(url)?);
     }
     if let Some(token) = args.get_one::<String>("token") {
-        cfg.hass.token = token.clone();
+        cfg.hass.set_token(token);
     }
     if let Some(timeout) = args.get_one::<String>("connection_timeout") {
         cfg.hass.connection_timeout = u8::from_str(timeout)?;
@@ -106,7 +106,7 @@ fn parse_args_load_cfg() -> anyhow::Result<Settings> {
         cfg.hass.request_timeout = u8::from_str(timeout)?;
     }
 
-    if !cfg.hass.url.has_host() || cfg.hass.token.is_empty() {
+    if !cfg.hass.get_url().has_host() || cfg.hass.get_token().is_empty() {
         eprintln!("Can't connect to Home Assistant: URL or token is missing");
         std::process::exit(1);
     }
