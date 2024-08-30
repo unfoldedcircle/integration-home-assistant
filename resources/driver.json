@@ -1,5 +1,11 @@
 {
   "driver_id": "hass",
+  "features": [
+    {
+      "name": "auth.external_tokens",
+      "required": false
+    }
+  ],
   "version": "",
   "min_core_api": "0.20.0",
   "name": {

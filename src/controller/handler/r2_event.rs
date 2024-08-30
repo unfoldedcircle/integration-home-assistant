@@ -7,10 +7,9 @@ use crate::controller::handler::{AbortDriverSetup, ConnectMsg, DisconnectMsg};
 use crate::controller::{Controller, R2EventMsg, SendWsMessage};
 use actix::{AsyncContext, Handler};
 use log::{error, info};
-use serde_json::json;
 use uc_api::intg::ws::R2Event;
 use uc_api::intg::DeviceState;
-use uc_api::ws::{WsMessage};
+use uc_api::ws::WsMessage;
 
 impl Handler<R2EventMsg> for Controller {
     type Result = ();
@@ -27,7 +26,10 @@ impl Handler<R2EventMsg> for Controller {
         match msg.event {
             R2Event::Connect => {
                 if self.device_state != DeviceState::Connected {
-                    info!("[{}] Not connected, requesting registered HA tokens from remote:  {}", msg.ws_id, self.device_state);
+                    info!(
+                        "[{}] Not connected, requesting registered HA tokens from remote:  {}",
+                        msg.ws_id, self.device_state
+                    );
                     let fakeid = 32768;
                     //TODO @Markus this message type should be an EVENT and not a REQUEST :
                     // WS connection R2 => HA driver : R2 = server, HA driver = client
@@ -38,11 +40,10 @@ impl Handler<R2EventMsg> for Controller {
                         "id": Some(fakeid),
                         "msg": "get_runtime_info",
                     });
-                    let request: WsMessage = serde_json::from_value(json).expect("Invalid json message");
+                    let request: WsMessage =
+                        serde_json::from_value(json).expect("Invalid json message");
 
-                    match session
-                        .recipient
-                        .try_send(SendWsMessage(request)) {
+                    match session.recipient.try_send(SendWsMessage(request)) {
                         Ok(_) => info!("[{}] Request sent", fakeid),
                         Err(e) => error!("[{}] Error sending entity_states: {e:?}", msg.ws_id),
                     }

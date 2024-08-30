@@ -12,9 +12,7 @@ impl Handler<R2ResponseMsg> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: R2ResponseMsg, _ctx: &mut Self::Context) -> Self::Result {
-
-        match msg.msg
-        {
+        match msg.msg {
             R2Response::RuntimeInfo => {
                 info!("{:?}", msg);
             }
