@@ -496,6 +496,9 @@ impl HomeAssistantClient {
     }
 
     fn send_uc_info_command(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
+        debug!("[{}] UC Home assistant component : {:?}",
+                    self.id, self.uc_ha_component
+                );
         if !self.uc_ha_component {
             self.uc_ha_component_info_id = Some(self.new_msg_id());
             if let Err(e) = self.send_json(

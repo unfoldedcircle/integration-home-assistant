@@ -6,14 +6,24 @@
 use crate::controller::{Controller, R2ResponseMsg};
 use actix::Handler;
 use log::info;
+use uc_api::intg::ws::R2Response;
 
 impl Handler<R2ResponseMsg> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: R2ResponseMsg, _ctx: &mut Self::Context) -> Self::Result {
-        info!(
-            "[{}] TODO implement remote response: {}",
-            msg.ws_id, msg.msg
-        );
+
+        match msg.msg
+        {
+            R2Response::RuntimeInfo => {
+                info!("{:?}", msg);
+            }
+            _ => {
+                info!(
+                    "[{}] TODO implement remote response: {}",
+                    msg.ws_id, msg.msg
+                );
+            }
+        }
     }
 }

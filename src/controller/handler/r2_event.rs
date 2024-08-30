@@ -4,11 +4,13 @@
 //! Actix message handler for [R2EventMsg].
 
 use crate::controller::handler::{AbortDriverSetup, ConnectMsg, DisconnectMsg};
-use crate::controller::{Controller, R2EventMsg};
+use crate::controller::{Controller, R2EventMsg, SendWsMessage};
 use actix::{AsyncContext, Handler};
-use log::error;
+use log::{error, info};
+use serde_json::json;
 use uc_api::intg::ws::R2Event;
 use uc_api::intg::DeviceState;
+use uc_api::ws::{WsMessage};
 
 impl Handler<R2EventMsg> for Controller {
     type Result = ();
@@ -25,6 +27,26 @@ impl Handler<R2EventMsg> for Controller {
         match msg.event {
             R2Event::Connect => {
                 if self.device_state != DeviceState::Connected {
+                    info!("[{}] Not connected, requesting registered HA tokens from remote:  {}", msg.ws_id, self.device_state);
+                    let fakeid = 32768;
+                    //TODO @Markus this message type should be an EVENT and not a REQUEST :
+                    // WS connection R2 => HA driver : R2 = server, HA driver = client
+                    // Meantime I have built the message from a json object which is not clean
+                    // With event type we will be able to remove the fakeid
+                    let json = serde_json::json!({
+                        "kind": "req",
+                        "id": Some(fakeid),
+                        "msg": "get_runtime_info",
+                    });
+                    let request: WsMessage = serde_json::from_value(json).expect("Invalid json message");
+
+                    match session
+                        .recipient
+                        .try_send(SendWsMessage(request)) {
+                        Ok(_) => info!("[{}] Request sent", fakeid),
+                        Err(e) => error!("[{}] Error sending entity_states: {e:?}", msg.ws_id),
+                    }
+
                     ctx.notify(ConnectMsg::default());
                 }
                 // make sure client has the correct state, it might be out of sync, or not calling get_device_state
