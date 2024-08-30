@@ -1,5 +1,5 @@
 {
-  "driver_id": "hass",
+  "driver_id": "hass2",
   "features": [
     {
       "name": "auth.external_tokens",
@@ -9,7 +9,7 @@
   "version": "",
   "min_core_api": "0.20.0",
   "name": {
-    "en": "Home Assistant"
+    "en": "Home Assistant 2"
   },
   "icon": "uc:integration",
   "description": {
