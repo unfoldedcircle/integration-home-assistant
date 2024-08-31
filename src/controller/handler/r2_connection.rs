@@ -12,7 +12,8 @@ impl Handler<NewR2Session> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: NewR2Session, _: &mut Context<Self>) -> Self::Result {
-        self.sessions.insert(msg.id.clone(), R2Session::new(msg.addr));
+        self.sessions
+            .insert(msg.id.clone(), R2Session::new(msg.addr));
 
         self.send_device_state(&msg.id);
 
@@ -31,19 +32,17 @@ impl Handler<NewR2Session> for Controller {
             // Meantime I have built the message from a json object which is not clean
             // With event type we will be able to remove the fakeid
             let json = serde_json::json!({
-                        "kind": "req",
-                        "id": Some(requestid),
-                        "msg": "get_runtime_info",
-                    });
-            let request: WsMessage =
-                serde_json::from_value(json).expect("Invalid json message");
+                "kind": "req",
+                "id": Some(requestid),
+                "msg": "get_runtime_info",
+            });
+            let request: WsMessage = serde_json::from_value(json).expect("Invalid json message");
 
             match session.recipient.try_send(SendWsMessage(request)) {
                 Ok(_) => info!("[{}] Request sent", requestid),
                 Err(e) => error!("[{}] Error sending entity_states: {e:?}", msg.id),
             }
         }
-
     }
 }
 

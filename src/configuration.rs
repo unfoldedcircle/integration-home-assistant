@@ -197,7 +197,7 @@ impl HomeAssistantSettings {
         if token != self.token {
             return true;
         }
-        return false;
+        false
     }
 
     /// Return the configured HA server access token.
