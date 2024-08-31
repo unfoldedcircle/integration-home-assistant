@@ -86,7 +86,8 @@ impl Handler<ConnectMsg> for Controller {
         if let Some(handle) = self.reconnect_handle.take() {
             ctx.cancel_future(handle);
         }
-        if !matches!(self.machine.state(), &OperationModeState::Running) {
+        if !matches!(self.machine.state(), &OperationModeState::Running
+            | &OperationModeState::RequireSetup) {
             error!("Cannot connect in state: {:?}", self.machine.state());
             return Box::pin(fut::result(Err(Error::new(
                 ErrorKind::InvalidInput,
