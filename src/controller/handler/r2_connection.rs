@@ -3,10 +3,34 @@
 
 //! Actix message handler for Remote Two connection messages.
 
+use crate::controller::handler::r2_connection;
 use crate::controller::{Controller, NewR2Session, R2Session, R2SessionDisconnect, SendWsMessage};
 use actix::{Context, Handler};
 use log::{error, info};
-use uc_api::ws::WsMessage;
+use serde_json::json;
+use std::collections::HashMap;
+use uc_api::ws::{WsMessage, WsRequest};
+
+// TODO : Markus the UCAPI should be able to convert requests to messages (WsRequest is an impl
+//  of WsMessage structure
+trait From<WsRequest> {
+    fn from(f: WsRequest) -> Self;
+}
+impl From<WsRequest> for WsMessage {
+    fn from(f: WsRequest) -> Self {
+        WsMessage {
+            kind: Some(f.kind),
+            id: Some(f.id),
+            msg: Some(f.msg),
+            msg_data: f.msg_data,
+            req_id: None,
+            code: None,
+            extra: HashMap::new(),
+            ts: None,
+            cat: None,
+        }
+    }
+}
 
 impl Handler<NewR2Session> for Controller {
     type Result = ();
@@ -17,30 +41,16 @@ impl Handler<NewR2Session> for Controller {
 
         self.send_device_state(&msg.id);
 
-        // Retrieve the runtime info to store the remote id (used later to identify the remote
+        // Retrieve the version info to store the remote id (used later to identify the remote
         // from unified HA component
-        // TODO @Markus store the runtime_info.remote_identifier but no remote ID in the runtime info
-        //  Example of what is transmitted :
-        //  {"driver_id": "hass", "intg_ids": ["hass.main"], extra: {} }
         if let Some(session) = self.sessions.get_mut(&msg.id) {
-            // Avoid conflict with next received request ids
-            // let mut requestid: i32 = (&msg.id).parse().unwrap();
-            // requestid += 100;
-            let requestid = 32768;
-            //TODO @Markus this message type should be an EVENT and not a REQUEST :
-            // WS connection R2 => HA driver : R2 = server, HA driver = client
-            // Meantime I have built the message from a json object which is not clean
-            // With event type we will be able to remove the fakeid
-            let json = serde_json::json!({
-                "kind": "req",
-                "id": Some(requestid),
-                "msg": "get_runtime_info",
-            });
-            let request: WsMessage = serde_json::from_value(json).expect("Invalid json message");
-
-            match session.recipient.try_send(SendWsMessage(request)) {
-                Ok(_) => info!("[{}] Request sent", requestid),
-                Err(e) => error!("[{}] Error sending entity_states: {e:?}", msg.id),
+            let request_id = session.new_msg_id();
+            if let Ok(request) = WsRequest::new(request_id, "get_version", json!({})) {
+                let message = <WsMessage as r2_connection::From<WsRequest>>::from(request);
+                match session.recipient.try_send(SendWsMessage(message)) {
+                    Ok(_) => info!("[{}] Request sent", request_id),
+                    Err(e) => error!("[{}] Error sending entity_states: {e:?}", msg.id),
+                }
             }
         }
     }

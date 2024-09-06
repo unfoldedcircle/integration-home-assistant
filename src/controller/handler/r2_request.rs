@@ -121,6 +121,7 @@ impl Handler<R2RequestMsg> for Controller {
 
         // FIXME quick & dirty request id "mapping". This requires a rewrite with proper callback & timeout handling!
         let mut entity_ids = Default::default();
+        let remote_id = self.remote_id.clone();
         if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
             if msg.request == R2Request::GetAvailableEntities {
                 session.get_available_entities_id = Some(msg.req_id);
@@ -185,7 +186,7 @@ impl Handler<R2RequestMsg> for Controller {
                         );
                         ha_client
                             .send(GetStates {
-                                remote_id: msg.ws_id,
+                                remote_id,
                                 entity_ids,
                             })
                             .await??;
@@ -205,11 +206,7 @@ impl Handler<R2RequestMsg> for Controller {
                     // get states from Home Assistant. Response from HA will call AvailableEntities handler
                     if let Some(ha_client) = ha_client {
                         debug!("[{}] Requesting available entities from HA", msg.ws_id);
-                        ha_client
-                            .send(GetAvailableEntities {
-                                remote_id: msg.ws_id,
-                            })
-                            .await??;
+                        ha_client.send(GetAvailableEntities { remote_id }).await??;
                         Ok(None) // asynchronous response message. TODO check if GetStates could return the response
                     } else {
                         error!(

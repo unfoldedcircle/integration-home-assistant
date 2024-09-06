@@ -84,6 +84,13 @@ pub struct EntityEvent {
     pub entity_change: EntityChange,
 }
 
+/// Set remote id from remote to client
+#[derive(Message)]
+#[rtype(result = "Result<(), ServiceError>")]
+pub struct SetRemoteId {
+    pub remote_id: String,
+}
+
 /// HA client request: disconnect and close the session.
 // Used internally by the client and from Controller
 #[derive(Message)]

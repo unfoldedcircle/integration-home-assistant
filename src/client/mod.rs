@@ -37,6 +37,7 @@ mod get_states;
 pub mod messages;
 mod model;
 mod service;
+mod set_remote_id;
 mod streamhandler;
 mod subscribed_entities;
 
@@ -302,6 +303,7 @@ impl HomeAssistantClient {
 
                     // Subscribe to configuration change events (new entities to subscribe)
                     // from Home Assistant
+                    self.unsubscribe_uc_configuration(ctx);
                     self.subscribe_uc_configuration(ctx);
 
                     // If subscribed entities are defined, send them to HA for events
@@ -586,6 +588,31 @@ impl HomeAssistantClient {
         }
     }
 
+    /// Unsubscribe to configuration events by UC HA component
+    fn unsubscribe_uc_configuration(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
+        if self.subscribe_configure_id.is_none() {
+            return;
+        }
+        let id = Some(self.new_msg_id());
+        if let Err(e) = self.send_json(
+            json!({
+            "id": id,
+            "type": "unfoldedcircle/event/configure/unsubscribe",
+            "data": {
+                "client_id": self.remote_id,
+                "subscription_id": self.subscribe_configure_id
+            }
+            }),
+            _ctx,
+        ) {
+            error!(
+                "[{}] Error during unsubscription of UC configure : {:?}",
+                self.id, e
+            );
+        }
+        self.subscribe_configure_id = None;
+    }
+
     /// Subscribe to custom events handled by UC HA component
     fn subscribe_uc_events(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
         // Don't subscribe again to the same event
@@ -593,6 +620,10 @@ impl HomeAssistantClient {
             return;
         }
         self.subscribe_uc_events_id = Some(self.new_msg_id());
+        debug!(
+            "Subscribe to unfoldedcircle/event/entities/subscribe events with remote id {}",
+            self.remote_id
+        );
         if let Err(e) = self.send_json(
             json!({
                 "id": self.subscribe_uc_events_id.unwrap(),

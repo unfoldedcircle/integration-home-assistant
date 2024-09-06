@@ -32,7 +32,10 @@ impl Handler<R2EventMsg> for Controller {
                 // have changed, whatever the connection state is
                 // Ex : the user has changed the HA endpoint (from HA component),
                 // the user renewed the (nearly expired) token
-                if self.settings.hass.connection_settings_changed() {
+                //TODO not sure about condition on device state : reconnect all the time ?
+                if self.device_state == DeviceState::Connected
+                    && self.settings.hass.connection_settings_changed()
+                {
                     info!("[{}] HA connection settings have changed, (re)connect to HA with the new settings... :  {}",
                         msg.ws_id, self.device_state
                     );

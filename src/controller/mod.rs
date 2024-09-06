@@ -56,6 +56,8 @@ state_machine! {
 
 struct R2Session {
     recipient: Recipient<SendWsMessage>,
+    /// Request message id from driver to remote
+    ws_id: u32,
     standby: bool,
     subscribed_entities: HashSet<String>,
     // TODO replace with request id map & oneshot notification
@@ -71,12 +73,18 @@ impl R2Session {
     fn new(recipient: Recipient<SendWsMessage>) -> Self {
         Self {
             recipient,
+            ws_id: 0,
             standby: false,
             subscribed_entities: Default::default(),
             get_available_entities_id: None,
             get_entity_states_id: None,
             reconfiguring: None,
         }
+    }
+
+    fn new_msg_id(&mut self) -> u32 {
+        self.ws_id += 1;
+        self.ws_id
     }
 }
 
@@ -108,6 +116,8 @@ pub struct Controller {
     reconnect_handle: Option<SpawnHandle>,
     /// List of subscribed entities sent by HA component
     susbcribed_entity_ids: Option<Vec<AvailableIntgEntity>>,
+    /// Request id sent to the remote to get the version information
+    remote_id: String,
 }
 
 impl Controller {
@@ -138,6 +148,7 @@ impl Controller {
             setup_timeout: None,
             reconnect_handle: None,
             susbcribed_entity_ids: None,
+            remote_id: "".to_string(),
         }
     }
 

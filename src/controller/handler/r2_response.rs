@@ -3,9 +3,10 @@
 
 //! Actix message handler for [R2ResponseMsg].
 
+use crate::client::messages::SetRemoteId;
 use crate::controller::{Controller, R2ResponseMsg};
 use actix::Handler;
-use log::info;
+use log::{error, info};
 use uc_api::intg::ws::R2Response;
 
 impl Handler<R2ResponseMsg> for Controller {
@@ -15,6 +16,28 @@ impl Handler<R2ResponseMsg> for Controller {
         match msg.msg {
             R2Response::RuntimeInfo => {
                 info!("{:?}", msg);
+            }
+            R2Response::Version => {
+                info!("{:?}", msg);
+                if let Some(remote_id) = msg
+                    .response
+                    .msg_data
+                    .unwrap()
+                    .as_object_mut()
+                    .unwrap()
+                    .get_mut("hostname")
+                    .and_then(|v| v.as_str())
+                {
+                    info!("Remote identifier : {:?}", remote_id);
+                    self.remote_id = remote_id.to_string();
+                    if let Some(ha_client) = &self.ha_client {
+                        if let Err(e) = ha_client.try_send(SetRemoteId {
+                            remote_id: self.remote_id.clone(),
+                        }) {
+                            error!("Error sending remote identifier to client : {:?}", e);
+                        }
+                    }
+                }
             }
             _ => {
                 info!(
