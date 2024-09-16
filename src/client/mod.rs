@@ -316,18 +316,6 @@ impl HomeAssistantClient {
                     // Subscribe to states changed on subscribed entities
                     self.unsubscribe_uc_events(ctx);
                     self.subscribe_uc_events(ctx);
-
-                    /*
-                    // If subscribed entities are defined, send them to HA for events
-                    if !self.subscribed_entities.is_empty() {
-                        debug!(
-                            "[{}] Initialize subscribed entities : {}",
-                            self.id,
-                            itertools::join(&self.subscribed_entities, ",")
-                        );
-                        self.unsubscribe_uc_events(ctx);
-                        self.subscribe_uc_events(ctx);
-                    }*/
                 } else if Some(id) == self.subscribe_configure_id {
                     debug!(
                         "[{}] Received HA response for unfoldedcircle/event/configure/subscribe event ({})",

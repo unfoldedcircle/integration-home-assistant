@@ -1,7 +1,7 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-//! Actix actor handler implementation for the `GetStates` message
+//! Actix actor handler implementation for the `SetRemoteId` message
 
 use crate::client::messages::SetRemoteId;
 use crate::client::HomeAssistantClient;
