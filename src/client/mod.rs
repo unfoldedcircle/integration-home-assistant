@@ -132,7 +132,7 @@ impl HomeAssistantClient {
                 authenticated: false,
                 remote_id: "".to_string(),
                 uc_ha_component_check_interval: Duration::from_secs(5),
-                uc_ha_component_check_duration: Duration::from_secs(600),
+                uc_ha_component_check_duration: Duration::from_secs(0), // check forever
             }
         })
     }

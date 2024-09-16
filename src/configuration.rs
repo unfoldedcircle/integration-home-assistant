@@ -186,19 +186,7 @@ impl HomeAssistantSettings {
         }
         None
     }
-
-    /// Returns true if the HA connection URL has changed or the HA token has changed
-    pub fn connection_settings_changed(&self) -> bool {
-        let url = self.get_url();
-        if url.as_str() != self.url.as_str() {
-            return true;
-        }
-        let token = self.get_token();
-        if token != self.token {
-            return true;
-        }
-        false
-    }
+    
 
     /// Return the configured HA server access token.
     ///
