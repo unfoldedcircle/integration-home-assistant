@@ -18,8 +18,9 @@ impl Handler<SubscribedEntities> for HomeAssistantClient {
         if !self.authenticated {
             return;
         }
-        // Occurs when the remote reloads due (wakes up) or when the user
+        // Occurs when the remote reloads (wakes up) or when the user
         // selected new entities from HA, subscribe to configuration event if not already done
+        self.unsubscribe_uc_configuration(_ctx);
         self.subscribe_uc_configuration(_ctx);
         self.unsubscribe_uc_events(_ctx);
         self.subscribe_uc_events(_ctx);

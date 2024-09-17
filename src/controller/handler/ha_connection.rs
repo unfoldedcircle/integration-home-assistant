@@ -3,7 +3,9 @@
 
 //! Actix message handler for Home Assistant client connection messages.
 
-use crate::client::messages::{Close, ConnectionEvent, ConnectionState, SubscribedEntities};
+use crate::client::messages::{
+    Close, ConnectionEvent, ConnectionState, SetRemoteId, SubscribedEntities,
+};
 use crate::client::HomeAssistantClient;
 use crate::controller::handler::{ConnectMsg, DisconnectMsg};
 use crate::controller::{Controller, OperationModeState};
@@ -86,7 +88,10 @@ impl Handler<ConnectMsg> for Controller {
         if let Some(handle) = self.reconnect_handle.take() {
             ctx.cancel_future(handle);
         }
-        if !matches!(self.machine.state(), &OperationModeState::Running) {
+        if !matches!(
+            self.machine.state(),
+            &OperationModeState::Running | &OperationModeState::RequireSetup
+        ) {
             error!("Cannot connect in state: {:?}", self.machine.state());
             return Box::pin(fut::result(Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -110,6 +115,7 @@ impl Handler<ConnectMsg> for Controller {
         let token = self.settings.hass.get_token();
         let client_address = ctx.address();
         let heartbeat = self.settings.hass.heartbeat;
+        let remote_id = self.remote_id.clone();
 
         info!(
             "Connecting to: {url} (timeout: {}s, request_timeout: {}s)",
@@ -145,6 +151,10 @@ impl Handler<ConnectMsg> for Controller {
                         if let Some(session) = act.sessions.values().next() {
                             let entities = session.subscribed_entities.clone();
                             if let Some(ha_client) = &act.ha_client {
+                                if let Err(e) = ha_client.try_send(SetRemoteId { remote_id }) {
+                                    error!("Error sending remote identifier to client : {:?}", e);
+                                }
+
                                 if let Err(e) = ha_client.try_send(SubscribedEntities {
                                     entity_ids: entities,
                                 }) {
