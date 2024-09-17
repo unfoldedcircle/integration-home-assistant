@@ -620,7 +620,7 @@ impl HomeAssistantClient {
     }
 
     /// Subscribe to custom events handled by UC HA component
-    fn subscribe_uc_events(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
+    fn subscribe_uc_events(&mut self, ctx: &mut Context<HomeAssistantClient>) {
         // Don't subscribe again to the same event
         if self.subscribe_uc_events_id.is_some() {
             return;
@@ -639,13 +639,13 @@ impl HomeAssistantClient {
                     "client_id": self.remote_id
                 }
             }),
-            _ctx,
+            ctx,
         ) {
             error!(
                 "[{}] Error sending unfoldedcircle/event/entities/subscribe to HA: {:?}",
                 self.id, e
             );
-            _ctx.notify(Close::invalid());
+            ctx.notify(Close::invalid());
             self.subscribe_uc_events_id = None;
         }
     }
@@ -682,7 +682,10 @@ impl HomeAssistantClient {
         _ctx: &mut Context<HomeAssistantClient>,
         ha_start_time: SystemTime,
     ) {
-        if !_ctx.connected() || self.uc_ha_component {
+        if !_ctx.connected() {
+            return;
+        }
+        if self.uc_ha_component {
             debug!("UC HA component found");
             return;
         }

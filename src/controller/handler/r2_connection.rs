@@ -21,12 +21,7 @@ impl Handler<NewR2Session> for Controller {
         // from unified HA component
         if let Some(session) = self.sessions.get_mut(&msg.id) {
             let request_id = session.new_msg_id();
-            let message = WsMessage {
-                kind: Some("req".into()),
-                id: Some(request_id),
-                msg: Some("get_version".into()),
-                ..Default::default()
-            };
+            let message = WsMessage::simple_request(request_id, "get_version");
             match session.recipient.try_send(SendWsMessage(message)) {
                 Ok(_) => info!("[{}] Request sent", request_id),
                 Err(e) => error!("[{}] Error sending entity_states: {e:?}", msg.id),

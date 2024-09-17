@@ -186,7 +186,6 @@ impl HomeAssistantSettings {
         }
         None
     }
-    
 
     /// Return the configured HA server access token.
     ///
