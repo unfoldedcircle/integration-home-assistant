@@ -28,13 +28,13 @@ impl Handler<R2ResponseMsg> for Controller {
                     .get_mut("hostname")
                     .and_then(|v| v.as_str())
                 {
-                    info!("Remote identifier : {:?}", remote_id);
+                    info!("Remote identifier: '{remote_id}'");
                     self.remote_id = remote_id.to_string();
                     if let Some(ha_client) = &self.ha_client {
                         if let Err(e) = ha_client.try_send(SetRemoteId {
                             remote_id: self.remote_id.clone(),
                         }) {
-                            error!("Error sending remote identifier to client : {:?}", e);
+                            error!("Error sending remote identifier to client: {:?}", e);
                         }
                     }
                 }

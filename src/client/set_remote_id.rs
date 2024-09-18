@@ -13,7 +13,7 @@ impl Handler<SetRemoteId> for HomeAssistantClient {
     type Result = Result<(), ServiceError>;
 
     fn handle(&mut self, msg: SetRemoteId, ctx: &mut Self::Context) -> Self::Result {
-        debug!("[{}] SetRemoteId from {}", self.id, msg.remote_id);
+        debug!("[{}] SetRemoteId: '{}'", self.id, msg.remote_id);
         self.remote_id = msg.remote_id;
         if self.uc_ha_component {
             self.unsubscribe_uc_configuration(ctx);

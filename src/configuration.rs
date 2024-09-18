@@ -216,7 +216,7 @@ impl HomeAssistantSettings {
         let mut path = PathBuf::from(env::var(ENV_TOKENS_HOME).ok()?);
         path.push(key);
         if !path.is_file() {
-            warn!("Token file '{key}' does not exist. Using local configuration.");
+            info!("Token file '{key}' does not exist. Using local configuration.");
             return None;
         }
 

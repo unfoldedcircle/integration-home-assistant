@@ -113,9 +113,10 @@ struct Listeners {
 }
 
 fn create_tcp_listeners(cfg: &IntegrationSettings) -> Result<Listeners, io::Error> {
+    let version = built_info::GIT_VERSION.unwrap_or(built_info::PKG_VERSION);
     let listener = if cfg.http.enabled {
         let address = format!("{}:{}", cfg.interface, cfg.http.port);
-        println!("{} listening on: {address}", built_info::PKG_NAME);
+        println!("{} {version} listening on: {address}", built_info::PKG_NAME);
         Some(TcpListener::bind(address)?)
     } else {
         None
@@ -131,7 +132,7 @@ fn create_tcp_listeners(cfg: &IntegrationSettings) -> Result<Listeners, io::Erro
             Some(c) => c.clone(),
         };
 
-        println!("{} listening on: {address}", built_info::PKG_NAME);
+        println!("{} {version} listening on: {address}", built_info::PKG_NAME);
         (Some(TcpListener::bind(address)?), certs)
     } else {
         (None, Default::default())

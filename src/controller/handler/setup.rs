@@ -669,6 +669,7 @@ fn validate_url<'a>(addr: impl Into<Option<&'a str>>) -> Result<Url, ServiceErro
 
 fn parse_with_ws_scheme(address: &str) -> Result<Url, url::ParseError> {
     let address = format!("ws://{address}");
+    #[allow(clippy::manual_inspect)] // first we need to set `rust-version = "1.81"` in Cargo.toml
     Url::parse(&address).map_err(|e| {
         warn!("Invalid URL '{address}': {e}");
         e

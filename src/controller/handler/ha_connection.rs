@@ -143,7 +143,6 @@ impl Handler<ConnectMsg> for Controller {
                 act.ha_client_id = None; // will be set with Connected event
                 match result {
                     Ok(addr) => {
-                        debug!("Successfully connected to: {}", act.settings.hass.get_url());
                         act.ha_client = Some(addr);
                         act.ha_reconnect_duration = act.settings.hass.reconnect.duration;
                         act.ha_reconnect_attempt = 0;
@@ -152,16 +151,13 @@ impl Handler<ConnectMsg> for Controller {
                             let entities = session.subscribed_entities.clone();
                             if let Some(ha_client) = &act.ha_client {
                                 if let Err(e) = ha_client.try_send(SetRemoteId { remote_id }) {
-                                    error!("Error sending remote identifier to client : {:?}", e);
+                                    error!("Error sending remote identifier to client: {:?}", e);
                                 }
 
                                 if let Err(e) = ha_client.try_send(SubscribedEntities {
                                     entity_ids: entities,
                                 }) {
-                                    error!(
-                                        "Error updating subscribed entities to client : {:?}",
-                                        e
-                                    );
+                                    error!("Error updating subscribed entities to client: {:?}", e);
                                 }
                             }
                         }

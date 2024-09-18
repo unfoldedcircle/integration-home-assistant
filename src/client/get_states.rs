@@ -19,7 +19,7 @@ impl Handler<GetStates> for HomeAssistantClient {
     type Result = Result<(), ServiceError>;
 
     fn handle(&mut self, msg: GetStates, ctx: &mut Self::Context) -> Self::Result {
-        debug!("[{}] GetStates from {}", self.id, msg.remote_id);
+        debug!("[{}] GetStates from '{}'", self.id, msg.remote_id);
         self.remote_id = msg.remote_id;
         let entity_ids = msg.entity_ids;
         let id = self.new_msg_id();
