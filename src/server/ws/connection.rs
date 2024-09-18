@@ -29,6 +29,10 @@ impl Actor for WsConn {
     type Context = WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        // Noticed `send failed because receiver is full` errors with the default 16.
+        // Likely due to rapid entity updates from HA.
+        ctx.set_mailbox_capacity(32);
+
         self.start_heartbeat(ctx);
 
         // since we only implemented the header based authentication in server::ws_index we can send

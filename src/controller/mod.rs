@@ -159,8 +159,12 @@ impl Controller {
                 debug!("Remote is in standby, not sending message: {:?}", message);
                 return;
             }
+            let msg = message.msg.clone();
             if let Err(e) = session.recipient.try_send(SendWsMessage(message)) {
-                error!("[{ws_id}] Internal message send error: {e}");
+                error!(
+                    "[{ws_id}] Internal message send error of '{}': {e}",
+                    msg.unwrap_or_default()
+                );
             }
         } else {
             warn!("attempting to send message but couldn't find session: {ws_id}");
