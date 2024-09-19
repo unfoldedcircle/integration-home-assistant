@@ -106,13 +106,22 @@ impl Handler<ConnectMsg> for Controller {
             }
         }
 
+        let url = self.settings.hass.get_url();
+        let token = self.settings.hass.get_token();
+
+        if url.host_str().is_none() || token.is_empty() {
+            error!("Cannot connect: HA url or token missing");
+            return Box::pin(fut::result(Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Missing HA url or token",
+            ))));
+        }
+
         self.set_device_state(DeviceState::Connecting);
 
-        let url = self.settings.hass.get_url();
         let ws_request = self.ws_client.ws(url.as_str());
         // align frame size to Home Assistant
         let ws_request = ws_request.max_frame_size(self.settings.hass.max_frame_size_kb * 1024);
-        let token = self.settings.hass.get_token();
         let client_address = ctx.address();
         let heartbeat = self.settings.hass.heartbeat;
         let remote_id = self.remote_id.clone();

@@ -201,8 +201,8 @@ impl HomeAssistantSettings {
     }
 
     /// Update the local configuration token.
-    pub fn set_token(&mut self, token: impl ToString) {
-        self.token = token.to_string();
+    pub fn set_token(&mut self, token: impl AsRef<str>) {
+        self.token = token.as_ref().trim().to_string();
     }
 
     /// Get the value of an external system token key.
