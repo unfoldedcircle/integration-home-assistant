@@ -8,6 +8,7 @@ use crate::client::messages::{
 };
 use crate::client::HomeAssistantClient;
 use crate::controller::handler::{ConnectMsg, DisconnectMsg};
+use crate::controller::OperationModeInput::{AbortSetup, Connected};
 use crate::controller::{Controller, OperationModeState};
 use actix::{fut, ActorFutureExt, AsyncContext, Context, Handler, ResponseActFuture, WrapFuture};
 use futures::StreamExt;
@@ -111,6 +112,10 @@ impl Handler<ConnectMsg> for Controller {
 
         if url.host_str().is_none() || token.is_empty() {
             error!("Cannot connect: HA url or token missing");
+            let dummy_ws_id = "0"; // we don't have a WS request msg id
+            if let Err(e) = self.sm_consume(dummy_ws_id, &AbortSetup, ctx) {
+                error!("{e}");
+            }
             return Box::pin(fut::result(Err(Error::new(
                 ErrorKind::InvalidInput,
                 "Missing HA url or token",
@@ -152,6 +157,11 @@ impl Handler<ConnectMsg> for Controller {
                 act.ha_client_id = None; // will be set with Connected event
                 match result {
                     Ok(addr) => {
+                        let dummy_ws_id = "0"; // we don't have a WS request msg id
+                        if let Err(e) = act.sm_consume(dummy_ws_id, &Connected, ctx) {
+                            error!("{e}");
+                        }
+
                         act.ha_client = Some(addr);
                         act.ha_reconnect_duration = act.settings.hass.reconnect.duration;
                         act.ha_reconnect_attempt = 0;

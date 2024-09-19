@@ -33,24 +33,32 @@ state_machine! {
         ConfigurationAvailable => Running,
         AbortSetup => RequireSetup,
         SetupDriverRequest => SetupFlow [SetupFlowTimer],
+        Connected => Running,  // URL & token set with external access token
     },
-    Running(SetupDriverRequest) => SetupFlow [SetupFlowTimer],
-    Running(R2Request) => Running,
+    Running => {
+        SetupDriverRequest => SetupFlow [SetupFlowTimer],
+        R2Request => Running,
+        Connected => Running,  // reconnection
+        AbortSetup => RequireSetup,
+    },
     SetupFlow => {
         RequestUserInput => WaitSetupUserData,
         Successful => Running [CancelSetupFlowTimer],
         SetupError => SetupError [CancelSetupFlowTimer],
         AbortSetup => RequireSetup [CancelSetupFlowTimer],
+        Connected => SetupFlow,  // setup flow will connect to HA, but final input is Successful
     },
     WaitSetupUserData => {
         SetupUserData => SetupFlow,
         SetupError => SetupError [CancelSetupFlowTimer],
         AbortSetup => RequireSetup [CancelSetupFlowTimer],
+        Connected => WaitSetupUserData,
     },
     SetupError => {
         AbortSetup => RequireSetup,
         SetupDriverRequest => SetupFlow,
         SetupError => SetupError,
+        Connected => Running,  // should not happen, just for safety
     }
 }
 
