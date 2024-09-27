@@ -25,6 +25,13 @@ use url::Url;
 /// Local Actix message to request further user data.
 #[derive(Constructor, Message)]
 #[rtype(result = "()")]
+struct RequestOptionsMsg {
+    pub ws_id: String,
+}
+
+/// Local Actix message to request further user data.
+#[derive(Constructor, Message)]
+#[rtype(result = "()")]
 struct RequestExpertOptionsMsg {
     pub ws_id: String,
 }
@@ -40,8 +47,8 @@ struct FinishSetupFlowMsg {
 /// Start integration setup flow.
 ///
 /// Disconnect an active HA connection to start a new client connection with the changed data later.   
-/// Either continue with expert configuration options with [RequestExpertOptionsMsg] if selected in initial
-/// configuration screen, or finish setup with [FinishSetupFlowMsg].
+/// Either continue the normal configuration with [RequestOptionsMsg], or the expert configuration
+/// options with [RequestExpertOptionsMsg] if selected in initial configuration screen.
 impl Handler<SetupDriverMsg> for Controller {
     type Result = Result<(), ServiceError>;
 
@@ -57,38 +64,12 @@ impl Handler<SetupDriverMsg> for Controller {
             ));
         }
 
-        let mut cfg = self.settings.hass.clone();
-
-        // validate setup data
-        cfg.url = validate_url(msg.data.setup_data.get("url").map(|u| u.as_str()))?;
-
-        if let Some(token) = msg.data.setup_data.get("token").map(|t| t.trim()) {
-            if token.is_empty() && !cfg.token.is_empty() {
-                warn!(
-                    "[{}] no token value provided in setup, using existing token",
-                    msg.ws_id
-                )
-            } else if !token.is_empty() {
-                cfg.token = token.to_string();
-            } else {
-                return Err(BadRequest("Missing token".into()));
-            }
-        } else {
-            return Err(BadRequest("Missing field: token".into()));
-        }
-
         if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
             session.reconfiguring = msg.data.reconfigure;
         };
 
-        save_user_settings(&cfg)?;
-
         info!("Disconnecting from HA during setup-flow");
         self.disconnect(ctx);
-
-        // TODO verify WebSocket connection to make sure user provided URL & token are ok! #3
-        // Right now the core will just send a Connect request after setup...
-        self.settings.hass = cfg;
 
         // use a delay that the ack response will be sent first
         let delay = Duration::from_millis(100);
@@ -99,11 +80,10 @@ impl Handler<SetupDriverMsg> for Controller {
             .and_then(|v| bool::from_str(v).ok())
             .unwrap_or_default()
         {
-            // start expert setup with an additional configuration screen
+            // start expert setup with a different configuration screen
             ctx.notify_later(RequestExpertOptionsMsg::new(msg.ws_id), delay);
         } else {
-            // setup done!
-            ctx.notify_later(FinishSetupFlowMsg::new(msg.ws_id, None), delay);
+            ctx.notify_later(RequestOptionsMsg::new(msg.ws_id), delay);
         }
 
         // this will acknowledge the setup_driver request message
@@ -111,7 +91,7 @@ impl Handler<SetupDriverMsg> for Controller {
     }
 }
 
-/// Handle driver setup input data from the expert configuration screen.
+/// Handle driver setup input data from the normal configuration or expert configuration screen.
 ///
 /// Validate and save entered data, then trigger the end of the setup flow with [FinishSetupFlowMsg].
 impl Handler<SetDriverUserDataMsg> for Controller {
@@ -127,8 +107,30 @@ impl Handler<SetDriverUserDataMsg> for Controller {
         }
 
         // validate setup data
+        // Plain and simple: same for all setup pages. If it gets more complex, keep track of current
+        // page as for example in the ATV integration, and only check expected fields.
         let mut cfg = self.settings.hass.clone();
         if let IntegrationSetup::InputValues(values) = msg.data {
+            if values.contains_key("url") {
+                // TODO verify WebSocket connection to make sure user provided URL & token are ok! #3
+                // Right now the core will just send a Connect request after setup...
+                let url = parse_value::<String>(&values, "url");
+                cfg.set_url(validate_url(url.as_deref())?);
+            }
+
+            if let Some(token) = parse_value::<String>(&values, "token") {
+                if token.is_empty() && !cfg.get_token().is_empty() {
+                    warn!(
+                        "[{}] no token value provided in setup, using existing token",
+                        msg.ws_id
+                    )
+                } else if !token.is_empty() {
+                    cfg.set_token(token);
+                } else {
+                    return Err(BadRequest("Missing token".into()));
+                }
+            }
+
             if let Some(value) = parse_value(&values, "connection_timeout") {
                 if value >= 3 {
                     cfg.connection_timeout = value;
@@ -188,6 +190,136 @@ impl Handler<SetDriverUserDataMsg> for Controller {
     }
 }
 
+/// Request configuration options.
+///
+/// - If the external token & URL has been set by the HA UC component, just show the configured URL.
+/// - Otherwise, show URL and token input fields.
+impl Handler<RequestOptionsMsg> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: RequestOptionsMsg, ctx: &mut Self::Context) -> Self::Result {
+        if self.sm_consume(&msg.ws_id, &RequestUserInput, ctx).is_err() {
+            return;
+        }
+
+        // TODO externalize i18n
+        let event = if self.settings.hass.has_external_url_and_token() {
+            WsMessage::event(
+                "driver_setup_change",
+                EventCategory::Device,
+                json!({
+                    "event_type": SetupChangeEventType::Setup,
+                    "state": IntegrationSetupState::WaitUserAction,
+                    "require_user_action": {
+                        "input": {
+                            "title": {
+                                "en": "Home Assistant settings",
+                                "de": "Home Assistant Konfiguration",
+                                "fr": "Configuration Home Assistant"
+                            },
+                            "settings": [
+                              {
+                                "id": "info",
+                                "label": {
+                                  "en": "Home Assistant Server",
+                                  "fr": "Serveur Home Assistant"
+                                },
+                                "field": {
+                                  "label": {
+                                    "value": {
+                                      "en": "The configuration has been provided by the Home Assistance UC component. Click _Next_ to connect to Home Assistant and to retrieve available entities.",
+                                      "de": "Die Konfiguration wurde durch die Home Assistance UC Komponente vorgenommen. Klicke auf _Weiter_ um auf Home Assistant zu verbinden und die verfügbaren Entitäten zu laden.",
+                                      "fr": "La configuration a été fournie par le composant Home Assistance UC. Cliquez sur _Suivant_ pour vous connecter à Home Assistant et récupérer les entités disponibles."
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "id": "url",
+                                "label": {
+                                  "en": "Configured Home Assistant WebSocket API URL:",
+                                  "de": "Konfigurierte Home Assistant WebSocket API URL:",
+                                  "fr": "URL de l'API WebSocket de Home Assistant configurée:"
+                                },
+                                "field": {
+                                  "label": {
+                                    "value": {
+                                       "en": self.settings.hass.get_url()
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                        }
+                    }
+                }),
+            )
+        } else {
+            let token_missing = self.settings.hass.get_token().is_empty();
+            WsMessage::event(
+                "driver_setup_change",
+                EventCategory::Device,
+                json!({
+                    "event_type": SetupChangeEventType::Setup,
+                    "state": IntegrationSetupState::WaitUserAction,
+                    "require_user_action": {
+                        "input": {
+                            "title": {
+                                "en": "Home Assistant settings",
+                                "de": "Home Assistant Konfiguration",
+                                "fr": "Configuration Home Assistant"
+                            },
+                            "settings": [
+                              {
+                                "id": "info",
+                                "label": {
+                                  "en": "Home Assistant Server",
+                                  "fr": "Serveur Home Assistant"
+                                },
+                                "field": {
+                                  "label": {
+                                    "value": {
+                                      "en": "The driver requires WebSocket API access to communicate with Home Assistant.\nSee [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) for more information on how to create a long lived access token.\n\nThe access token is required for setting up the integration. If the integration is reconfigured, the access token can be omitted and the previously configured token is used.",
+                                      "de": "Der Treiber benötigt WebSocket-API Zugriff, um mit Home Assistant zu kommunizieren.\nWeitere Informationen zur Erstellung eines langlebigen Zugriffstokens findest du in der [Home Assistant Dokumentation](https://www.home-assistant.io/docs/authentication/).\n\nDas Zugriffstoken wird zum Einrichten der Integration benötigt. Wird die Integration neu konfiguriert, kann das Zugriffstoken weggelassen werden und das vorher konfigurierte Token wird verwendet.",
+                                      "fr": "Le pilote nécessite l'accès à l'API WebSocket pour communiquer avec Home Assistant.\nVoir [Home Assistant documentation] (https://www.home-assistant.io/docs/authentication/) pour plus d'informations sur la création d'un \"long lived access token\".\n\nLe token d'accès est requis pour configurer l'intégration. Si l'intégration est reconfigurée, le token d'accès peut être omis et le token précédemment configuré est utilisé."
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "id": "url",
+                                "label": {
+                                  "en": "WebSocket API URL"
+                                },
+                                "field": {
+                                  "text": {
+                                    "value": self.settings.hass.get_url()
+                                  }
+                                }
+                              },
+                              {
+                                "id": "token",
+                                "label": {
+                                  "en": format!("Long lived access token {}", if token_missing { "- not yet configured!" } else { "(empty: old token)" }),
+                                  "de": format!("Langlebiges Zugriffstoken {}", if token_missing { "- noch nicht konfiguriert!" } else { "(leer: altes Token)" }),
+                                  "fr": format!("Jeton d'accès de longue durée {}", if token_missing { "- pas encore configuré!" } else { "(vide : ancien jeton)" })
+                                },
+                                "field": {
+                                  "password": {
+                                  }
+                                }
+                              }
+                            ]
+                        }
+                    }
+                }),
+            )
+        };
+
+        self.send_r2_msg(event, &msg.ws_id);
+    }
+}
+
 /// Send the expert configuration data request.
 ///
 /// The setup flow will continue with the [SetDriverUserDataMsg] or timeout if no response is received.
@@ -199,6 +331,7 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
             return;
         }
 
+        // TODO externalize i18n
         let event = WsMessage::event(
             "driver_setup_change",
             EventCategory::Device,
@@ -465,14 +598,14 @@ impl Handler<AbortDriverSetup> for Controller {
             }
 
             // Continue normal operation if it was a reconfiguration and not an initial setup.
-            // Otherwise we'll always get a "setup required" when requesting entities in the web-configurator.
+            // Otherwise, we'll always get a "setup required" when requesting entities in the web-configurator.
             if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
                 let reconfiguring = session.reconfiguring;
                 session.reconfiguring = None;
                 if matches!(self.machine.state(), &OperationModeState::RequireSetup)
                     && reconfiguring == Some(true)
-                    && self.settings.hass.url.has_host()
-                    && !self.settings.hass.token.is_empty()
+                    && self.settings.hass.get_url().has_host()
+                    && !self.settings.hass.get_token().is_empty()
                 {
                     let _ = self.sm_consume(&msg.ws_id, &ConfigurationAvailable, ctx);
                     ctx.notify(ConnectMsg::default());
@@ -536,6 +669,7 @@ fn validate_url<'a>(addr: impl Into<Option<&'a str>>) -> Result<Url, ServiceErro
 
 fn parse_with_ws_scheme(address: &str) -> Result<Url, url::ParseError> {
     let address = format!("ws://{address}");
+    #[allow(clippy::manual_inspect)] // first we need to set `rust-version = "1.81"` in Cargo.toml
     Url::parse(&address).map_err(|e| {
         warn!("Invalid URL '{address}': {e}");
         e

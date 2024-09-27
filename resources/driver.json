@@ -1,5 +1,11 @@
 {
   "driver_id": "hass",
+  "features": [
+    {
+      "name": "auth.external_tokens",
+      "required": false
+    }
+  ],
   "version": "",
   "min_core_api": "0.20.0",
   "name": {
@@ -32,32 +38,10 @@
         "field": {
           "label": {
             "value": {
-              "en": "The driver requires WebSocket API access to communicate with Home Assistant.\nSee [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) for more information on how to create a long lived access token.\n\nThe access token is required for setting up the integration. If the integration is reconfigured, the access token can be omitted and the previously configured token is used.",
-              "de": "Der Treiber benötigt WebSocket-API Zugriff, um mit Home Assistant zu kommunizieren.\nWeitere Informationen zur Erstellung eines langlebigen Zugriffstokens findest du in der [Home Assistant Dokumentation](https://www.home-assistant.io/docs/authentication/).\n\nDas Zugriffstoken wird zum Einrichten der Integration benötigt. Wird die Integration neu konfiguriert, kann das Zugriffstoken weggelassen werden und das vorher konfigurierte Token wird verwendet.",
-              "fr": "Le pilote nécessite l'accès à l'API WebSocket pour communiquer avec Home Assistant.\nVoir [Home Assistant documentation] (https://www.home-assistant.io/docs/authentication/) pour plus d'informations sur la création d'un \"long lived access token\".\n\nLe token d'accès est requis pour configurer l'intégration. Si l'intégration est reconfigurée, le token d'accès peut être omis et le token précédemment configuré est utilisé."
+              "en": "The driver requires WebSocket API access to communicate with Home Assistant.\nSee [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) for more information on how to create a long lived access token.\n\nWhen using the [Unfolded Circle for Home Assistant component](https://github.com/JackJPowell/hass-unfoldedcircle), the connection parameters are automatically configured and you don't need to manually set an access token.\n\nThe _enhanced options_ below can be used to change expert connection parameters.",
+              "de": "Der Treiber benötigt WebSocket-API Zugriff, um mit Home Assistant zu kommunizieren.\nWeitere Informationen zur Erstellung eines langlebigen Zugriffstokens findest du in der [Home Assistant Dokumentation](https://www.home-assistant.io/docs/authentication/).\n\nWenn Du die [Unfolded Circle for Home Assistant](https://github.com/JackJPowell/hass-unfoldedcircle) Komponente verwendest, werden die Verbindungsparameter automatisch konfiguriert, und Du musst kein Zugriffstoken manuell setzen.\n\nMit den _erweiterten Optionen_ können Experten-Verbindungsparameter geändert werden.",
+              "fr": "Le pilote nécessite l'accès à l'API WebSocket pour communiquer avec Home Assistant.\nVoir [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) pour plus d'informations sur la création d'un \"long lived access token\".\n\nLorsque vous utilisez le composant [Unfolded Circle for Home Assistant](https://github.com/JackJPowell/hass-unfoldedcircle), les paramètres de connexion sont automatiquement configurés et vous n'avez pas besoin de définir manuellement un jeton d'accès.\n\nLes _options avancées_ ci-dessous peuvent être utilisées pour modifier les paramètres de connexion des experts."
             }
-          }
-        }
-      },
-      {
-        "id": "url",
-        "label": {
-          "en": "WebSocket API URL"
-        },
-        "field": {
-          "text": {
-            "value": "ws://homeassistant.local:8123/api/websocket"
-          }
-        }
-      },
-      {
-        "id": "token",
-        "label": {
-          "en": "Long lived access token (empty: old token)",
-          "de": "Langlebiges Zugriffstoken (leer: altes Token)"
-        },
-        "field": {
-          "password": {
           }
         }
       },
@@ -76,5 +60,5 @@
       }
     ]
   },
-  "release_date": "2023-03-08"
+  "release_date": "2023-08-27"
 }

@@ -29,6 +29,10 @@ impl Actor for WsConn {
     type Context = WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        // Noticed `send failed because receiver is full` errors with the default 16.
+        // Likely due to rapid entity updates from HA.
+        ctx.set_mailbox_capacity(32);
+
         self.start_heartbeat(ctx);
 
         // since we only implemented the header based authentication in server::ws_index we can send
@@ -118,6 +122,7 @@ impl Handler<TextMsg> for WsConn {
 
         // clone required data for async context
         let req_id = msg.id.unwrap_or_default();
+        let req_msg = msg.msg.clone().unwrap_or_default();
         let session_id = self.id.clone();
         let controller_addr = self.controller_addr.clone();
 
@@ -135,7 +140,9 @@ impl Handler<TextMsg> for WsConn {
                             WsConn::on_event(&session_id, msg, controller_addr).await?;
                             Ok(None)
                         }
-                        _ => Err(ServiceError::BadRequest("Unsupported kind value".into())),
+                        _ => Err(ServiceError::BadRequest(format!(
+                            "Unsupported message kind: {k}"
+                        ))),
                     },
                 }
             }
@@ -146,7 +153,10 @@ impl Handler<TextMsg> for WsConn {
                         ctx.notify(SendWsMessage(response));
                     }
                     Err(e) => {
-                        warn!("[{}] Error processing received text message: {e}", act.id);
+                        warn!(
+                            "[{}] Error processing received message '{req_msg}': {e}",
+                            act.id
+                        );
                         let response = service_error_to_ws_message(&act.id, req_id, e);
                         ctx.notify(SendWsMessage(response));
                     }

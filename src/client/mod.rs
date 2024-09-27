@@ -5,10 +5,10 @@
 
 use std::collections::HashSet;
 use std::env;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use actix::io::SinkWrite;
-use actix::{Actor, ActorContext, Addr, AsyncContext, Context};
+use actix::{Actor, ActorContext, Addr, AsyncContext, Context, SpawnHandle};
 use actix_codec::Framed;
 use awc::{ws, BoxedSocket};
 use bytes::Bytes;
@@ -37,6 +37,7 @@ mod get_states;
 pub mod messages;
 mod model;
 mod service;
+mod set_remote_id;
 mod streamhandler;
 mod subscribed_entities;
 
@@ -50,9 +51,16 @@ pub struct HomeAssistantClient {
     /// HA request message id
     ws_id: u32,
     access_token: String,
-    uc_ha_component: bool,
     /// True if custom HA component is detected and will use optimized workflows
+    uc_ha_component: bool,
+    /// Request id of `unfoldedcircle/info` to check after UC HA component
     uc_ha_component_info_id: Option<u32>,
+    /// Check interval of UC HA component in seconds
+    uc_ha_component_check_interval: Duration,
+    /// Check duration of UC HA component after authentication to HA in seconds
+    uc_ha_component_check_duration: Option<Duration>,
+    /// Poller handle for checking the UC HA component
+    uc_ha_comp_check_handle: Option<SpawnHandle>,
     /// True if subscription to standard events has been done request.
     subscribed_events: bool,
     /// request id of the last `subscribe_events` request. This id will be used in the result and event messages.
@@ -125,6 +133,9 @@ impl HomeAssistantClient {
                 subscribed_entities: HashSet::new(),
                 authenticated: false,
                 remote_id: "".to_string(),
+                uc_ha_component_check_interval: Duration::from_secs(5),
+                uc_ha_component_check_duration: None, // check forever
+                uc_ha_comp_check_handle: None,
             }
         })
     }
@@ -302,18 +313,12 @@ impl HomeAssistantClient {
 
                     // Subscribe to configuration change events (new entities to subscribe)
                     // from Home Assistant
+                    self.unsubscribe_uc_configuration(ctx);
                     self.subscribe_uc_configuration(ctx);
 
-                    // If subscribed entities are defined, send them to HA for events
-                    if !self.subscribed_entities.is_empty() {
-                        debug!(
-                            "[{}] Initialize subscribed entities : {}",
-                            self.id,
-                            itertools::join(&self.subscribed_entities, ",")
-                        );
-                        self.unsubscribe_uc_events(ctx);
-                        self.subscribe_uc_events(ctx);
-                    }
+                    // Subscribe to states changed on subscribed entities
+                    self.unsubscribe_uc_events(ctx);
+                    self.subscribe_uc_events(ctx);
                 } else if Some(id) == self.subscribe_configure_id {
                     debug!(
                         "[{}] Received HA response for unfoldedcircle/event/configure/subscribe event ({})",
@@ -421,7 +426,13 @@ impl HomeAssistantClient {
                 // we check after the UC HA component then fall back to standard HA events
                 // However the custom messages won't be available right after HA restart so
                 // we will have to try again
+                // Note : this check should be done right after authentication EXCEPT that
+                // if auth occurs right after HA reboots, custom events won't be available yet
+                // We will have to check after custom events later if unavailable
                 self.send_uc_info_command(ctx);
+                // Store start time of HA so that we check regularly after custom events
+                let ha_start_time = Instant::now();
+                self.check_uc_ha_component(ctx, ha_start_time);
             }
             "pong" => self.last_hb = Instant::now(),
             _ => {}
@@ -495,7 +506,11 @@ impl HomeAssistantClient {
         Ok(())
     }
 
-    fn send_uc_info_command(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
+    fn send_uc_info_command(&mut self, ctx: &mut Context<HomeAssistantClient>) {
+        debug!(
+            "[{}] UC Home assistant component: {:?}",
+            self.id, self.uc_ha_component
+        );
         if !self.uc_ha_component {
             self.uc_ha_component_info_id = Some(self.new_msg_id());
             if let Err(e) = self.send_json(
@@ -503,7 +518,7 @@ impl HomeAssistantClient {
                   "id": self.uc_ha_component_info_id,
                   "type": "unfoldedcircle/info"
                 }),
-                _ctx,
+                ctx,
             ) {
                 debug!(
                     "[{}] UC Home assistant component not installed. Switching to standard HA: {:?}",
@@ -514,8 +529,8 @@ impl HomeAssistantClient {
     }
 
     /// Unsubscribe to standard HA events
-    fn unsubscribe_standard_events(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
-        debug!("[{}] {}", self.id, "Unsubscribe standard events get_states");
+    fn unsubscribe_standard_events(&mut self, ctx: &mut Context<HomeAssistantClient>) {
+        debug!("[{}] Unsubscribe standard events get_states", self.id);
         let id = Some(self.new_msg_id());
         if let Err(e) = self.send_json(
             json!({
@@ -523,10 +538,10 @@ impl HomeAssistantClient {
               "type": "unsubscribe_events",
               "subscription": self.subscribe_standard_events_id.unwrap(),
             }),
-            _ctx,
+            ctx,
         ) {
             error!(
-                "[{}] Error unsubscribing standard events to HA (to switch to UC HA) : {:?}",
+                "[{}] Error unsubscribing standard events to HA (to switch to UC HA): {:?}",
                 self.id, e
             );
         }
@@ -535,7 +550,7 @@ impl HomeAssistantClient {
     }
 
     /// Subscribe to standard HA events
-    fn subscribe_standard_events(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
+    fn subscribe_standard_events(&mut self, ctx: &mut Context<HomeAssistantClient>) {
         self.subscribe_standard_events_id = Some(self.new_msg_id());
         if let Err(e) = self.send_json(
             json!({
@@ -543,13 +558,13 @@ impl HomeAssistantClient {
               "type": "subscribe_events",
               "event_type": "state_changed"
             }),
-            _ctx,
+            ctx,
         ) {
             error!(
                 "[{}] Error sending subscribe_events to HA: {:?}",
                 self.id, e
             );
-            _ctx.notify(Close::invalid());
+            ctx.notify(Close::invalid());
             self.subscribe_standard_events_id = None;
             self.subscribed_events = false;
         }
@@ -557,7 +572,7 @@ impl HomeAssistantClient {
 
     /// Subscribe to configuration events handled by UC HA component
     /// This event is raised when the entities list to subscribe to change from HA side
-    fn subscribe_uc_configuration(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
+    fn subscribe_uc_configuration(&mut self, ctx: &mut Context<HomeAssistantClient>) {
         // Don't subscribe again to the same event
         if self.subscribe_configure_id.is_some() {
             return;
@@ -571,24 +586,53 @@ impl HomeAssistantClient {
                     "client_id": self.remote_id
                 }
             }),
-            _ctx,
+            ctx,
         ) {
             error!(
                 "[{}] Error sending unfoldedcircle/event/configure/subscribe to HA: {:?}",
                 self.id, e
             );
-            _ctx.notify(Close::invalid());
+            ctx.notify(Close::invalid());
             self.subscribe_configure_id = None;
         }
     }
 
+    /// Unsubscribe to configuration events by UC HA component
+    fn unsubscribe_uc_configuration(&mut self, ctx: &mut Context<HomeAssistantClient>) {
+        if self.subscribe_configure_id.is_none() {
+            return;
+        }
+        let id = Some(self.new_msg_id());
+        if let Err(e) = self.send_json(
+            json!({
+            "id": id,
+            "type": "unfoldedcircle/event/configure/unsubscribe",
+            "data": {
+                "client_id": self.remote_id,
+                "subscription_id": self.subscribe_configure_id
+            }
+            }),
+            ctx,
+        ) {
+            error!(
+                "[{}] Error during unsubscription of UC configure: {:?}",
+                self.id, e
+            );
+        }
+        self.subscribe_configure_id = None;
+    }
+
     /// Subscribe to custom events handled by UC HA component
-    fn subscribe_uc_events(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
+    fn subscribe_uc_events(&mut self, ctx: &mut Context<HomeAssistantClient>) {
         // Don't subscribe again to the same event
         if self.subscribe_uc_events_id.is_some() {
             return;
         }
         self.subscribe_uc_events_id = Some(self.new_msg_id());
+        debug!(
+            "[{}] Subscribe to unfoldedcircle/event/entities/subscribe events with remote id '{}'",
+            self.id, self.remote_id
+        );
         if let Err(e) = self.send_json(
             json!({
                 "id": self.subscribe_uc_events_id.unwrap(),
@@ -598,19 +642,19 @@ impl HomeAssistantClient {
                     "client_id": self.remote_id
                 }
             }),
-            _ctx,
+            ctx,
         ) {
             error!(
                 "[{}] Error sending unfoldedcircle/event/entities/subscribe to HA: {:?}",
                 self.id, e
             );
-            _ctx.notify(Close::invalid());
+            ctx.notify(Close::invalid());
             self.subscribe_uc_events_id = None;
         }
     }
 
     /// Unsubscribe to custom events handled by UC HA component
-    fn unsubscribe_uc_events(&mut self, _ctx: &mut Context<HomeAssistantClient>) {
+    fn unsubscribe_uc_events(&mut self, ctx: &mut Context<HomeAssistantClient>) {
         //let id = Some(self.new_msg_id());
         if self.subscribe_uc_events_id.is_none() {
             return;
@@ -625,14 +669,58 @@ impl HomeAssistantClient {
                 "subscription_id": self.subscribe_uc_events_id
             }
             }),
-            _ctx,
+            ctx,
         ) {
             error!(
-                "[{}] Error during unsubscription of HA events : {:?}",
+                "[{}] Error during unsubscription of HA events: {:?}",
                 self.id, e
             );
         }
         self.subscribe_uc_events_id = None;
+    }
+
+    /// Check after UC HA component regularly
+    fn check_uc_ha_component(
+        &mut self,
+        ctx: &mut Context<HomeAssistantClient>,
+        ha_start_time: Instant,
+    ) {
+        if let Some(handle) = self.uc_ha_comp_check_handle.take() {
+            ctx.cancel_future(handle);
+        }
+
+        if !ctx.connected() {
+            return;
+        }
+        if self.uc_ha_component {
+            debug!("[{}] UC HA component found", self.id);
+            return;
+        }
+
+        if let Some(check_duration) = self.uc_ha_component_check_duration.map(|d| d.as_secs()) {
+            // Note: Previous Rust versions panicked when the current time was earlier than self. Currently this
+            // method returns a Duration of zero in that case. Future versions may reintroduce the panic.
+            if ha_start_time.elapsed().as_secs() > check_duration {
+                debug!(
+                    "[{}] UC HA component not found after {check_duration}s: checking stopped",
+                    self.id
+                );
+                return;
+            }
+        }
+
+        self.uc_ha_comp_check_handle = Some(ctx.run_later(
+            self.uc_ha_component_check_interval,
+            move |act, ctx| {
+                if act.uc_ha_component {
+                    debug!("[{}] UC HA component found", act.id);
+                    return;
+                }
+                debug!("[{}] Check again after UC HA component...", act.id);
+                act.send_uc_info_command(ctx);
+                act.check_uc_ha_component(ctx, ha_start_time);
+            },
+        ));
     }
 }
 

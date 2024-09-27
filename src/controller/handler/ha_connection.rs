@@ -3,9 +3,12 @@
 
 //! Actix message handler for Home Assistant client connection messages.
 
-use crate::client::messages::{Close, ConnectionEvent, ConnectionState, SubscribedEntities};
+use crate::client::messages::{
+    Close, ConnectionEvent, ConnectionState, SetRemoteId, SubscribedEntities,
+};
 use crate::client::HomeAssistantClient;
 use crate::controller::handler::{ConnectMsg, DisconnectMsg};
+use crate::controller::OperationModeInput::{AbortSetup, Connected};
 use crate::controller::{Controller, OperationModeState};
 use actix::{fut, ActorFutureExt, AsyncContext, Context, Handler, ResponseActFuture, WrapFuture};
 use futures::StreamExt;
@@ -86,7 +89,10 @@ impl Handler<ConnectMsg> for Controller {
         if let Some(handle) = self.reconnect_handle.take() {
             ctx.cancel_future(handle);
         }
-        if !matches!(self.machine.state(), &OperationModeState::Running) {
+        if !matches!(
+            self.machine.state(),
+            &OperationModeState::Running | &OperationModeState::RequireSetup
+        ) {
             error!("Cannot connect in state: {:?}", self.machine.state());
             return Box::pin(fut::result(Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -101,15 +107,29 @@ impl Handler<ConnectMsg> for Controller {
             }
         }
 
+        let url = self.settings.hass.get_url();
+        let token = self.settings.hass.get_token();
+
+        if url.host_str().is_none() || token.is_empty() {
+            error!("Cannot connect: HA url or token missing");
+            let dummy_ws_id = "0"; // we don't have a WS request msg id
+            if let Err(e) = self.sm_consume(dummy_ws_id, &AbortSetup, ctx) {
+                error!("{e}");
+            }
+            return Box::pin(fut::result(Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Missing HA url or token",
+            ))));
+        }
+
         self.set_device_state(DeviceState::Connecting);
 
-        let ws_request = self.ws_client.ws(self.settings.hass.url.as_str());
+        let ws_request = self.ws_client.ws(url.as_str());
         // align frame size to Home Assistant
         let ws_request = ws_request.max_frame_size(self.settings.hass.max_frame_size_kb * 1024);
-        let url = self.settings.hass.url.clone();
-        let token = self.settings.hass.token.clone();
         let client_address = ctx.address();
         let heartbeat = self.settings.hass.heartbeat;
+        let remote_id = self.remote_id.clone();
 
         info!(
             "Connecting to: {url} (timeout: {}s, request_timeout: {}s)",
@@ -137,7 +157,11 @@ impl Handler<ConnectMsg> for Controller {
                 act.ha_client_id = None; // will be set with Connected event
                 match result {
                     Ok(addr) => {
-                        debug!("Successfully connected to: {}", act.settings.hass.url);
+                        let dummy_ws_id = "0"; // we don't have a WS request msg id
+                        if let Err(e) = act.sm_consume(dummy_ws_id, &Connected, ctx) {
+                            error!("{e}");
+                        }
+
                         act.ha_client = Some(addr);
                         act.ha_reconnect_duration = act.settings.hass.reconnect.duration;
                         act.ha_reconnect_attempt = 0;
@@ -145,13 +169,14 @@ impl Handler<ConnectMsg> for Controller {
                         if let Some(session) = act.sessions.values().next() {
                             let entities = session.subscribed_entities.clone();
                             if let Some(ha_client) = &act.ha_client {
+                                if let Err(e) = ha_client.try_send(SetRemoteId { remote_id }) {
+                                    error!("Error sending remote identifier to client: {:?}", e);
+                                }
+
                                 if let Err(e) = ha_client.try_send(SubscribedEntities {
                                     entity_ids: entities,
                                 }) {
-                                    error!(
-                                        "Error updating subscribed entities to client : {:?}",
-                                        e
-                                    );
+                                    error!("Error updating subscribed entities to client: {:?}", e);
                                 }
                             }
                         }

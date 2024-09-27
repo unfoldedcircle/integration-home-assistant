@@ -32,6 +32,12 @@ const DEV_USER_CFG_FILENAME: &str = "home-assistant.json";
 /// This ENV variable is set on the Remote device to the integration specific data directory.
 const ENV_CONFIG_HOME: &str = "UC_CONFIG_HOME";
 
+/// Environment variable for the credential files directory.
+const ENV_TOKENS_HOME: &str = "UC_TOKENS_HOME";
+
+/// External system `token_id` value holding the HA server url and access token.
+const TOKEN_ID: &str = "ws-ha-api";
+
 /// Environment variable to disable mDNS service publishing.
 ///
 /// When running on the Remote device, service publishing is not required.
@@ -116,8 +122,8 @@ pub struct WebSocketSettings {
 
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct HomeAssistantSettings {
-    pub url: Url,
-    pub token: String,
+    url: Url,
+    token: String,
     /// WebSocket connection timeout in seconds.
     /// This is the max time allowed to connect to the remote host, including DNS name resolution.
     /// Make sure that `request_timeout` >= `connection_timeout`.
@@ -148,6 +154,78 @@ impl Default for HomeAssistantSettings {
             reconnect: Default::default(),
             heartbeat: Default::default(),
             disconnect_in_standby: default_disconnect_in_standby(),
+        }
+    }
+}
+
+impl HomeAssistantSettings {
+    /// Checks if an external URL and token has been provided.
+    ///
+    /// See Core-API: `/auth/external/:system`
+    pub fn has_external_url_and_token(&self) -> bool {
+        self.get_token_value(TOKEN_ID).is_some() && self.get_ext_url().is_some()
+    }
+
+    /// Return the configured HA server URL.
+    ///
+    /// This is either the provided URL in the external system, or the local configuration URL.
+    pub fn get_url(&self) -> Url {
+        if let Some(url) = self.get_ext_url() {
+            return url;
+        }
+        self.url.clone()
+    }
+
+    fn get_ext_url(&self) -> Option<Url> {
+        let key = format!("{TOKEN_ID}-URL");
+        if let Some(url) = self.get_token_value(&key) {
+            match Url::parse(&url) {
+                Ok(url) => return Some(url),
+                Err(e) => error!("Invalid URL in token '{key}': {e}"),
+            }
+        }
+        None
+    }
+
+    /// Return the configured HA server access token.
+    ///
+    /// This is either the provided token in the external system, or the local configuration token.
+    pub fn get_token(&self) -> String {
+        self.get_token_value(TOKEN_ID)
+            .unwrap_or_else(|| self.token.clone())
+    }
+
+    /// Update the local configuration URL.
+    pub fn set_url(&mut self, url: Url) {
+        self.url = url;
+    }
+
+    /// Update the local configuration token.
+    pub fn set_token(&mut self, token: impl AsRef<str>) {
+        self.token = token.as_ref().trim().to_string();
+    }
+
+    /// Get the value of an external system token key.
+    ///
+    /// # Arguments
+    ///
+    /// * `key`: token key
+    ///
+    /// returns: None if the token file doesn't exist or the file couldn't be read.
+    fn get_token_value(&self, key: &str) -> Option<String> {
+        let mut path = PathBuf::from(env::var(ENV_TOKENS_HOME).ok()?);
+        path.push(key);
+        if !path.is_file() {
+            info!("Token file '{key}' does not exist. Using local configuration.");
+            return None;
+        }
+
+        match fs::read_to_string(path) {
+            Ok(v) => Some(v.trim().to_string()),
+            Err(e) => {
+                error!("Error reading token file '{key}', using local configuration. {e}");
+                None
+            }
         }
     }
 }

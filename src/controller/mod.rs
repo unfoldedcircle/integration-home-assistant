@@ -33,29 +33,39 @@ state_machine! {
         ConfigurationAvailable => Running,
         AbortSetup => RequireSetup,
         SetupDriverRequest => SetupFlow [SetupFlowTimer],
+        Connected => Running,  // URL & token set with external access token
     },
-    Running(SetupDriverRequest) => SetupFlow [SetupFlowTimer],
-    Running(R2Request) => Running,
+    Running => {
+        SetupDriverRequest => SetupFlow [SetupFlowTimer],
+        R2Request => Running,
+        Connected => Running,  // reconnection
+        AbortSetup => RequireSetup,
+    },
     SetupFlow => {
         RequestUserInput => WaitSetupUserData,
         Successful => Running [CancelSetupFlowTimer],
         SetupError => SetupError [CancelSetupFlowTimer],
         AbortSetup => RequireSetup [CancelSetupFlowTimer],
+        Connected => SetupFlow,  // setup flow will connect to HA, but final input is Successful
     },
     WaitSetupUserData => {
         SetupUserData => SetupFlow,
         SetupError => SetupError [CancelSetupFlowTimer],
         AbortSetup => RequireSetup [CancelSetupFlowTimer],
+        Connected => WaitSetupUserData,
     },
     SetupError => {
         AbortSetup => RequireSetup,
         SetupDriverRequest => SetupFlow,
         SetupError => SetupError,
+        Connected => Running,  // should not happen, just for safety
     }
 }
 
 struct R2Session {
     recipient: Recipient<SendWsMessage>,
+    /// Request message id from driver to remote
+    ws_id: u32,
     standby: bool,
     subscribed_entities: HashSet<String>,
     // TODO replace with request id map & oneshot notification
@@ -71,12 +81,18 @@ impl R2Session {
     fn new(recipient: Recipient<SendWsMessage>) -> Self {
         Self {
             recipient,
+            ws_id: 0,
             standby: false,
             subscribed_entities: Default::default(),
             get_available_entities_id: None,
             get_entity_states_id: None,
             reconfiguring: None,
         }
+    }
+
+    fn new_msg_id(&mut self) -> u32 {
+        self.ws_id += 1;
+        self.ws_id
     }
 }
 
@@ -108,13 +124,16 @@ pub struct Controller {
     reconnect_handle: Option<SpawnHandle>,
     /// List of subscribed entities sent by HA component
     susbcribed_entity_ids: Option<Vec<AvailableIntgEntity>>,
+    /// Request id sent to the remote to get the version information
+    remote_id: String,
 }
 
 impl Controller {
     pub fn new(settings: Settings, drv_metadata: IntegrationDriverUpdate) -> Self {
         let mut machine = StateMachine::new();
+        let url = settings.hass.get_url();
         // if we have all required HA connection settings, we can skip driver setup
-        if settings.hass.url.has_host() && !settings.hass.token.is_empty() {
+        if url.has_host() && !settings.hass.get_token().is_empty() {
             let _ = machine.consume(&OperationModeInput::ConfigurationAvailable);
         } else {
             info!("Home Assistant connection requires setup");
@@ -125,7 +144,7 @@ impl Controller {
             ws_client: new_websocket_client(
                 Duration::from_secs(settings.hass.connection_timeout as u64),
                 Duration::from_secs(settings.hass.request_timeout as u64),
-                matches!(settings.hass.url.scheme(), "wss" | "https"),
+                matches!(url.scheme(), "wss" | "https"),
             ),
             ha_reconnect_duration: settings.hass.reconnect.duration,
             settings,
@@ -137,6 +156,7 @@ impl Controller {
             setup_timeout: None,
             reconnect_handle: None,
             susbcribed_entity_ids: None,
+            remote_id: "".to_string(),
         }
     }
 
@@ -147,8 +167,12 @@ impl Controller {
                 debug!("Remote is in standby, not sending message: {:?}", message);
                 return;
             }
+            let msg = message.msg.clone();
             if let Err(e) = session.recipient.try_send(SendWsMessage(message)) {
-                error!("[{ws_id}] Internal message send error: {e}");
+                error!(
+                    "[{ws_id}] Internal message send error of '{}': {e}",
+                    msg.unwrap_or_default()
+                );
             }
         } else {
             warn!("attempting to send message but couldn't find session: {ws_id}");
