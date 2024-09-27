@@ -11,19 +11,19 @@ use std::io::ErrorKind;
 
 #[derive(Debug, Display, PartialEq)]
 pub enum ServiceError {
-    #[display(fmt = "Internal server error")]
+    #[display("Internal server error")]
     InternalServerError(String),
 
-    #[display(fmt = "Internal serialization error")]
+    #[display("Internal serialization error")]
     SerializationError(String),
 
-    #[display(fmt = "BadRequest: {}", _0)]
+    #[display("BadRequest: {}", _0)]
     BadRequest(String),
 
-    #[display(fmt = "Not found: {}", _0)]
+    #[display("Not found: {}", _0)]
     NotFound(String),
 
-    #[display(fmt = "The connection is closed or closing")]
+    #[display("The connection is closed or closing")]
     NotConnected,
 
     ServiceUnavailable(String),

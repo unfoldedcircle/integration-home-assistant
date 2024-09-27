@@ -69,7 +69,7 @@ env_logger = "0.11"
 lazy_static = "1.4"
 log = "0.4"
 
-uuid = { version = "1.0.0", features = ["v4"] }
+uuid = { version = "1", features = ["v4"] }
 url = { version = "2", features = ["serde"] }
 time = { version = "0.3", default-features = false, features = ["std", "formatting"] }
 
@@ -77,17 +77,17 @@ time = { version = "0.3", default-features = false, features = ["std", "formatti
 # Attention: strum needs to be in sync with uc_api
 strum = "0.26"
 strum_macros = "0.26"
-derive_more = "0.99"
+derive_more = { version = "1", features = ["constructor", "display"] }
 
 anyhow = { version = "1", features = [] }
 itertools = "0.13.0"
 
 [build-dependencies]
 # Warning! Using built 0.7.1 upgrades git2 0.18.3 to 0.19.0 and libgit2-sys 0.16.2+1.7.2 to 0.17.0+1.8.1 which breaks cross compilation!
-built = { version = "0.7.1", features = ["git2", "chrono", "dependency-tree", "semver"] }
+built = { version = "=0.7.1", features = ["git2", "chrono", "dependency-tree", "semver"] }
 
 [dev-dependencies]
-rstest = "0.21"
+rstest = "0.22"
 
 [patch.crates-io]
 mdns-sd = { git = "https://github.com/zehnm/mdns-sd", rev = "aa95af75e21f40ee9ea74d117ca31e0672d722fb" }
