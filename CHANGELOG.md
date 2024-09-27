@@ -8,13 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.11.0 - 2024-09-27
 ### Added
-- Automatic configuration and setup through the [Unfolded Circle for Home Assistant component](https://github.com/JackJPowell/hass-unfoldedcircle). In cooperation with @albaintor and @JackJPowell, thanks! ([#60](https://github.com/unfoldedcircle/integration-home-assistant/pull/60)).  
-  - Please note that the autoconfiguration feature in the Home Assistant component is still under development. 
+- Automatic configuration and setup through the [Unfolded Circle for Home Assistant component](https://github.com/JackJPowell/hass-unfoldedcircle). In cooperation with @albaintor and @JackJPowell, thanks! ([#60](https://github.com/unfoldedcircle/integration-home-assistant/pull/60)).
+  - Please note that the autoconfiguration feature in the Home Assistant component is still under development at the time of this release.
 ### Fixed
 - Avoid initial failed Home Assistant login attempt with default HA server url and empty access token.
-
----
 
 ## v0.10.0 - 2024-08-24
 ### Added
