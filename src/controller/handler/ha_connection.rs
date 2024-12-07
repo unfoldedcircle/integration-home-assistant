@@ -167,6 +167,7 @@ impl Handler<ConnectMsg> for Controller {
                         act.ha_reconnect_attempt = 0;
                         debug!("Sending subscribed entities to client for events subscriptions");
                         if let Some(session) = act.sessions.values().next() {
+                            debug!("Subscribed entities : {:?}", session.subscribed_entities);
                             let entities = session.subscribed_entities.clone();
                             if let Some(ha_client) = &act.ha_client {
                                 if let Err(e) = ha_client.try_send(SetRemoteId { remote_id }) {

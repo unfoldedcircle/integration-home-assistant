@@ -127,6 +127,7 @@ impl Handler<R2RequestMsg> for Controller {
                 session.get_available_entities_id = Some(msg.req_id);
                 // Check if available entities have been set (through a previous push from client)
                 // let id = Some(session.get_available_entities_id);
+
                 if let (Some(available_entities), Some(id)) = (
                     &self.susbcribed_entity_ids,
                     session.get_available_entities_id,
@@ -141,7 +142,6 @@ impl Handler<R2RequestMsg> for Controller {
                         match session.recipient.try_send(SendWsMessage(message.clone())) {
                             Ok(_) => {
                                 session.get_available_entities_id = None;
-                                self.susbcribed_entity_ids = None;
                                 return_fut_ok!(Some(message));
                             }
                             Err(e) => error!(
