@@ -127,7 +127,6 @@ impl Handler<R2RequestMsg> for Controller {
                 session.get_available_entities_id = Some(msg.req_id);
                 // Check if available entities have been set (through a previous push from client)
                 // let id = Some(session.get_available_entities_id);
-
                 if let (Some(available_entities), Some(id)) = (
                     &self.susbcribed_entity_ids,
                     session.get_available_entities_id,

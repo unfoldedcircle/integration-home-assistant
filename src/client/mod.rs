@@ -19,7 +19,6 @@ use serde::de::Error;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicU32, Ordering};
 use url::Url;
-
 use crate::client::messages::{
     AvailableEntities, ConnectionEvent, ConnectionState, SetAvailableEntities,
 };
@@ -27,6 +26,7 @@ use crate::client::model::Event;
 use crate::configuration::{HeartbeatSettings, ENV_HASS_MSG_TRACING};
 use crate::errors::ServiceError;
 use crate::Controller;
+use crate::APP_VERSION;
 
 mod actor;
 mod close_handler;
@@ -583,7 +583,8 @@ impl HomeAssistantClient {
                 "id": self.subscribe_configure_id,
                 "type": "unfoldedcircle/event/configure/subscribe",
                 "data": {
-                    "client_id": self.remote_id
+                    "client_id": self.remote_id,
+                    "version": Some(APP_VERSION.to_string())
                 }
             }),
             ctx,
