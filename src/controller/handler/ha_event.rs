@@ -116,29 +116,7 @@ impl Handler<SubscribeHaEventsMsg> for Controller {
 
         if let Some(session) = self.sessions.get_mut(&msg.0.ws_id) {
             let subscribe: SubscribeEvents = msg.0.deserialize()?;
-            // If self.susbscribed_entity_ids is set, it means that the user set entities to subscribe from HA
-            // Take them into account but only if subscribe.entity_ids from the message is empty because :
-            // 1/ If the list from the message is empty => subscribe to ALL available entities == chosen ones from HA
-            // 2/ If the list is not empty => the user changed the list to subscribe from the remote configurator
-            if let Some(from_ha_subscribed_entity_ids) = &self.susbcribed_entity_ids {
-                if from_ha_subscribed_entity_ids.len() > 0 && subscribe.entity_ids.is_empty() {
-                    session.subscribed_entities.clear();
-                    for entity in from_ha_subscribed_entity_ids.iter() {
-                        session.subscribed_entities.insert(entity.entity_id.clone());
-                    }
-                    debug!("Subscribed entities updated from HA : {:?}", session.subscribed_entities);
-                }
-                else {
-                    debug!("Subscribed entities to add : {:?}", subscribe.entity_ids);
-                    session.subscribed_entities.extend(subscribe.entity_ids);
-                }
-                self.susbcribed_entity_ids = None;
-            }
-            else {
-                debug!("Subscribed entities to add : {:?}", subscribe.entity_ids);
-                session.subscribed_entities.extend(subscribe.entity_ids);
-            }
-
+            session.subscribed_entities.extend(subscribe.entity_ids);
             debug!("Sending updated subscribed entities to client for events subscriptions");
             if let Some(ha_client) = &self.ha_client {
                 ha_client.try_send(SubscribedEntities {

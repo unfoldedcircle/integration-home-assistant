@@ -142,6 +142,7 @@ impl Handler<R2RequestMsg> for Controller {
                         match session.recipient.try_send(SendWsMessage(message.clone())) {
                             Ok(_) => {
                                 session.get_available_entities_id = None;
+                                self.susbcribed_entity_ids = None;
                                 return_fut_ok!(Some(message));
                             }
                             Err(e) => error!(
