@@ -19,14 +19,35 @@ impl Handler<GetAvailableEntities> for HomeAssistantClient {
         let id = self.new_msg_id();
 
         self.entity_states_id = Some(id);
-        // Try to subsscribe again to custom events if not already done when
+        // Try to subscribe again to custom events if not already done when
         // GetAvailableEntities command is received from the remote
         self.send_uc_info_command(ctx);
-        self.send_json(
-            json!(
-                {"id": id, "type": "get_states"}
-            ),
-            ctx,
-        )
+        if self.uc_ha_component {
+            // Retrieve the states of available entities (including subscribed entities)
+            // Available entities are defined on HA component side and should include
+            // subscribed entities but sent anyway just in case some are missing
+            debug!(
+                "[{}] Get states from {} with unfoldedcircle/get_states",
+                self.id, self.remote_id
+            );
+            self.send_json(
+                json!(
+                    {"id": id, "type": "unfoldedcircle/entities/states",
+                    "data": {
+                        "entity_ids": self.subscribed_entities,
+                        "client_id": self.remote_id
+                    }}
+                ),
+                ctx,
+            )
+        } else {
+            debug!("[{}] Get standard states from {} ", self.id, self.remote_id);
+            self.send_json(
+                json!(
+                    {"id": id, "type": "get_states"}
+                ),
+                ctx,
+            )
+        }
     }
 }

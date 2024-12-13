@@ -138,6 +138,7 @@ impl Handler<UnsubscribeHaEventsMsg> for Controller {
             return Err(ServiceError::ServiceUnavailable("Setup required".into()));
         }
         if let Some(session) = self.sessions.get_mut(&msg.0.ws_id) {
+            debug!("UnsubscribeHaEventsMsg: {:?}", msg);
             let unsubscribe: SubscribeEvents = msg.0.deserialize()?;
             for i in unsubscribe.entity_ids {
                 session.subscribed_entities.remove(&i);

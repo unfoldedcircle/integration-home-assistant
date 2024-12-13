@@ -36,7 +36,8 @@ impl Handler<GetStates> for HomeAssistantClient {
                         "id": id,
                         "type": "unfoldedcircle/entities/states",
                         "data": {
-                            "entity_ids": entity_ids.clone()
+                            "entity_ids": entity_ids.clone(),
+                            "client_id": self.remote_id
                         }
                     }
                 ),
