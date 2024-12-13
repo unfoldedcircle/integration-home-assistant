@@ -7,6 +7,14 @@ use std::collections::HashSet;
 use std::env;
 use std::time::{Duration, Instant};
 
+use crate::client::messages::{
+    AvailableEntities, ConnectionEvent, ConnectionState, SetAvailableEntities,
+};
+use crate::client::model::Event;
+use crate::configuration::{HeartbeatSettings, ENV_HASS_MSG_TRACING};
+use crate::errors::ServiceError;
+use crate::Controller;
+use crate::APP_VERSION;
 use actix::io::SinkWrite;
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context, SpawnHandle};
 use actix_codec::Framed;
@@ -19,14 +27,6 @@ use serde::de::Error;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicU32, Ordering};
 use url::Url;
-use crate::client::messages::{
-    AvailableEntities, ConnectionEvent, ConnectionState, SetAvailableEntities,
-};
-use crate::client::model::Event;
-use crate::configuration::{HeartbeatSettings, ENV_HASS_MSG_TRACING};
-use crate::errors::ServiceError;
-use crate::Controller;
-use crate::APP_VERSION;
 
 mod actor;
 mod close_handler;
