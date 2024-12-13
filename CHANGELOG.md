@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.12.0 - 2024-12-13
+### Added
+- Available entities mode with HA component: get states will retrieve only available entities from HA component instead of all entities in HA. Contributed by @albaintor, thanks! ([#62](https://github.com/unfoldedcircle/integration-home-assistant/pull/62)).
+
 ## v0.11.0 - 2024-09-27
 ### Added
 - Automatic configuration and setup through the [Unfolded Circle for Home Assistant component](https://github.com/JackJPowell/hass-unfoldedcircle). In cooperation with @albaintor and @JackJPowell, thanks! ([#60](https://github.com/unfoldedcircle/integration-home-assistant/pull/60)).
