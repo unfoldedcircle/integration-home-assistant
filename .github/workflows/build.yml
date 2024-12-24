@@ -18,6 +18,7 @@ env:
   APP_NAME: uc-intg-hass
   BIN_OUTPUT_PATH: binaries
   HASH_FILENAME: uc-intg-hass.hash
+  BUILD_CHANGELOG: build-changelog.md
   LINUX_ARTIFACT_SUFFIX: Linux-x64
   CARGO_TERM_COLOR: always
   # Enable GitHub cache (not recommended for self-hosted runner!): true | false
@@ -30,7 +31,7 @@ env:
 jobs:
   fmt:
     name: Rustfmt
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,7 +46,7 @@ jobs:
   test:
     # run tests & clippy in same job for improved caching & faster builds
     name: Test and clippy
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,7 +67,7 @@ jobs:
   build:
     name: Linux-x64 build
     needs: test
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -91,15 +92,15 @@ jobs:
         shell: bash
         run: cargo build --features mdns-sd --release
 
-# This takes over 5 min! Do it manually...
-#      - name: Create license report for releases
-#        if: "contains(github.ref, 'tags/v')"
-#        shell: bash
-#        run: |
-#          mkdir -p ${GITHUB_WORKSPACE}/${{env.BIN_OUTPUT_PATH }}
-#          cargo install cargo-about
-#          cargo about generate about.hbs > ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/integration-hass_licenses.html
-#          cargo about generate about-markdown.hbs > ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/integration-hass_licenses.md
+      # This takes over 5 min! Do it manually...
+      #      - name: Create license report for releases
+      #        if: "contains(github.ref, 'tags/v')"
+      #        shell: bash
+      #        run: |
+      #          mkdir -p ${GITHUB_WORKSPACE}/${{env.BIN_OUTPUT_PATH }}
+      #          cargo install cargo-about
+      #          cargo about generate about.hbs > ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/integration-hass_licenses.html
+      #          cargo about generate about-markdown.hbs > ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/integration-hass_licenses.md
 
       # Archive is required to preserve file permissions and re-used for release uploads
       - name: Create upload artifact
@@ -123,7 +124,7 @@ jobs:
 
   cross_compile:
     name: ${{ matrix.config.name }} build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: test
     strategy:
       matrix:
@@ -239,24 +240,24 @@ jobs:
           - {
             name: "ha-test Linux-x64",
             target: "Linux-x64",
-            os: "ubuntu-latest",
+            os: "ubuntu-24.04",
             artifact: "ha-test",
             archive: "ha-test_Linux-x64.tar.gz"
-            }
+          }
           - {
             name: "ha-test Windows-x64",
             target: "Windows-x64",
             os: "windows-latest",
             artifact: "ha-test.exe",
             archive: "ha-test_Windows-x64.zip"
-            }
+          }
           - {
             name: "ha-test macOS-x64",
             target: "macOS-x64",
             os: "macos-latest",
             artifact: "ha-test",
             archive: "ha-test_macOS-x64.tar.gz"
-            }
+          }
 
     steps:
       - name: Checkout ${{ env.PROJECT_NAME}}
@@ -304,11 +305,40 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+  changelog:
+    name: Create changelog
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: "Create Changelog"
+        run: |
+          npm install -g conventional-changelog-cli
+          conventional-changelog -p conventionalcommits -u -o ${{ env.BUILD_CHANGELOG }}
+          cat ${{ env.BUILD_CHANGELOG }}
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: ${{ env.BUILD_CHANGELOG }}
+          if-no-files-found: error
+          retention-days: 3
+
   release:
     name: GitHub release
     if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
-    needs: [build, cross_compile, tools]
-    runs-on: ubuntu-22.04
+    needs: [ build, cross_compile, tools, changelog ]
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Download build artifacts
@@ -352,14 +382,31 @@ jobs:
           for filename in *.{tar.gz,zip}; do echo "sha256  `sha256sum $filename`" >> ${{ env.HASH_FILENAME }}; done;
           ls -lah
 
+      # Checkout is required for the next `gh release delete` step
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: main
+
+      # We have to delete the "latest" release, otherwise `softprops/action-gh-release` will only append the new artifact.
+      # This simulates the old marvinpinto/action-automatic-releases action.
+      - name: Remove previous pre-release
+        run: |
+          cd main
+          gh release delete latest --cleanup-tag -y || true
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # Use conventional commit changelog, and append the GitHub generated changelog
       - name: Create Pre-Release
-        uses: "marvinpinto/action-automatic-releases@latest"
+        uses: softprops/action-gh-release@v2
         if: "!contains(github.ref, 'tags/v')"
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
           prerelease: true
-          title: "Development Build"
+          tag_name: latest
+          body_path: ${{ env.BUILD_CHANGELOG }}
+          generate_release_notes: true
+          name: "Development Build"
           files: |
             *.tar.gz
             *.zip
@@ -373,11 +420,11 @@ jobs:
           ls -lah
 
       - name: Create Release
-        uses: "marvinpinto/action-automatic-releases@latest"
+        uses: softprops/action-gh-release@v2
         if: "contains(github.ref, 'tags/v')"
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
+          generate_release_notes: true
           files: |
             *.tar.gz
             *.zip
@@ -386,7 +433,7 @@ jobs:
   container:
     name: Create Docker image
     if: "contains(github.ref, 'tags/v')" # only publish releases!
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: release
 
     steps:
@@ -405,7 +452,7 @@ jobs:
           printenv
 
       - name: Check out repo for Docker build
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           # needs to be a subdirectory, otherwise the workspace gets erased
           path: src
