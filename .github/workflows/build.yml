@@ -46,7 +46,7 @@ jobs:
   test:
     # run tests & clippy in same job for improved caching & faster builds
     name: Test and clippy
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,7 +67,7 @@ jobs:
   build:
     name: Linux-x64 build
     needs: test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -240,7 +240,7 @@ jobs:
           - {
             name: "ha-test Linux-x64",
             target: "Linux-x64",
-            os: "ubuntu-24.04",
+            os: "ubuntu-22.04",
             artifact: "ha-test",
             archive: "ha-test_Linux-x64.tar.gz"
           }
@@ -336,7 +336,8 @@ jobs:
 
   release:
     name: GitHub release
-    if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
+    # !!! DISABLED FOR PR TESTING
+    # if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
     needs: [ build, cross_compile, tools, changelog ]
     runs-on: ubuntu-24.04
 
@@ -432,7 +433,8 @@ jobs:
 
   container:
     name: Create Docker image
-    if: "contains(github.ref, 'tags/v')" # only publish releases!
+    # !!! DISABLED FOR PR TESTING
+    # if: "contains(github.ref, 'tags/v')" # only publish releases!
     runs-on: ubuntu-24.04
     needs: release
 
