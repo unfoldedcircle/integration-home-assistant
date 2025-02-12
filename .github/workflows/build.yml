@@ -67,6 +67,7 @@ jobs:
   build:
     name: Linux-x64 build
     needs: test
+    # Attention: target is a Debian bookworm Docker image. Ubuntu 24.04 glibc version isn't compatible!
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -336,8 +337,7 @@ jobs:
 
   release:
     name: GitHub release
-    # !!! DISABLED FOR PR TESTING
-    # if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
+    if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
     needs: [ build, cross_compile, tools, changelog ]
     runs-on: ubuntu-24.04
 
@@ -433,8 +433,7 @@ jobs:
 
   container:
     name: Create Docker image
-    # !!! DISABLED FOR PR TESTING
-    # if: "contains(github.ref, 'tags/v')" # only publish releases!
+    if: "contains(github.ref, 'tags/v')" # only publish releases!
     runs-on: ubuntu-24.04
     needs: release
 
