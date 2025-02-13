@@ -46,7 +46,7 @@ jobs:
   test:
     # run tests & clippy in same job for improved caching & faster builds
     name: Test and clippy
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,7 +67,8 @@ jobs:
   build:
     name: Linux-x64 build
     needs: test
-    runs-on: ubuntu-24.04
+    # Attention: target is a Debian bookworm Docker image. Ubuntu 24.04 glibc version isn't compatible!
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -240,7 +241,7 @@ jobs:
           - {
             name: "ha-test Linux-x64",
             target: "Linux-x64",
-            os: "ubuntu-24.04",
+            os: "ubuntu-22.04",
             artifact: "ha-test",
             archive: "ha-test_Linux-x64.tar.gz"
           }
