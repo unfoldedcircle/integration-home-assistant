@@ -56,11 +56,14 @@ pub(crate) fn map_media_player_attributes(
         }
         json::move_value(ha_attr, &mut attributes, "is_volume_muted", "muted");
         json::move_entry(ha_attr, &mut attributes, "media_position");
+        json::move_entry(ha_attr, &mut attributes, "media_position_updated_at");
         json::move_entry(ha_attr, &mut attributes, "media_duration");
         json::move_entry(ha_attr, &mut attributes, "media_title");
         json::move_entry(ha_attr, &mut attributes, "media_artist");
         json::move_value(ha_attr, &mut attributes, "media_album_name", "media_album");
-        json::move_value(ha_attr, &mut attributes, "media_content_type", "media_type");
+        if let Some(value) = ha_attr.get("media_content_type").and_then(|v| v.as_str()) {
+            attributes.insert("media_type".into(), value.to_uppercase().into());
+        }
         json::move_entry(ha_attr, &mut attributes, "shuffle");
         if let Some(value) = ha_attr.get("repeat").and_then(|v| v.as_str()) {
             attributes.insert("repeat".into(), value.to_uppercase().into());
