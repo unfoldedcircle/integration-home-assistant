@@ -56,6 +56,7 @@ pub(crate) fn map_media_player_attributes(
         }
         json::move_value(ha_attr, &mut attributes, "is_volume_muted", "muted");
         json::move_entry(ha_attr, &mut attributes, "media_position");
+        json::move_entry(ha_attr, &mut attributes, "media_position_updated_at");
         json::move_entry(ha_attr, &mut attributes, "media_duration");
         json::move_entry(ha_attr, &mut attributes, "media_title");
         json::move_entry(ha_attr, &mut attributes, "media_artist");

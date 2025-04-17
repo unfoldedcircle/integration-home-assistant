@@ -8,8 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+- Propagate media player attribute `media_position_updated_at`.
+
 ### Fixed
 - Media player `media_type` attribute value should be upper case to match entity documentation.
+
 ### Changed
 - update README and driver description ([#67](https://github.com/unfoldedcircle/integration-home-assistant/pull/67)).
 
