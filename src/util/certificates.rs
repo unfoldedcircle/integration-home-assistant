@@ -13,8 +13,8 @@ use std::{fs, io};
 ///
 /// * `cert_file`: path to public key file
 /// * `key_file`: path to private key file containing either a DER-encoded plaintext RSA private key
-///               (as specified in PKCS#1/RFC3447) or a DER-encoded plaintext private key (as
-///               specified in PKCS#8/RFC5958).
+///   (as specified in PKCS#1/RFC3447) or a DER-encoded plaintext private key (as specified in
+///   PKCS#8/RFC5958).
 ///
 /// returns: Result<ServerConfig, Error>
 pub fn create_single_cert_server_config<S: AsRef<OsStr> + ?Sized>(
