@@ -13,13 +13,14 @@
   },
   "icon": "uc:integration",
   "description": {
-    "en": "Control Home Assistant entities with Remote Two.",
-    "de": "Steuere Home Assistant Entitäten mit Remote Two.",
-    "fr": "Contrôler les entités de Home Assistant avec Remote Two."
+    "en": "Control Home Assistant entities with Remote Two/3.",
+    "de": "Steuere Home Assistant Entitäten mit Remote Two/3.",
+    "fr": "Contrôler les entités de Home Assistant avec Remote Two/3."
   },
   "developer": {
     "name": "Unfolded Circle ApS",
-    "url": "https://www.unfoldedcircle.com"
+    "email": "hello@unfoldedcircle.com",
+    "url": "https://support.unfoldedcircle.com/hc/en-us/articles/19479726340380"
   },
   "home_page": "https://www.unfoldedcircle.com",
   "setup_data_schema": {
@@ -38,9 +39,9 @@
         "field": {
           "label": {
             "value": {
-              "en": "The driver requires WebSocket API access to communicate with Home Assistant.\nSee [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) for more information on how to create a long lived access token.\n\nWhen using the [Unfolded Circle for Home Assistant component](https://github.com/JackJPowell/hass-unfoldedcircle), the connection parameters are automatically configured and you don't need to manually set an access token.\n\nThe _enhanced options_ below can be used to change expert connection parameters.",
-              "de": "Der Treiber benötigt WebSocket-API Zugriff, um mit Home Assistant zu kommunizieren.\nWeitere Informationen zur Erstellung eines langlebigen Zugriffstokens findest du in der [Home Assistant Dokumentation](https://www.home-assistant.io/docs/authentication/).\n\nWenn Du die [Unfolded Circle for Home Assistant](https://github.com/JackJPowell/hass-unfoldedcircle) Komponente verwendest, werden die Verbindungsparameter automatisch konfiguriert, und Du musst kein Zugriffstoken manuell setzen.\n\nMit den _erweiterten Optionen_ können Experten-Verbindungsparameter geändert werden.",
-              "fr": "Le pilote nécessite l'accès à l'API WebSocket pour communiquer avec Home Assistant.\nVoir [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) pour plus d'informations sur la création d'un \"long lived access token\".\n\nLorsque vous utilisez le composant [Unfolded Circle for Home Assistant](https://github.com/JackJPowell/hass-unfoldedcircle), les paramètres de connexion sont automatiquement configurés et vous n'avez pas besoin de définir manuellement un jeton d'accès.\n\nLes _options avancées_ ci-dessous peuvent être utilisées pour modifier les paramètres de connexion des experts."
+              "en": "The driver requires WebSocket API access to communicate with Home Assistant.\nSee [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) for more information on how to create a long lived access token.\n\nWhen using the [Unfolded Circle for Home Assistant component](https://github.com/JackJPowell/hass-unfoldedcircle), the connection parameters are automatically configured and you don't need to manually set an access token.\n\nThe _enhanced options_ below can be used to change expert connection parameters.\n\nPlease see our [support article](https://support.unfoldedcircle.com/hc/en-us/articles/19479726340380) for requirements, features and restrictions.",
+              "de": "Der Treiber benötigt WebSocket-API Zugriff, um mit Home Assistant zu kommunizieren.\nWeitere Informationen zur Erstellung eines langlebigen Zugriffstokens findest du in der [Home Assistant Dokumentation](https://www.home-assistant.io/docs/authentication/).\n\nWenn Du die [Unfolded Circle for Home Assistant](https://github.com/JackJPowell/hass-unfoldedcircle) Komponente verwendest, werden die Verbindungsparameter automatisch konfiguriert, und Du musst kein Zugriffstoken manuell setzen.\n\nMit den _erweiterten Optionen_ können Experten-Verbindungsparameter geändert werden.\n\nBitte beachte unseren [Support-Artikel](https://support.unfoldedcircle.com/hc/en-us/articles/19479726340380) zu Anforderungen, unterstützten Funktionen und Einschränkungen.",
+              "fr": "Le pilote nécessite l'accès à l'API WebSocket pour communiquer avec Home Assistant.\nVoir [Home Assistant documentation](https://www.home-assistant.io/docs/authentication/) pour plus d'informations sur la création d'un \"long lived access token\".\n\nLorsque vous utilisez le composant [Unfolded Circle for Home Assistant](https://github.com/JackJPowell/hass-unfoldedcircle), les paramètres de connexion sont automatiquement configurés et vous n'avez pas besoin de définir manuellement un jeton d'accès.\n\nLes _options avancées_ ci-dessous peuvent être utilisées pour modifier les paramètres de connexion des experts.\n\nConsulte [l’article de support](https://support.unfoldedcircle.com/hc/en-us/articles/19479726340380) pour connaître les exigences, les fonctionnalités prises en charge et les restrictions."
             }
           }
         }
