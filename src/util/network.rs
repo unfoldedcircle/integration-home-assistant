@@ -3,7 +3,6 @@
 
 use crate::configuration::ENV_DISABLE_CERT_VERIFICATION;
 use crate::util::bool_from_env;
-use actix_tls::connect::rustls_0_21::webpki_roots_cert_store;
 use rustls::ClientConfig;
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,13 +31,14 @@ pub fn new_websocket_client(
     tls: bool,
     disable_cert_validation: bool,
 ) -> awc::Client {
+    use rustls_platform_verifier::ConfigVerifierExt as _;
+
     if tls {
         // TLS configuration: https://github.com/actix/actix-web/blob/master/awc/tests/test_rustls_client.rs
         // TODO self-signed certificate handling #4
-        let mut config = ClientConfig::builder()
-            .with_safe_defaults()
-            .with_root_certificates(webpki_roots_cert_store())
-            .with_no_client_auth();
+        // TODO only crate once and then Arc::clone() it in awc::Connector
+        let mut config =
+            ClientConfig::with_platform_verifier().expect("Platform certificate verifier required");
 
         // http2 has (or at least had) issues with wss. Needs further investigation.
         config.alpn_protocols = vec![b"http/1.1".to_vec()];
@@ -51,12 +51,13 @@ pub fn new_websocket_client(
                 .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
         }
 
-        let connector = awc::Connector::new()
-            .rustls_021(Arc::new(config))
-            .timeout(connection_timeout);
-        awc::ClientBuilder::new()
+        awc::Client::builder()
             .timeout(request_timeout)
-            .connector(connector)
+            .connector(
+                awc::Connector::new()
+                    .rustls_0_23(Arc::new(config))
+                    .timeout(connection_timeout),
+            )
             .finish()
     } else {
         awc::ClientBuilder::new()
@@ -68,23 +69,49 @@ pub fn new_websocket_client(
 
 mod danger {
     use log::warn;
-    use rustls::client::{ServerCertVerified, ServerCertVerifier};
-    use std::time::SystemTime;
+    use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+    use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+    use rustls::{DigitallySignedStruct, Error, SignatureScheme};
+    use std::fmt::Debug;
 
+    #[derive(Debug)]
     pub struct NoCertificateVerification {}
 
     impl ServerCertVerifier for NoCertificateVerification {
         fn verify_server_cert(
             &self,
-            _end_entity: &rustls::Certificate,
-            _intermediates: &[rustls::Certificate],
-            _server_name: &rustls::ServerName,
-            _scts: &mut dyn Iterator<Item = &[u8]>,
+            _end_entity: &CertificateDer<'_>,
+            _intermediates: &[CertificateDer<'_>],
+            _server_name: &ServerName<'_>,
             _ocsp_response: &[u8],
-            _now: SystemTime,
+            _now: UnixTime,
         ) -> Result<ServerCertVerified, rustls::Error> {
             warn!("Certificate verification disabled");
             Ok(ServerCertVerified::assertion())
+        }
+
+        fn verify_tls12_signature(
+            &self,
+            _message: &[u8],
+            _cert: &CertificateDer<'_>,
+            _dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, Error> {
+            Ok(HandshakeSignatureValid::assertion())
+        }
+
+        fn verify_tls13_signature(
+            &self,
+            _message: &[u8],
+            _cert: &CertificateDer<'_>,
+            _dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, Error> {
+            Ok(HandshakeSignatureValid::assertion())
+        }
+
+        fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+            rustls::crypto::aws_lc_rs::default_provider()
+                .signature_verification_algorithms
+                .supported_schemes()
         }
     }
 }

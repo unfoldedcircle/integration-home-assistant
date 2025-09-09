@@ -106,6 +106,11 @@ fn parse_args_load_cfg() -> anyhow::Result<Settings> {
             env::set_var(ENV_HASS_MSG_TRACING, msg_trace);
         }
     }
+
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
     let cfg_file = None;
     let mut cfg = get_configuration(cfg_file).expect("Failed to read configuration");
     if let Some(url) = args.get_one::<String>("url") {

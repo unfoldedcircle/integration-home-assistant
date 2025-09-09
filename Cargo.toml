@@ -35,23 +35,23 @@ uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.12.
 #uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "1650ada3e11bb90318cef173811b6c475fa1d782" }
 
 # WebSockets server
-actix-web = { version = "4.4", features = ["rustls-0_21"] }
+actix-web = { version = "4.11", features = ["rustls-0_23"] }
 actix-web-actors = "4.2"
 actix = "0.13"
-actix-tls = { version = "3.1", features = ["rustls-0_21"] }
+actix-tls = { version = "3.4", features = ["rustls-0_23-native-roots"] }
 bytestring = "1"
-rustls = { version = "0.21", features = ["dangerous_configuration"] }
-rustls-pemfile = "1"
-# rustls-pki-types = "1" # required for rustls 0.22
+rustls = { version = "0.23" }
+rustls-platform-verifier = "0.6"
+rustls-pemfile = "2"
 # WebSockets client
 actix-codec = "0.5"
-awc = { version = "3.3", features = ["rustls-0_21"] }
+awc = { version = "3.8", features = ["rustls-0_23"] }
 bytes = "1"
 futures = "0.3"
 
 # see mdns-sd patch at the end of this file
 mdns-sd = { version = "0.9.3", optional = true }
-if-addrs = "0.13"
+if-addrs = "0.14"
 hostname = "0.4"
 zeroconf = { version = "0.14", optional = true }
 
@@ -63,7 +63,7 @@ serde_with = "3"
 rust-fsm = "0.6"
 
 clap = "4"
-config = { version = "0.14", default-features = false, features = ["yaml", "json"] }
+config = { version = "0.15", default-features = false, features = ["yaml", "json"] }
 const_format = "0.2"
 env_logger = "0.11"
 lazy_static = "1.4"
@@ -77,10 +77,10 @@ time = { version = "0.3", default-features = false, features = ["std", "formatti
 # Attention: strum needs to be in sync with uc_api
 strum = "0.26"
 strum_macros = "0.26"
-derive_more = { version = "1", features = ["constructor", "display"] }
+derive_more = { version = "2", features = ["constructor", "display"] }
 
 anyhow = { version = "1", features = [] }
-itertools = "0.13.0"
+itertools = "0.14.0"
 
 [build-dependencies]
 # Warning! Using built 0.7.1 upgrades git2 0.18.3 to 0.19.0 and libgit2-sys 0.16.2+1.7.2 to 0.17.0+1.8.1 which breaks cross compilation!
