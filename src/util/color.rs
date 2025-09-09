@@ -35,12 +35,12 @@ pub fn color_xy_brightness_to_rgb(
     ibrightness: u16,
     gamut: Option<GamutType>,
 ) -> (u16, u16, u16) {
-    if let Some(gamut) = gamut {
-        if !check_point_in_lamps_reach((v_x, v_y), gamut) {
-            let xy_closest = get_closest_point_to_point((v_x, v_y), gamut);
-            v_x = xy_closest.0;
-            v_y = xy_closest.1;
-        }
+    if let Some(gamut) = gamut
+        && !check_point_in_lamps_reach((v_x, v_y), gamut)
+    {
+        let xy_closest = get_closest_point_to_point((v_x, v_y), gamut);
+        v_x = xy_closest.0;
+        v_y = xy_closest.1;
     }
 
     let brightness = ibrightness as f32 / 255.0;

@@ -11,9 +11,9 @@ use std::env;
 use std::str::FromStr;
 use std::time::Duration;
 use uc_api::intg::ws::{R2Event, R2Request};
-use uc_intg_hass::configuration::{get_configuration, Settings, DEF_HA_URL, ENV_HASS_MSG_TRACING};
+use uc_intg_hass::configuration::{DEF_HA_URL, ENV_HASS_MSG_TRACING, Settings, get_configuration};
 use uc_intg_hass::{
-    configuration, Controller, NewR2Session, R2EventMsg, R2RequestMsg, SendWsMessage, APP_VERSION,
+    APP_VERSION, Controller, NewR2Session, R2EventMsg, R2RequestMsg, SendWsMessage, configuration,
 };
 use url::Url;
 
@@ -89,7 +89,9 @@ fn parse_args_load_cfg() -> anyhow::Result<Settings> {
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     if let Some(msg_trace) = args.get_one::<String>("trace_level") {
-        env::set_var(ENV_HASS_MSG_TRACING, msg_trace);
+        unsafe {
+            env::set_var(ENV_HASS_MSG_TRACING, msg_trace);
+        }
     }
     let cfg_file = None;
     let mut cfg = get_configuration(cfg_file).expect("Failed to read configuration");
@@ -138,22 +140,22 @@ impl Handler<SendWsMessage> for ServerMock {
 
     fn handle(&mut self, msg: SendWsMessage, _ctx: &mut Self::Context) {
         let msg_name = msg.0.msg.clone().unwrap_or_default();
-        if msg_name == "device_state" {
-            if let Some(msg_data) = msg.0.msg_data.as_ref() {
-                self.connected = msg_data
-                    .as_object()
-                    .and_then(|o| o.get("state"))
-                    .and_then(|s| s.as_str())
-                    == Some("CONNECTED");
+        if msg_name == "device_state"
+            && let Some(msg_data) = msg.0.msg_data.as_ref()
+        {
+            self.connected = msg_data
+                .as_object()
+                .and_then(|o| o.get("state"))
+                .and_then(|s| s.as_str())
+                == Some("CONNECTED");
 
-                if self.connected {
-                    self.controller_addr.do_send(R2RequestMsg {
-                        ws_id: self.id.clone(),
-                        req_id: 0,
-                        request: R2Request::GetEntityStates,
-                        msg_data: None,
-                    });
-                }
+            if self.connected {
+                self.controller_addr.do_send(R2RequestMsg {
+                    ws_id: self.id.clone(),
+                    req_id: 0,
+                    request: R2Request::GetEntityStates,
+                    msg_data: None,
+                });
             }
         }
 
