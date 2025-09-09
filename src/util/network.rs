@@ -30,6 +30,7 @@ pub fn new_websocket_client(
     connection_timeout: Duration,
     request_timeout: Duration,
     tls: bool,
+    disable_cert_validation: bool,
 ) -> awc::Client {
     if tls {
         // TLS configuration: https://github.com/actix/actix-web/blob/master/awc/tests/test_rustls_client.rs
@@ -44,7 +45,7 @@ pub fn new_websocket_client(
 
         // Disable TLS verification
         // Requires: rustls = { ... optional = true, features = ["dangerous_configuration"] }
-        if bool_from_env(ENV_DISABLE_CERT_VERIFICATION) {
+        if disable_cert_validation || bool_from_env(ENV_DISABLE_CERT_VERIFICATION) {
             config
                 .dangerous()
                 .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));

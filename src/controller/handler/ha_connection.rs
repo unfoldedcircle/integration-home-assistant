@@ -141,7 +141,7 @@ impl Handler<ConnectMsg> for Controller {
                     Ok((r, f)) => (r, f),
                     Err(e) => {
                         warn!("Could not connect to {url}: {e:?}");
-                        return Err(Error::new(ErrorKind::Other, e.to_string()));
+                        return Err(Error::other(e.to_string()));
                     }
                 };
                 info!("Connected to: {url} ({heartbeat})");

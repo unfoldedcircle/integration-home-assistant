@@ -141,6 +141,10 @@ pub struct HomeAssistantSettings {
     // for data migration of existing configurations
     #[serde(default = "default_disconnect_in_standby")]
     pub disconnect_in_standby: bool,
+    /// Disables certificate verification for the Home Assistant WS connection.
+    // for data migration of existing configurations
+    #[serde(default = "default_disable_cert_validation")]
+    pub disable_cert_validation: bool,
 }
 
 impl Default for HomeAssistantSettings {
@@ -154,6 +158,7 @@ impl Default for HomeAssistantSettings {
             reconnect: Default::default(),
             heartbeat: Default::default(),
             disconnect_in_standby: default_disconnect_in_standby(),
+            disable_cert_validation: default_disable_cert_validation(),
         }
     }
 }
@@ -235,6 +240,9 @@ fn default_request_timeout() -> u8 {
 }
 fn default_disconnect_in_standby() -> bool {
     true
+}
+fn default_disable_cert_validation() -> bool {
+    false
 }
 
 #[serde_as]
