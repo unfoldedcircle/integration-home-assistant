@@ -166,9 +166,9 @@ pub(crate) fn convert_climate_entity(
 mod tests {
     use crate::client::entity::climate_event_to_entity_change;
     use crate::client::model::EventData;
-    use serde_json::{json, Value};
-    use uc_api::intg::EntityChange;
+    use serde_json::{Value, json};
     use uc_api::EntityType;
+    use uc_api::intg::EntityChange;
 
     #[test]
     fn climate_event_heat() {

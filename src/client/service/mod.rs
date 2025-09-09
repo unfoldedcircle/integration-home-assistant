@@ -7,15 +7,15 @@
 //! See <https://developers.home-assistant.io/docs/api/websocket/#calling-a-service> for further
 //! information.
 
+use crate::client::HomeAssistantClient;
 use crate::client::messages::CallService;
 use crate::client::model::{CallServiceMsg, Target};
-use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
 use actix::Handler;
 use log::info;
 use serde_json::{Map, Value};
-use uc_api::intg::EntityCommand;
 use uc_api::EntityType;
+use uc_api::intg::EntityCommand;
 
 mod button;
 mod climate;

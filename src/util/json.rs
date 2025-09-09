@@ -79,7 +79,7 @@ pub fn number_value(json: &Map<String, Value>, key: &str) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use crate::util::json::{copy_entry, move_entry, move_value};
-    use serde_json::{json, Map};
+    use serde_json::{Map, json};
 
     #[test]
     fn copy_entry_with_non_existing_key_returns_false() {

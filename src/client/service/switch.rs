@@ -6,8 +6,8 @@
 use crate::client::service::cmd_from_str;
 use crate::errors::ServiceError;
 use serde_json::Value;
-use uc_api::intg::EntityCommand;
 use uc_api::SwitchCommand;
+use uc_api::intg::EntityCommand;
 
 pub(crate) fn handle_switch(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
     let cmd: SwitchCommand = cmd_from_str(&msg.cmd_id)?;

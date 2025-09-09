@@ -7,8 +7,8 @@ use crate::controller::handler::{AbortDriverSetup, ConnectMsg, DisconnectMsg};
 use crate::controller::{Controller, R2EventMsg};
 use actix::{AsyncContext, Handler};
 use log::error;
-use uc_api::intg::ws::R2Event;
 use uc_api::intg::DeviceState;
+use uc_api::intg::ws::R2Event;
 
 impl Handler<R2EventMsg> for Controller {
     type Result = ();

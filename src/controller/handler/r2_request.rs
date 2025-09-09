@@ -3,6 +3,7 @@
 
 //! Actix message handler for [R2RequestMsg].
 
+use crate::APP_VERSION;
 use crate::built_info;
 use crate::client::messages::{CallService, GetAvailableEntities, GetStates};
 use crate::configuration::get_driver_metadata;
@@ -11,12 +12,11 @@ use crate::controller::handler::{
 };
 use crate::controller::{Controller, OperationModeInput, R2RequestMsg, SendWsMessage};
 use crate::errors::ServiceError;
-use crate::util::{return_fut_err, return_fut_ok, DeserializeMsgData};
-use crate::APP_VERSION;
-use actix::{fut, AsyncContext, Handler, ResponseFuture};
+use crate::util::{DeserializeMsgData, return_fut_err, return_fut_ok};
+use actix::{AsyncContext, Handler, ResponseFuture, fut};
 use lazy_static::lazy_static;
 use log::{debug, error};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use strum::EnumMessage;
 use uc_api::intg::ws::{AvailableEntitiesMsgData, DriverVersionMsgData, R2Request};
 use uc_api::intg::{EntityCommand, IntegrationVersion};

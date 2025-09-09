@@ -5,15 +5,15 @@
 
 use std::str::FromStr;
 
+use crate::client::HomeAssistantClient;
 use crate::client::entity::*;
 use crate::client::messages::GetStates;
-use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
 use actix::Handler;
 use log::{debug, error, info, warn};
-use serde_json::{json, Value};
-use uc_api::intg::AvailableIntgEntity;
+use serde_json::{Value, json};
 use uc_api::EntityType;
+use uc_api::intg::AvailableIntgEntity;
 
 impl Handler<GetStates> for HomeAssistantClient {
     type Result = Result<(), ServiceError>;

@@ -6,8 +6,8 @@
 use crate::client::service::cmd_from_str;
 use crate::errors::ServiceError;
 use serde_json::Value;
-use uc_api::intg::EntityCommand;
 use uc_api::ButtonCommand;
+use uc_api::intg::EntityCommand;
 
 pub(crate) fn handle_button(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
     let cmd: ButtonCommand = cmd_from_str(&msg.cmd_id)?;

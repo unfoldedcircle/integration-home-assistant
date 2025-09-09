@@ -3,11 +3,11 @@
 
 //! WebSocket server for the Remote Two integration API
 
-use crate::configuration::{HeartbeatSettings, WebSocketSettings, ENV_API_MSG_TRACING};
 use crate::Controller;
+use crate::configuration::{ENV_API_MSG_TRACING, HeartbeatSettings, WebSocketSettings};
 use actix::Addr;
 use actix_web::error::JsonPayloadError;
-use actix_web::{error, get, web, Error, HttpRequest, HttpResponse};
+use actix_web::{Error, HttpRequest, HttpResponse, error, get, web};
 use log::{debug, info};
 use std::env;
 use std::time::Instant;

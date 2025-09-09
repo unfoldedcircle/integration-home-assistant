@@ -16,14 +16,14 @@
 #![deny(unsafe_code)]
 
 use crate::configuration::{
-    get_configuration, CertificateSettings, IntegrationSettings, ENV_DISABLE_MDNS_PUBLISH,
+    CertificateSettings, ENV_DISABLE_MDNS_PUBLISH, IntegrationSettings, get_configuration,
 };
 use crate::controller::Controller;
 use crate::server::publish_service;
 use crate::util::{bool_from_env, create_single_cert_server_config};
 use actix::Actor;
-use actix_web::{middleware, web, App, HttpServer};
-use clap::{arg, Command};
+use actix_web::{App, HttpServer, middleware, web};
+use clap::{Command, arg};
 use configuration::DEF_CONFIG_FILE;
 use log::{error, info};
 use std::io;
@@ -31,7 +31,7 @@ use std::net::TcpListener;
 use std::path::Path;
 use uc_api::intg::IntegrationDriverUpdate;
 use uc_api::util::text_from_language_map;
-use uc_intg_hass::{built_info, APP_VERSION};
+use uc_intg_hass::{APP_VERSION, built_info};
 
 mod client;
 mod configuration;
