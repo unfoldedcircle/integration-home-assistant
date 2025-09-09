@@ -7,24 +7,24 @@ use std::collections::HashSet;
 use std::env;
 use std::time::{Duration, Instant};
 
+use crate::APP_VERSION;
+use crate::Controller;
 use crate::client::messages::{
     AvailableEntities, ConnectionEvent, ConnectionState, SetAvailableEntities,
 };
 use crate::client::model::Event;
-use crate::configuration::{HeartbeatSettings, ENV_HASS_MSG_TRACING};
+use crate::configuration::{ENV_HASS_MSG_TRACING, HeartbeatSettings};
 use crate::errors::ServiceError;
-use crate::Controller;
-use crate::APP_VERSION;
 use actix::io::SinkWrite;
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context, SpawnHandle};
 use actix_codec::Framed;
-use awc::{ws, BoxedSocket};
+use awc::{BoxedSocket, ws};
 use bytes::Bytes;
 use futures::stream::{SplitSink, SplitStream};
 use log::{debug, error, info, warn};
 use messages::Close;
 use serde::de::Error;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::atomic::{AtomicU32, Ordering};
 use url::Url;
 
@@ -249,11 +249,17 @@ impl HomeAssistantClient {
                                             entities,
                                         })
                                     {
-                                        error!("[{}] Error handling HA set available entities result: {:?}", self.id, e);
+                                        error!(
+                                            "[{}] Error handling HA set available entities result: {e:?}",
+                                            self.id
+                                        );
                                     }
                                 }
                                 Err(e) => {
-                                    error!("[{}] Error handling HA set available entities result: {:?}", self.id, e);
+                                    error!(
+                                        "[{}] Error handling HA set available entities result: {e:?}",
+                                        self.id
+                                    );
                                 }
                             }
                         }
@@ -266,13 +272,10 @@ impl HomeAssistantClient {
                 let event = serde_json::from_value::<Event>(
                     object_msg.remove("event").unwrap_or(Value::Null),
                 );
-                if let Ok(event) = event {
-                    if let Err(e) = self.handle_event(event) {
-                        error!(
-                            "[{}] Error handling HA state_changed event: {:?}",
-                            self.id, e
-                        );
-                    }
+                if let Ok(event) = event
+                    && let Err(e) = self.handle_event(event)
+                {
+                    error!("[{}] Error handling HA state_changed event: {e:?}", self.id);
                 }
             }
             // result messages : sent by HA in response of a previous request, including :
@@ -287,8 +290,8 @@ impl HomeAssistantClient {
                     .unwrap_or_default();
                 if Some(id) == self.uc_ha_component_info_id {
                     debug!(
-                        "[{}] Received HA response for unfoldedcircle/info custom event ({})",
-                        self.id, success
+                        "[{}] Received HA response for unfoldedcircle/info custom event ({success})",
+                        self.id
                     );
                     // If the unfoldedcircle/info message type is unknown, the UC HA component is not
                     // installed then we switch back to standard HA events
@@ -321,22 +324,26 @@ impl HomeAssistantClient {
                     self.subscribe_uc_events(ctx);
                 } else if Some(id) == self.subscribe_configure_id {
                     debug!(
-                        "[{}] Received HA response for unfoldedcircle/event/configure/subscribe event ({})",
-                        self.id,
-                        success
+                        "[{}] Received HA response for unfoldedcircle/event/configure/subscribe event ({success})",
+                        self.id
                     );
                     if !success {
-                        error!("[{}] unfoldedcircle/event/configure/subscribe subscription event failed", self.id);
+                        error!(
+                            "[{}] unfoldedcircle/event/configure/subscribe subscription event failed",
+                            self.id
+                        );
                         self.subscribe_configure_id = None
                     }
                 } else if Some(id) == self.subscribe_uc_events_id {
                     debug!(
-                        "[{}] Received HA response for unfoldedcircle/event/entities/subscribe ({})",
-                        self.id,
-                        success
+                        "[{}] Received HA response for unfoldedcircle/event/entities/subscribe ({success})",
+                        self.id
                     );
                     if !success {
-                        error!("[{}] unfoldedcircle/event/entities/subscribe subscription event failed", self.id);
+                        error!(
+                            "[{}] unfoldedcircle/event/entities/subscribe subscription event failed",
+                            self.id
+                        );
                         self.subscribe_uc_events_id = None
                     } else {
                         self.controller_actor.do_send(ConnectionEvent {
@@ -373,16 +380,13 @@ impl HomeAssistantClient {
                                     entities,
                                 }) {
                                     error!(
-                                        "[{}] Error handling HA get_states result: {:?}",
-                                        self.id, e
+                                        "[{}] Error handling HA get_states result: {e:?}",
+                                        self.id
                                     );
                                 }
                             }
                             Err(e) => {
-                                error!(
-                                    "[{}] Error handling HA get_states result: {:?}",
-                                    self.id, e
-                                );
+                                error!("[{}] Error handling HA get_states result: {e:?}", self.id);
                             }
                         }
                     }
@@ -393,7 +397,7 @@ impl HomeAssistantClient {
                     json!({ "type": "auth", "access_token": self.access_token}),
                     ctx,
                 ) {
-                    error!("[{}] Error sending auth to HA: {:?}", self.id, e);
+                    error!("[{}] Error sending auth to HA: {e:?}", self.id);
                     ctx.notify(Close::invalid());
                 }
             }

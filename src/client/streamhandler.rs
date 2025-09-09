@@ -7,8 +7,8 @@ use actix::{ActorContext, AsyncContext, Context, StreamHandler};
 use actix_web_actors::ws::{Frame, ProtocolError as WsProtocolError};
 use log::{debug, error, info};
 
-use crate::client::messages::Close;
 use crate::client::HomeAssistantClient;
+use crate::client::messages::Close;
 
 impl StreamHandler<Result<Frame, WsProtocolError>> for HomeAssistantClient {
     fn handle(&mut self, msg: Result<Frame, WsProtocolError>, ctx: &mut Self::Context) {

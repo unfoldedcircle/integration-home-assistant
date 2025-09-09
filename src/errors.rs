@@ -3,8 +3,8 @@
 
 //! Custom application error with conversions from common Rust and 3rd-party errors.
 
-use actix::dev::SendError;
 use actix::MailboxError;
+use actix::dev::SendError;
 use derive_more::Display;
 use log::error;
 use std::io::ErrorKind;

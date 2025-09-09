@@ -6,8 +6,8 @@
 use actix::{Actor, Context};
 use log::debug;
 
-use crate::client::messages::{ConnectionEvent, ConnectionState};
 use crate::client::HomeAssistantClient;
+use crate::client::messages::{ConnectionEvent, ConnectionState};
 
 impl Actor for HomeAssistantClient {
     type Context = Context<Self>;

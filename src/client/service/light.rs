@@ -5,9 +5,9 @@
 
 use crate::client::service::cmd_from_str;
 use crate::errors::ServiceError;
-use serde_json::{json, Map, Value};
-use uc_api::intg::EntityCommand;
+use serde_json::{Map, Value, json};
 use uc_api::LightCommand;
+use uc_api::intg::EntityCommand;
 
 pub(crate) fn handle_light(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
     let cmd: LightCommand = cmd_from_str(&msg.cmd_id)?;
@@ -31,12 +31,11 @@ pub(crate) fn handle_light(msg: &EntityCommand) -> Result<(String, Option<Value>
                         color_temp_percent_to_mired(color_temp_pct, min_mireds, max_mireds)?;
                     data.insert("color_temp".into(), Value::Number(color_temp.into()));
                 }
-                if let Some(hue @ 0..=360) = params.get("hue").and_then(|v| v.as_u64()) {
-                    if let Some(saturation @ 0..=255) =
+                if let Some(hue @ 0..=360) = params.get("hue").and_then(|v| v.as_u64())
+                    && let Some(saturation @ 0..=255) =
                         params.get("saturation").and_then(|v| v.as_u64())
-                    {
-                        data.insert("hs_color".into(), json!([hue, saturation * 100 / 255]));
-                    }
+                {
+                    data.insert("hs_color".into(), json!([hue, saturation * 100 / 255]));
                 }
             }
             ("turn_on".into(), Some(Value::Object(data)))

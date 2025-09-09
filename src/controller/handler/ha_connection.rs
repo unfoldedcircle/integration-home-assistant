@@ -3,14 +3,14 @@
 
 //! Actix message handler for Home Assistant client connection messages.
 
+use crate::client::HomeAssistantClient;
 use crate::client::messages::{
     Close, ConnectionEvent, ConnectionState, SetRemoteId, SubscribedEntities,
 };
-use crate::client::HomeAssistantClient;
-use crate::controller::handler::{ConnectMsg, DisconnectMsg};
 use crate::controller::OperationModeInput::{AbortSetup, Connected};
+use crate::controller::handler::{ConnectMsg, DisconnectMsg};
 use crate::controller::{Controller, OperationModeState};
-use actix::{fut, ActorFutureExt, AsyncContext, Context, Handler, ResponseActFuture, WrapFuture};
+use actix::{ActorFutureExt, AsyncContext, Context, Handler, ResponseActFuture, WrapFuture, fut};
 use futures::StreamExt;
 use log::{debug, error, info, warn};
 use std::io::{Error, ErrorKind};
@@ -100,11 +100,11 @@ impl Handler<ConnectMsg> for Controller {
             ))));
         }
 
-        if let Some(client_id) = self.ha_client_id.as_ref() {
-            if self.ha_client.is_some() {
-                warn!("[{client_id}] Ignoring connect request: already connected to HA server");
-                return Box::pin(fut::ok(()));
-            }
+        if let Some(client_id) = self.ha_client_id.as_ref()
+            && self.ha_client.is_some()
+        {
+            warn!("[{client_id}] Ignoring connect request: already connected to HA server");
+            return Box::pin(fut::ok(()));
         }
 
         let url = self.settings.hass.get_url();
@@ -141,7 +141,7 @@ impl Handler<ConnectMsg> for Controller {
                     Ok((r, f)) => (r, f),
                     Err(e) => {
                         warn!("Could not connect to {url}: {e:?}");
-                        return Err(Error::new(ErrorKind::Other, e.to_string()));
+                        return Err(Error::other(e.to_string()));
                     }
                 };
                 info!("Connected to: {url} ({heartbeat})");

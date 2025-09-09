@@ -9,7 +9,7 @@ use crate::errors::ServiceError;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::AvailableIntgEntity;
-use uc_api::{intg::EntityChange, EntityType, SensorOptionField};
+use uc_api::{EntityType, SensorOptionField, intg::EntityChange};
 
 pub(crate) fn map_sensor_attributes(
     _entity_id: &str,
@@ -19,13 +19,13 @@ pub(crate) fn map_sensor_attributes(
     let mut attributes = serde_json::Map::with_capacity(2);
     attributes.insert("value".into(), state.into());
 
-    if let Some(ha_attr) = ha_attr {
-        if let Some(uom) = ha_attr.remove("unit_of_measurement") {
-            attributes.insert("unit".into(), uom);
-        }
-        // TODO check and handle attributes.device_class? E.g. checking for supported sensors.
-        // Currently supported: "battery" | "current" | "energy" | "humidity" | "power" | "temperature" | "voltage"
+    if let Some(ha_attr) = ha_attr
+        && let Some(uom) = ha_attr.remove("unit_of_measurement")
+    {
+        attributes.insert("unit".into(), uom);
     }
+    // TODO check and handle attributes.device_class? E.g. checking for supported sensors.
+    // Currently supported: "battery" | "current" | "energy" | "humidity" | "power" | "temperature" | "voltage"
 
     Ok(attributes)
 }
@@ -80,13 +80,13 @@ pub(crate) fn convert_sensor_entity(
         | Some("temperature") | Some("voltage") => device_class.map(|v| v.into()),
         // Map non-supported device classes to a custom sensor and use device class as label
         v => {
-            if let Some(v) = v {
-                if let Some(label) = device_class_to_label(v) {
-                    options.insert(
-                        SensorOptionField::CustomLabel.to_string(),
-                        Value::String(label),
-                    );
-                }
+            if let Some(v) = v
+                && let Some(label) = device_class_to_label(v)
+            {
+                options.insert(
+                    SensorOptionField::CustomLabel.to_string(),
+                    Value::String(label),
+                );
             }
             if let Some(v) = ha_attr.get("unit_of_measurement") {
                 options.insert(SensorOptionField::CustomUnit.to_string(), v.clone());

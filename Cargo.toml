@@ -1,10 +1,10 @@
 [package]
 name = "uc-intg-hass"
 version = "0.12.0"
-edition = "2021"
+edition = "2024"
 authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
 license = "MPL-2.0"
-description = "Unfolded Circle Home-Assistant integration for Remote Two"
+description = "Unfolded Circle Home-Assistant integration for Remote Two/3"
 repository = "https://github.com/unfoldedcircle/integration-home-assistant"
 default-run = "uc-intg-hass"
 
