@@ -60,6 +60,7 @@ further interactions are possible:
   used in same internal network.
   - We cannot provide support for custom installations with reverse proxy, SSL setups, changed endpoints or URLs.
   - Self-signed certificates are not supported and don’t work.
+    - As a workaround the certificate validation can be disabled in the enhanced options of the setup flow. 
   - If only an SSL endpoint is exposed, then the `wss://` connection URL must be used in the integration!
     - Please note, that not all certificates or SSL setups seem to work.
     - It has been successfully tested with Let’s Encrypt certificates and a nginx reverse proxy.
@@ -181,15 +182,15 @@ Home Assistant server communication test
 Usage: ha-test [OPTIONS]
 
 Options:
-  -u <url>                     Home Assistant WebSocket API URL (overrides home-assistant.json)
-                               [default: ws://homeassistant.local:8123/api/websocket]
-  -t <token>                   Home Assistant long lived access token (overrides home-assistant.json)
-  -c <connection_timeout>      TCP connection timeout in seconds (overrides home-assistant.json)
-  -r <request_timeout>         Request timeout in seconds (overrides home-assistant.json)
-      --trace <MESSAGES>       Message tracing for HA server communication
-                               [default: all] [possible values: in, out, all, none]
-  -h, --help                   Print help
-  -V, --version                Print version
+  -u <url>                       Home Assistant WebSocket API URL (overrides home-assistant.json)
+      --disable-cert-validation  Disable SSL certificate verification (overrides home-assistant.json)
+  -t <token>                     Home Assistant long lived access token (overrides home-assistant.json)
+  -c <connection_timeout>        TCP connection timeout in seconds (overrides home-assistant.json)
+  -r <request_timeout>           Request timeout in seconds (overrides home-assistant.json)
+      --trace <MESSAGES>         Message tracing for HA server communication
+                                 [default: all] [possible values: in, out, all, none]
+  -h, --help                     Print help
+  -V, --version                  Print version
 ```
 
 ## Contributing

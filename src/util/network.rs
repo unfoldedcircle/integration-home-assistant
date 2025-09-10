@@ -28,43 +28,33 @@ pub fn my_ipv4_interfaces() -> Vec<if_addrs::IfAddr> {
 pub fn new_websocket_client(
     connection_timeout: Duration,
     request_timeout: Duration,
-    tls: bool,
     disable_cert_validation: bool,
 ) -> awc::Client {
     use rustls_platform_verifier::ConfigVerifierExt as _;
 
-    if tls {
-        // TLS configuration: https://github.com/actix/actix-web/blob/master/awc/tests/test_rustls_client.rs
-        // TODO self-signed certificate handling #4
-        // TODO only create once and then Arc::clone() it in awc::Connector
-        let mut config =
-            ClientConfig::with_platform_verifier().expect("Platform certificate verifier required");
+    // TLS configuration: https://github.com/actix/actix-web/blob/master/awc/tests/test_rustls_client.rs
+    // TODO self-signed certificate handling #4
+    let mut config =
+        ClientConfig::with_platform_verifier().expect("Platform certificate verifier required");
 
-        // http2 has (or at least had) issues with wss. Needs further investigation.
-        config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    // http2 has (or at least had) issues with wss. Needs further investigation.
+    config.alpn_protocols = vec![b"http/1.1".to_vec()];
 
-        // Disable TLS verification
-        // Requires: rustls = { ... optional = true, features = ["dangerous_configuration"] }
-        if disable_cert_validation || bool_from_env(ENV_DISABLE_CERT_VERIFICATION) {
-            config
-                .dangerous()
-                .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
-        }
-
-        awc::Client::builder()
-            .timeout(request_timeout)
-            .connector(
-                awc::Connector::new()
-                    .rustls_0_23(Arc::new(config))
-                    .timeout(connection_timeout),
-            )
-            .finish()
-    } else {
-        awc::ClientBuilder::new()
-            .timeout(request_timeout)
-            .connector(awc::Connector::new().timeout(connection_timeout))
-            .finish()
+    // Disable TLS verification
+    if disable_cert_validation || bool_from_env(ENV_DISABLE_CERT_VERIFICATION) {
+        config
+            .dangerous()
+            .set_certificate_verifier(Arc::new(danger::NoCertificateVerification {}));
     }
+
+    awc::Client::builder()
+        .timeout(request_timeout)
+        .connector(
+            awc::Connector::new()
+                .rustls_0_23(Arc::new(config))
+                .timeout(connection_timeout),
+        )
+        .finish()
 }
 
 mod danger {

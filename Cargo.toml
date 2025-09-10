@@ -38,7 +38,6 @@ uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.12.
 actix-web = { version = "4.11", features = ["rustls-0_23"] }
 actix-web-actors = "4.2"
 actix = "0.13"
-actix-tls = { version = "3.4", features = ["rustls-0_23-native-roots"] }
 bytestring = "1"
 rustls = { version = "0.23" }
 rustls-platform-verifier = "0.6"
