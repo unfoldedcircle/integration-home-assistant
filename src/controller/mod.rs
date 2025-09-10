@@ -145,6 +145,7 @@ impl Controller {
                 Duration::from_secs(settings.hass.connection_timeout as u64),
                 Duration::from_secs(settings.hass.request_timeout as u64),
                 matches!(url.scheme(), "wss" | "https"),
+                settings.hass.disable_cert_validation,
             ),
             ha_reconnect_duration: settings.hass.reconnect.duration,
             settings,

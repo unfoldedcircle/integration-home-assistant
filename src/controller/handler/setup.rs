@@ -158,6 +158,9 @@ impl Handler<SetDriverUserDataMsg> for Controller {
             if let Some(value) = parse_value(&values, "ping_frames") {
                 cfg.heartbeat.ping_frames = value;
             }
+            if let Some(value) = parse_value(&values, "disable_cert_validation") {
+                cfg.disable_cert_validation = value;
+            }
             if let Some(value) = parse_value(&values, "reconnect.attempts") {
                 cfg.reconnect.attempts = value;
             }
@@ -499,6 +502,19 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                                 "field": {
                                     "checkbox": {
                                       "value": self.settings.hass.heartbeat.ping_frames
+                                    }
+                                }
+                            },
+                            {
+                                "id": "disable_cert_validation",
+                                "label": {
+                                    "en": "Disable certificate verification",
+                                    "de": "Zertifikatsüberprüfung deaktivieren",
+                                    "fr": "Désactiver la vérification des certificats"
+                                },
+                                "field": {
+                                    "checkbox": {
+                                      "value": self.settings.hass.disable_cert_validation
                                     }
                                 }
                             }

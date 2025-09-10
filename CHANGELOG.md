@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+- Expert option to disable certificate validation of the Home Assistant WebSocket server connection.
+
 ---
 
 ## v0.12.2 - 2025-04-17
 ### Added
-- Propagate media player attribute `media_position_updated_at`.
+- Propagate media player attribute `media_position_updated_at` ([feature-and-bug-tracker#443](https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/443)).
+
 ### Fixed
 - Media player `media_type` attribute value should be upper case to match entity documentation.
 ### Changed
