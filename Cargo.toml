@@ -53,7 +53,7 @@ futures = "0.3"
 mdns-sd = { version = "0.9.3", optional = true }
 if-addrs = "0.14"
 hostname = "0.4"
-zeroconf = { version = "0.14", optional = true }
+zeroconf = { version = "0.15", optional = true }
 
 # JSON (de)serialization
 serde = { version = "1", features = ["derive"] }
@@ -71,23 +71,21 @@ log = "0.4"
 
 uuid = { version = "1", features = ["v4"] }
 url = { version = "2", features = ["serde"] }
-time = { version = "0.3", default-features = false, features = ["std", "formatting"] }
 
 # Helpful macros for working with enums and strings
 # Attention: strum needs to be in sync with uc_api
 strum = "0.26"
-strum_macros = "0.26"
 derive_more = { version = "2", features = ["constructor", "display"] }
 
 anyhow = { version = "1", features = [] }
-itertools = "0.14.0"
 
 [build-dependencies]
-# Warning! Using built 0.7.1 upgrades git2 0.18.3 to 0.19.0 and libgit2-sys 0.16.2+1.7.2 to 0.17.0+1.8.1 which breaks cross compilation!
-built = { version = "=0.7.1", features = ["git2", "chrono", "dependency-tree", "semver"] }
+# Warning: git2 feature causes a stack smashing error in cross-compilation, even with 16MB stack!
+# Solved with a custom git callout in build.rs
+built = { version = "0.8", features = ["chrono", "semver", "cargo-lock"] }
 
 [dev-dependencies]
-rstest = "0.22"
+rstest = "0.26"
 
 [patch.crates-io]
 mdns-sd = { git = "https://github.com/zehnm/mdns-sd", rev = "aa95af75e21f40ee9ea74d117ca31e0672d722fb" }

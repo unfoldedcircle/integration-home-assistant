@@ -6,6 +6,7 @@ use const_format::formatcp;
 /// Build information like timestamp, git hash, etc.
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
+    include!(concat!(env!("OUT_DIR"), "/git_built.rs"));
 }
 
 /// Application version built from git version information.
