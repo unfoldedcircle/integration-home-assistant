@@ -36,7 +36,7 @@ pub fn new_websocket_client(
     if tls {
         // TLS configuration: https://github.com/actix/actix-web/blob/master/awc/tests/test_rustls_client.rs
         // TODO self-signed certificate handling #4
-        // TODO only crate once and then Arc::clone() it in awc::Connector
+        // TODO only create once and then Arc::clone() it in awc::Connector
         let mut config =
             ClientConfig::with_platform_verifier().expect("Platform certificate verifier required");
 
