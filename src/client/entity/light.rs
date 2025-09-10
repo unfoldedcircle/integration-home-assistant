@@ -11,7 +11,7 @@ use log::warn;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::AvailableIntgEntity;
-use uc_api::{intg::EntityChange, EntityType, LightFeature};
+use uc_api::{EntityType, LightFeature, intg::EntityChange};
 
 pub(crate) fn map_light_attributes(
     entity_id: &str,

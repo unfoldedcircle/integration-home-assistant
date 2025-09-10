@@ -6,10 +6,10 @@
 //! See <https://developers.home-assistant.io/docs/api/websocket/#subscribe-to-events> for further
 //! information.
 
+use crate::client::HomeAssistantClient;
 use crate::client::entity::*;
 use crate::client::messages::EntityEvent;
 use crate::client::model::Event;
-use crate::client::HomeAssistantClient;
 use crate::errors::ServiceError;
 use log::debug;
 

@@ -6,8 +6,8 @@
 use crate::client::service::cmd_from_str;
 use crate::errors::ServiceError;
 use serde_json::{Map, Value};
-use uc_api::intg::EntityCommand;
 use uc_api::CoverCommand;
+use uc_api::intg::EntityCommand;
 
 pub(crate) fn handle_cover(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
     let cmd: CoverCommand = cmd_from_str(&msg.cmd_id)?;
@@ -18,10 +18,10 @@ pub(crate) fn handle_cover(msg: &EntityCommand) -> Result<(String, Option<Value>
         CoverCommand::Stop => ("stop_cover".into(), None),
         CoverCommand::Position => {
             let mut data = Map::new();
-            if let Some(params) = msg.params.as_ref() {
-                if let Some(pos @ 0..=100) = params.get("position").and_then(|v| v.as_u64()) {
-                    data.insert("position".into(), Value::Number(pos.into()));
-                }
+            if let Some(params) = msg.params.as_ref()
+                && let Some(pos @ 0..=100) = params.get("position").and_then(|v| v.as_u64())
+            {
+                data.insert("position".into(), Value::Number(pos.into()));
             }
             ("set_cover_position".into(), Some(data.into()))
         } // TODO implement tilt command #6

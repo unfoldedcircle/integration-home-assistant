@@ -5,9 +5,9 @@
 
 use crate::client::service::{cmd_from_str, get_required_params};
 use crate::errors::ServiceError;
-use serde_json::{json, Map, Value};
-use uc_api::intg::EntityCommand;
+use serde_json::{Map, Value, json};
 use uc_api::MediaPlayerCommand;
+use uc_api::intg::EntityCommand;
 
 pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
     let cmd: MediaPlayerCommand = cmd_from_str(&msg.cmd_id)?;
@@ -50,7 +50,7 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
         MediaPlayerCommand::FastForward
         | MediaPlayerCommand::Rewind
         | MediaPlayerCommand::MuteToggle => {
-            return Err(ServiceError::BadRequest("Not supported".into()))
+            return Err(ServiceError::BadRequest("Not supported".into()));
         }
         MediaPlayerCommand::Mute => (
             "volume_mute".into(),
@@ -121,7 +121,7 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
         | MediaPlayerCommand::Subtitle
         | MediaPlayerCommand::ContextMenu
         | MediaPlayerCommand::Settings => {
-            return Err(ServiceError::BadRequest("Not supported".into()))
+            return Err(ServiceError::BadRequest("Not supported".into()));
         }
         MediaPlayerCommand::SelectSource => {
             let mut data = Map::new();
@@ -157,9 +157,9 @@ mod tests {
     use crate::client::service::media_player::handle_media_player;
     use crate::errors::ServiceError;
     use rstest::rstest;
-    use serde_json::{json, Map, Value};
-    use uc_api::intg::EntityCommand;
+    use serde_json::{Map, Value, json};
     use uc_api::EntityType;
+    use uc_api::intg::EntityCommand;
 
     fn new_entity_command(cmd_id: impl Into<String>, params: Value) -> EntityCommand {
         EntityCommand {

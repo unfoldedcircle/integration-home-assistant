@@ -6,9 +6,9 @@
 use crate::client::service::{cmd_from_str, get_required_params};
 use crate::errors::ServiceError;
 use crate::util::json::copy_entry;
-use serde_json::{json, Map, Value};
-use uc_api::intg::EntityCommand;
+use serde_json::{Map, Value, json};
 use uc_api::ClimateCommand;
+use uc_api::intg::EntityCommand;
 
 pub(crate) fn handle_climate(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
     let cmd: ClimateCommand = cmd_from_str(&msg.cmd_id)?;
@@ -66,7 +66,7 @@ pub(crate) fn handle_climate(msg: &EntityCommand) -> Result<(String, Option<Valu
 mod tests {
     use crate::client::service::climate::handle_climate;
     use rstest::rstest;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
     use uc_api::intg::EntityCommand;
 
     #[test]

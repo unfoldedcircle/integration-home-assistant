@@ -6,7 +6,7 @@
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::AvailableIntgEntity;
-use uc_api::{intg::EntityChange, EntityType};
+use uc_api::{EntityType, intg::EntityChange};
 
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;

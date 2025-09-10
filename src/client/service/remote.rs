@@ -25,10 +25,10 @@ pub(crate) fn handle_remote(msg: &EntityCommand) -> Result<(String, Option<Value
 fn create_command(msg: &EntityCommand, cmd: &str) -> Result<(String, Option<Value>), ServiceError> {
     let mut data = Map::new();
     let params = get_required_params(msg)?;
-    if let Some(value) = params.get(cmd) {
-        if cmd == "sequence" && value.is_array() || cmd == "command" && value.is_string() {
-            data.insert("command".into(), value.clone());
-        }
+    if let Some(value) = params.get(cmd)
+        && (cmd == "sequence" && value.is_array() || cmd == "command" && value.is_string())
+    {
+        data.insert("command".into(), value.clone());
     }
     if data.is_empty() {
         return Err(ServiceError::BadRequest(format!(

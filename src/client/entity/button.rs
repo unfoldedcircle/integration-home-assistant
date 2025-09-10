@@ -6,8 +6,8 @@
 use crate::errors::ServiceError;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
-use uc_api::intg::AvailableIntgEntity;
 use uc_api::EntityType;
+use uc_api::intg::AvailableIntgEntity;
 
 pub(crate) fn convert_button_entity(
     entity_id: String,

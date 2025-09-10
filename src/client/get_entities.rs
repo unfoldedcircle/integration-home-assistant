@@ -3,8 +3,8 @@
 
 //! Actix actor handler implementation for the `GetStates` message
 
-use crate::client::messages::GetAvailableEntities;
 use crate::client::HomeAssistantClient;
+use crate::client::messages::GetAvailableEntities;
 use crate::errors::ServiceError;
 use actix::Handler;
 use log::debug;

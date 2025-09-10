@@ -10,8 +10,8 @@ use actix_web_actors::ws;
 use awc::ws::CloseReason;
 use log::info;
 
-use crate::client::messages::Close;
 use crate::client::HomeAssistantClient;
+use crate::client::messages::Close;
 
 impl Handler<Close> for HomeAssistantClient {
     type Result = ();

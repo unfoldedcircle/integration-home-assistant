@@ -1,7 +1,14 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Run intg-home-assistant  (mdns-sd)" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+    <option name="buildProfileId" value="dev" />
     <option name="command" value="run --package uc-intg-hass --bin uc-intg-hass --features mdns-sd" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+    <envs>
+      <env name="RUST_LOG" value="debug,uc_intg_hass::client=debug,uc_intg_hass::server=debug,mdns_sd=info" />
+      <env name="UC_API_MSG_TRACING" value="all" />
+      <env name="UC_HASS_MSG_TRACING" value="all" />
+      <env name="UC_SETUP_TIMEOUT" value="60" />
+    </envs>
     <option name="emulateTerminal" value="false" />
     <option name="channel" value="DEFAULT" />
     <option name="requiredFeatures" value="true" />
@@ -9,12 +16,6 @@
     <option name="withSudo" value="false" />
     <option name="buildTarget" value="REMOTE" />
     <option name="backtrace" value="SHORT" />
-    <envs>
-      <env name="RUST_LOG" value="debug,uc_intg_hass::client=debug,uc_intg_hass::server=debug,mdns_sd=info" />
-      <env name="UC_API_MSG_TRACING" value="all" />
-      <env name="UC_HASS_MSG_TRACING" value="all" />
-      <env name="UC_SETUP_TIMEOUT" value="60" />
-    </envs>
     <option name="isRedirectInput" value="false" />
     <option name="redirectInputPath" value="" />
     <method v="2">

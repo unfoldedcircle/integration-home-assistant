@@ -7,8 +7,8 @@ use crate::controller::{NewR2Session, R2SessionDisconnect, SendWsMessage};
 use crate::errors::ServiceError;
 use crate::server::ws::WsConn;
 use actix::{
-    fut, Actor, ActorContext, ActorFutureExt, AsyncContext, ContextFutureSpawner, Handler,
-    ResponseActFuture, Running, StreamHandler, WrapFuture,
+    Actor, ActorContext, ActorFutureExt, AsyncContext, ContextFutureSpawner, Handler,
+    ResponseActFuture, Running, StreamHandler, WrapFuture, fut,
 };
 use actix_web_actors::ws::{CloseCode, CloseReason, Message, ProtocolError, WebsocketContext};
 use bytestring::ByteString;

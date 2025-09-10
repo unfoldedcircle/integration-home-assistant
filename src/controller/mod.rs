@@ -9,7 +9,7 @@ mod messages;
 pub use messages::*;
 
 use crate::client::HomeAssistantClient;
-use crate::configuration::{Settings, DEF_SETUP_TIMEOUT_SEC, ENV_SETUP_TIMEOUT};
+use crate::configuration::{DEF_SETUP_TIMEOUT_SEC, ENV_SETUP_TIMEOUT, Settings};
 use crate::controller::handler::AbortDriverSetup;
 use crate::errors::ServiceError;
 use crate::util::new_websocket_client;

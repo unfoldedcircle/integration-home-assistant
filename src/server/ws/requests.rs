@@ -3,10 +3,10 @@
 
 //! Handle request messages from Remote Two
 
+use crate::Controller;
 use crate::controller::R2RequestMsg;
 use crate::errors::ServiceError;
 use crate::server::ws::WsConn;
-use crate::Controller;
 use actix::Addr;
 use log::{debug, warn};
 use std::str::FromStr;

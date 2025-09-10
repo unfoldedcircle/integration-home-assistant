@@ -3,11 +3,11 @@
 
 //! Configuration file handling.
 
-use crate::errors::ServiceError;
 use crate::APP_VERSION;
+use crate::errors::ServiceError;
 use config::Config;
 use log::{error, info, warn};
-use serde_with::{serde_as, DurationMilliSeconds, DurationSeconds};
+use serde_with::{DurationMilliSeconds, DurationSeconds, serde_as};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
@@ -384,7 +384,7 @@ fn check_cfg_values(mut settings: Settings) -> Result<Settings, config::ConfigEr
             return Err(config::ConfigError::Message(format!(
                 "invalid scheme in home_assistant.url: {}. Valid: [ws, wss]",
                 scheme
-            )))
+            )));
         }
     }
 

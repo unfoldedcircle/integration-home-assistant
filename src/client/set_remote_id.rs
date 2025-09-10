@@ -3,8 +3,8 @@
 
 //! Actix actor handler implementation for the `SetRemoteId` message
 
-use crate::client::messages::SetRemoteId;
 use crate::client::HomeAssistantClient;
+use crate::client::messages::SetRemoteId;
 use crate::errors::ServiceError;
 use actix::Handler;
 use log::debug;

@@ -10,7 +10,7 @@ use crate::controller::handler::{
 use crate::controller::{Controller, OperationModeInput::*, OperationModeState};
 use crate::errors::{ServiceError, ServiceError::BadRequest};
 use actix::clock::sleep;
-use actix::{fut, ActorFutureExt, AsyncContext, Handler, Message, ResponseActFuture, WrapFuture};
+use actix::{ActorFutureExt, AsyncContext, Handler, Message, ResponseActFuture, WrapFuture, fut};
 use derive_more::Constructor;
 use log::{debug, info, warn};
 use serde_json::json;
@@ -131,23 +131,23 @@ impl Handler<SetDriverUserDataMsg> for Controller {
                 }
             }
 
-            if let Some(value) = parse_value(&values, "connection_timeout") {
-                if value >= 3 {
-                    cfg.connection_timeout = value;
-                }
+            if let Some(value) = parse_value(&values, "connection_timeout")
+                && value >= 3
+            {
+                cfg.connection_timeout = value;
             }
-            if let Some(value) = parse_value(&values, "request_timeout") {
-                if value >= 3 {
-                    cfg.request_timeout = value;
-                }
+            if let Some(value) = parse_value(&values, "request_timeout")
+                && value >= 3
+            {
+                cfg.request_timeout = value;
             }
             if let Some(value) = parse_value(&values, "disconnect_in_standby") {
                 cfg.disconnect_in_standby = value;
             }
-            if let Some(value) = parse_value(&values, "max_frame_size_kb") {
-                if value >= 1024 {
-                    cfg.max_frame_size_kb = value;
-                }
+            if let Some(value) = parse_value(&values, "max_frame_size_kb")
+                && value >= 1024
+            {
+                cfg.max_frame_size_kb = value;
             }
             if let Some(value) = parse_value(&values, "heartbeat_interval") {
                 cfg.heartbeat.interval = Duration::from_secs(value);
@@ -170,10 +170,10 @@ impl Handler<SetDriverUserDataMsg> for Controller {
             if let Some(value) = parse_value(&values, "reconnect.duration_max_ms") {
                 cfg.reconnect.duration_max = Duration::from_millis(value);
             }
-            if let Some(value) = parse_value(&values, "reconnect.backoff_factor") {
-                if value >= 1f32 {
-                    cfg.reconnect.backoff_factor = value;
-                }
+            if let Some(value) = parse_value(&values, "reconnect.backoff_factor")
+                && value >= 1f32
+            {
+                cfg.reconnect.backoff_factor = value;
             }
         } else {
             return Err(BadRequest("Invalid response: require input_values".into()));
@@ -676,7 +676,7 @@ fn validate_url<'a>(addr: impl Into<Option<&'a str>>) -> Result<Url, ServiceErro
         _ => {
             return Err(BadRequest(
                 "Invalid scheme, allowed: ws, wss, http, https".into(),
-            ))
+            ));
         }
     }
 

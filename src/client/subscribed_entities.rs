@@ -1,5 +1,5 @@
-use crate::client::messages::SubscribedEntities;
 use crate::client::HomeAssistantClient;
+use crate::client::messages::SubscribedEntities;
 use actix::Handler;
 use log::debug;
 
