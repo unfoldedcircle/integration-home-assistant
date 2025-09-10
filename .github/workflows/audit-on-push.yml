@@ -11,6 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Cache cargo-bin
+        id: cache-dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin
+
       - name: Install cargo audit
         shell: bash
         run: |
