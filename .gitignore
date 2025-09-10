@@ -9,3 +9,4 @@
 *.bak
 /integration-hass_licenses.*
 /home-assistant.json
+/certs

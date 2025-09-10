@@ -139,8 +139,8 @@ jobs:
             # Rust target
             target: "aarch64-unknown-linux-gnu",
             target_id: "aarch64_unknown_linux_gnu",
-            buildroot-sdk-base-url: "https://github.com/unfoldedcircle/ucr2-toolchain/releases/download/v1.0.0",
-            buildroot-sdk-file-name: "ucr2-aarch64-toolchain-1.0.0-noqt.tar.gz",
+            buildroot-sdk-base-url: "https://github.com/unfoldedcircle/ucr2-toolchain/releases/download/v1.0.1",
+            buildroot-sdk-file-name: "ucr2-aarch64-toolchain-1.0.1-noqt.tar.gz",
             buildroot-sdk-name: "aarch64-buildroot-linux-gnu_sdk-buildroot",
             # linker must match ./cargo/config.toml target, otherwise the host linker is used! There's probably an easier way :-)
             linker: "ucr2-aarch64-none-linux-gnu-gcc"

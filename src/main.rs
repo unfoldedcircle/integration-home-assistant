@@ -51,6 +51,10 @@ async fn main() -> io::Result<()> {
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
     let cfg_file: Option<&str> =
         args.get_one("config")
             .map(|c: &String| c.as_str())
@@ -90,7 +94,7 @@ async fn main() -> io::Result<()> {
     if let Some(listener) = listeners.listener_tls {
         let server_cfg =
             create_single_cert_server_config(&listeners.certs.public, &listeners.certs.private)?;
-        http_server = http_server.listen_rustls_0_21(listener, server_cfg)?;
+        http_server = http_server.listen_rustls_0_23(listener, server_cfg)?;
     }
 
     if let Some(listener) = listeners.listener {

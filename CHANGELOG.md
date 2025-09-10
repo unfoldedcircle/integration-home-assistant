@@ -1,4 +1,4 @@
-# Home-Assistant Integration for Remote Two Changelog
+# Home-Assistant Integration for Remote Two/3 Changelog
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 _Changes in the next release_
 
 ### Added
-- Expert option to disable certificate validation of the Home Assistant WebSocket server connection.
+- Expert option to disable certificate validation of the Home Assistant WebSocket server connection  ([#71](https://github.com/unfoldedcircle/integration-home-assistant/pull/71)).
+
+### Fixed
+- Initial setup with a wss:// Home Assistant URL or switching from ws to wss doesn't require a reboot anymore ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)).
+
+### Changed
+- Rustls upgrade to 0.23 with system certificate verifier ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)). 
+- Update Rust crates and cross-compile toolchain ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)).
 
 ---
 
