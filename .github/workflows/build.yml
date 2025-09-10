@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - id: setup
         uses: ./.github/actions/rust-setup
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # History of 200 should be more than enough to calculate commit count since last release tag.
           fetch-depth: 200
@@ -148,7 +148,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ env.PROJECT_NAME}}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # History of 200 should be more than enough to calculate commit count since last release tag.
           fetch-depth: 200
@@ -262,7 +262,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ env.PROJECT_NAME}}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - id: setup
         uses: ./.github/actions/rust-setup
@@ -312,12 +312,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "lts/*"
 
@@ -343,7 +343,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
 
       - name: Log
         if: env.DEBUG_OUTPUT == 'true'
@@ -385,7 +385,7 @@ jobs:
 
       # Checkout is required for the next `gh release delete` step
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: main
 
@@ -439,7 +439,7 @@ jobs:
 
     steps:
       - name: Download Linux-x64 build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: "uc-intg-hass-*-${{ env.LINUX_ARTIFACT_SUFFIX }}*"
 
@@ -453,7 +453,7 @@ jobs:
           printenv
 
       - name: Check out repo for Docker build
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # needs to be a subdirectory, otherwise the workspace gets erased
           path: src

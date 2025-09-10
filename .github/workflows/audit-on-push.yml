@@ -9,6 +9,14 @@ jobs:
   security_audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
+
+      - name: Install cargo audit
+        shell: bash
+        run: |
+          if [[ ! -x "$(command -v cargo-audit)" ]]; then
+            echo "cargo-audit not found, installing it with cargo"
+            cargo install --force cargo-audit
+          fi;
 
       - run: cargo audit
