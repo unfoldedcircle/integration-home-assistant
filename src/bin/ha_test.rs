@@ -11,7 +11,7 @@ use std::env;
 use std::str::FromStr;
 use std::time::Duration;
 use uc_api::intg::ws::{R2Event, R2Request};
-use uc_intg_hass::configuration::{get_configuration, Settings, DEF_HA_URL, ENV_HASS_MSG_TRACING};
+use uc_intg_hass::configuration::{get_configuration, Settings, ENV_HASS_MSG_TRACING};
 use uc_intg_hass::{
     configuration, Controller, NewR2Session, R2EventMsg, R2RequestMsg, SendWsMessage, APP_VERSION,
 };
@@ -20,6 +20,14 @@ use url::Url;
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     let cfg = parse_args_load_cfg()?;
+
+    println!(
+        "Connecting to Home Assistant WebSocket server: {} (timeout={}s, request-timeout={}s, disable-cert={})",
+        cfg.hass.get_url(),
+        cfg.hass.connection_timeout,
+        cfg.hass.request_timeout,
+        cfg.hass.disable_cert_validation,
+    );
 
     let driver_metadata = configuration::get_driver_metadata()?;
     let controller = Controller::new(cfg, driver_metadata.clone()).start();
@@ -59,8 +67,13 @@ fn parse_args_load_cfg() -> anyhow::Result<Settings> {
         .arg(
             Arg::new("url")
                 .short('u')
-                .default_value(DEF_HA_URL)
                 .help("Home Assistant WebSocket API URL (overrides home-assistant.json)"),
+        )
+        .arg(
+            Arg::new("disable_cert_validation")
+                .long("disable-cert-validation")
+                .num_args(0)
+                .help("Disable SSL certificate verification (overrides home-assistant.json)"),
         )
         .arg(
             Arg::new("token")
@@ -95,6 +108,9 @@ fn parse_args_load_cfg() -> anyhow::Result<Settings> {
     let mut cfg = get_configuration(cfg_file).expect("Failed to read configuration");
     if let Some(url) = args.get_one::<String>("url") {
         cfg.hass.set_url(Url::parse(url)?);
+    }
+    if let Some(disable_cert_validation) = args.get_one::<bool>("disable_cert_validation") {
+        cfg.hass.disable_cert_validation = *disable_cert_validation;
     }
     if let Some(token) = args.get_one::<String>("token") {
         cfg.hass.set_token(token);

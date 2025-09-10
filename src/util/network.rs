@@ -67,6 +67,7 @@ pub fn new_websocket_client(
 }
 
 mod danger {
+    use log::warn;
     use rustls::client::{ServerCertVerified, ServerCertVerifier};
     use std::time::SystemTime;
 
@@ -82,6 +83,7 @@ mod danger {
             _ocsp_response: &[u8],
             _now: SystemTime,
         ) -> Result<ServerCertVerified, rustls::Error> {
+            warn!("Certificate verification disabled");
             Ok(ServerCertVerified::assertion())
         }
     }
