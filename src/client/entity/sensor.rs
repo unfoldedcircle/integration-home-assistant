@@ -9,7 +9,9 @@ use crate::errors::ServiceError;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::AvailableIntgEntity;
-use uc_api::{EntityType, SensorOptionField, intg::EntityChange};
+use uc_api::{
+    EntityType, SensorAttribute, SensorDeviceClass, SensorOptionField, intg::EntityChange,
+};
 
 fn map_sensor_attributes(
     entity_id: &str,
@@ -17,11 +19,14 @@ fn map_sensor_attributes(
     ha_attr: Option<&mut Map<String, Value>>,
 ) -> Result<Map<String, Value>, ServiceError> {
     let mut attributes = serde_json::Map::with_capacity(2);
-    attributes.insert("state".into(), convert_ha_sensor_state(state)?);
+    attributes.insert(
+        SensorAttribute::State.to_string(),
+        convert_ha_sensor_state(state)?,
+    );
     // HA: the state of a sensor entity is its currently detected value, which can be either text or a number.
     //     In addition, the entity can have the following states: unavailable, unknown
     //     https://www.home-assistant.io/integrations/sensor
-    attributes.insert("value".into(), state.into());
+    attributes.insert(SensorAttribute::Value.to_string(), state.into());
 
     // map HA binary-sensor device class into UC sensor unit field
     if entity_id.starts_with("binary_sensor.") {
@@ -31,7 +36,7 @@ fn map_sensor_attributes(
                 .and_then(|v| v.as_str().map(|v| v.to_lowercase()))
             && class != "none"
         {
-            attributes.insert("unit".into(), class.into());
+            attributes.insert(SensorAttribute::Unit.to_string(), class.into());
         }
         return Ok(attributes);
     }
@@ -39,7 +44,7 @@ fn map_sensor_attributes(
     if let Some(ha_attr) = ha_attr
         && let Some(uom) = ha_attr.remove("unit_of_measurement")
     {
-        attributes.insert("unit".into(), uom);
+        attributes.insert(SensorAttribute::Unit.to_string(), uom);
     }
     // TODO check and handle attributes.device_class? E.g. checking for supported sensors.
     // Currently supported: "battery" | "current" | "energy" | "humidity" | "power" | "temperature" | "voltage"
@@ -74,7 +79,7 @@ pub(crate) fn convert_sensor_entity(
     let mut options = serde_json::Map::new();
     let device_class = ha_attr.get("device_class").and_then(|v| v.as_str());
     let device_class = match device_class {
-        _ if entity_id.starts_with("binary_sensor.") => Some("binary".into()),
+        _ if entity_id.starts_with("binary_sensor.") => Some(SensorDeviceClass::Binary.to_string()),
         // supported device classes
         Some("battery") | Some("current") | Some("energy") | Some("humidity") | Some("power")
         | Some("temperature") | Some("voltage") => device_class.map(|v| v.into()),
@@ -91,7 +96,7 @@ pub(crate) fn convert_sensor_entity(
             if let Some(v) = ha_attr.get("unit_of_measurement") {
                 options.insert(SensorOptionField::CustomUnit.to_string(), v.clone());
             }
-            Some("custom".into())
+            Some(SensorDeviceClass::Custom.to_string())
         }
     };
 

@@ -28,11 +28,11 @@ mdns-sd = ["dep:mdns-sd"]
 zeroconf = ["dep:zeroconf"]
 
 [dependencies]
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.12.1" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.14.0" }
 # for local development:
 #uc_api = { path = "../api-model-rs" }
 # Using a GitHub revision:
-#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "1650ada3e11bb90318cef173811b6c475fa1d782" }
+#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "cb59e2f1f703f8d9fdca09937b318c55256b27c4" }
 
 # WebSockets server
 actix-web = { version = "4.11", features = ["rustls-0_23"] }
@@ -73,7 +73,7 @@ url = { version = "2", features = ["serde"] }
 
 # Helpful macros for working with enums and strings
 # Attention: strum needs to be in sync with uc_api
-strum = "0.26"
+strum = "0.27"
 derive_more = { version = "2", features = ["constructor", "display"] }
 
 anyhow = { version = "1", features = [] }

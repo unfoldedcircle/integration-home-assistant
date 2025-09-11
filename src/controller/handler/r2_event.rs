@@ -52,6 +52,9 @@ impl Handler<R2EventMsg> for Controller {
                     timeout: false,
                 });
             }
+            R2Event::Oauth2Authorization | R2Event::Oauth2Refreshed => {
+                // ignore OAuth events: not supported
+            }
         }
     }
 }
