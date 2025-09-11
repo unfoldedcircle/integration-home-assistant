@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.13.0 - 2025-09-11
 ### Added
 - Expert option to disable certificate validation of the Home Assistant WebSocket server connection  ([#71](https://github.com/unfoldedcircle/integration-home-assistant/pull/71)).
 
@@ -17,16 +20,14 @@ _Changes in the next release_
 - Only report the documented sensor states `ON`, `UNAVAILABLE` and `UNKNOWN`.
 
 ### Breaking changes
-- The mapping of binary sensors has changed to better represent them on the user interface:
-  - The device class is now set to `binary` instead of `custom`.
-  - The Home Assistant device class is stored in the `unit` attribute.
-  - The `value` attribute is no longer a boolean, but contains the `on` and `off` sensor text values from Home Assistant.
+- The mapping of binary sensors has changed to better represent them on the user interface ([#74](https://github.com/unfoldedcircle/integration-home-assistant/pull/74)):
+    - The device class is now set to `binary` instead of `custom`.
+    - The Home Assistant device class is stored in the `unit` attribute.
+    - The `value` attribute is no longer a boolean, but contains the `on` and `off` sensor text values from Home Assistant.
 
 ### Changed
-- Rustls upgrade to 0.23 with system certificate verifier ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)). 
+- Rustls upgrade to 0.23 with system certificate verifier ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)).
 - Update Rust crates and cross-compile toolchain ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)).
-
----
 
 ## v0.12.2 - 2025-04-17
 ### Added
