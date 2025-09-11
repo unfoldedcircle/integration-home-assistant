@@ -50,6 +50,7 @@ async fn main() -> io::Result<()> {
         .get_matches();
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    info!("Starting {} {}", built_info::PKG_NAME, APP_VERSION);
 
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()

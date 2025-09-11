@@ -13,6 +13,7 @@ _Changes in the next release_
 
 ### Fixed
 - Initial setup with a wss:// Home Assistant URL or switching from ws to wss doesn't require a reboot anymore ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)).
+- Report the correct integration version without the "-dirty" suffix if it was built with a clean codebase.
 
 ### Changed
 - Rustls upgrade to 0.23 with system certificate verifier ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)). 

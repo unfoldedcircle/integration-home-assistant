@@ -17,7 +17,7 @@ pub const APP_VERSION: &str = formatcp!(
         None => formatcp!("{}-non-git", built_info::PKG_VERSION),
     },
     match built_info::GIT_DIRTY {
-        Some(_) => "-dirty",
-        None => "",
+        Some(true) => "-dirty",
+        _ => "",
     }
 );
