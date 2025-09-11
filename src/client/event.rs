@@ -12,6 +12,7 @@ use crate::client::messages::EntityEvent;
 use crate::client::model::Event;
 use crate::errors::ServiceError;
 use log::debug;
+use serde_json::json;
 
 impl HomeAssistantClient {
     /// Whenever an `event` message is received from HA, this method is called to handle it.  
@@ -47,8 +48,7 @@ impl HomeAssistantClient {
                 return Ok(());
             }
             "cover" => cover_event_to_entity_change(event.data),
-            "sensor" => sensor_event_to_entity_change(event.data),
-            "binary_sensor" => binary_sensor_event_to_entity_change(event.data),
+            "sensor" | "binary_sensor" => sensor_event_to_entity_change(event.data),
             "climate" => climate_event_to_entity_change(event.data),
             "media_player" => media_player_event_to_entity_change(&self.server, event.data),
             "remote" => remote_event_to_entity_change(event.data),
@@ -64,6 +64,22 @@ impl HomeAssistantClient {
         })?;
 
         Ok(())
+    }
+}
+
+/// Convert a HA sensor state to a UC sensor-entity state.
+///
+/// The UC sensor entity only supports the ON state, and the common entity states:
+/// https://unfoldedcircle.github.io/core-api/entities/entity_sensor.html#states
+/// # Arguments
+///
+/// * `state`: Home Assistant sensor or binary-sensor state.
+///
+/// returns: "ON", "UNAVAILABLE", or "UNKNOWN"
+pub(crate) fn convert_ha_sensor_state(state: &str) -> Result<serde_json::Value, ServiceError> {
+    match state {
+        "unavailable" | "unknown" => Ok(serde_json::Value::String(state.to_uppercase())),
+        &_ => Ok(json!("ON")),
     }
 }
 

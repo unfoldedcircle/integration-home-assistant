@@ -17,6 +17,11 @@ pub(crate) fn handle_remote(msg: &EntityCommand) -> Result<(String, Option<Value
         IntgRemoteCommand::Toggle => ("toggle".into(), None),
         IntgRemoteCommand::SendCmd => create_command(msg, "command")?,
         IntgRemoteCommand::SendCmdSequence => create_command(msg, "sequence")?,
+        IntgRemoteCommand::StopSend => {
+            return Err(ServiceError::BadRequest(
+                "stop_send command is not supported".into(),
+            ));
+        }
     };
 
     Ok(result)

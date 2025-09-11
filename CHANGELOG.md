@@ -14,6 +14,13 @@ _Changes in the next release_
 ### Fixed
 - Initial setup with a wss:// Home Assistant URL or switching from ws to wss doesn't require a reboot anymore ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)).
 - Report the correct integration version without the "-dirty" suffix if it was built with a clean codebase.
+- Only report the documented sensor states `ON`, `UNAVAILABLE` and `UNKNOWN`.
+
+### Breaking changes
+- The mapping of binary sensors has changed to better represent them on the user interface:
+  - The device class is now set to `binary` instead of `custom`.
+  - The Home Assistant device class is stored in the `unit` attribute.
+  - The `value` attribute is no longer a boolean, but contains the `on` and `off` sensor text values from Home Assistant.
 
 ### Changed
 - Rustls upgrade to 0.23 with system certificate verifier ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)). 
