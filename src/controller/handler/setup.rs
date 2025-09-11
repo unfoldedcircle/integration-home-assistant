@@ -218,7 +218,8 @@ impl Handler<RequestOptionsMsg> for Controller {
             return;
         }
 
-        // TODO externalize i18n
+        // TODO externalize i18n. Start with rust-i18n.
+        //      This will likely requires custom macros to return multi-language strings (as done in the JS & Python libraries).
         let event = if self.settings.hass.has_external_url_and_token() {
             WsMessage::event(
                 "driver_setup_change",

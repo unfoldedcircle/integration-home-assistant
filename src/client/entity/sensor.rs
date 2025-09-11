@@ -1,9 +1,9 @@
 // Copyright (c) 2022 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-//! Sensor entity specific logic.
+//! Sensor entity-specific logic.
 
-use crate::client::event::convert_ha_onoff_state;
+use crate::client::event::convert_ha_sensor_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
 use serde_json::{Map, Value};
@@ -11,13 +11,30 @@ use std::collections::HashMap;
 use uc_api::intg::AvailableIntgEntity;
 use uc_api::{EntityType, SensorOptionField, intg::EntityChange};
 
-pub(crate) fn map_sensor_attributes(
-    _entity_id: &str,
+fn map_sensor_attributes(
+    entity_id: &str,
     state: &str,
     ha_attr: Option<&mut Map<String, Value>>,
 ) -> Result<Map<String, Value>, ServiceError> {
     let mut attributes = serde_json::Map::with_capacity(2);
+    attributes.insert("state".into(), convert_ha_sensor_state(state)?);
+    // HA: the state of a sensor entity is its currently detected value, which can be either text or a number.
+    //     In addition, the entity can have the following states: unavailable, unknown
+    //     https://www.home-assistant.io/integrations/sensor
     attributes.insert("value".into(), state.into());
+
+    // map HA binary-sensor device class into UC sensor unit field
+    if entity_id.starts_with("binary_sensor.") {
+        if let Some(ha_attr) = ha_attr
+            && let Some(class) = ha_attr
+                .remove("device_class")
+                .and_then(|v| v.as_str().map(|v| v.to_lowercase()))
+            && class != "none"
+        {
+            attributes.insert("unit".into(), class.into());
+        }
+        return Ok(attributes);
+    }
 
     if let Some(ha_attr) = ha_attr
         && let Some(uom) = ha_attr.remove("unit_of_measurement")
@@ -47,25 +64,6 @@ pub(crate) fn sensor_event_to_entity_change(
     })
 }
 
-pub(crate) fn binary_sensor_event_to_entity_change(
-    data: EventData,
-) -> Result<EntityChange, ServiceError> {
-    let mut attributes = serde_json::Map::with_capacity(3);
-    let state = convert_ha_onoff_state(&data.new_state.state)?;
-
-    // TODO decide on how to handle the special binary sensor #13
-    attributes.insert("value".into(), (Some("ON") == state.as_str()).into());
-    attributes.insert("state".into(), state);
-    attributes.insert("unit".into(), "boolean".into());
-
-    Ok(EntityChange {
-        device_id: None,
-        entity_type: EntityType::Sensor,
-        entity_id: data.entity_id,
-        attributes,
-    })
-}
-
 pub(crate) fn convert_sensor_entity(
     entity_id: String,
     state: String,
@@ -76,6 +74,8 @@ pub(crate) fn convert_sensor_entity(
     let mut options = serde_json::Map::new();
     let device_class = ha_attr.get("device_class").and_then(|v| v.as_str());
     let device_class = match device_class {
+        _ if entity_id.starts_with("binary_sensor.") => Some("binary".into()),
+        // supported device classes
         Some("battery") | Some("current") | Some("energy") | Some("humidity") | Some("power")
         | Some("temperature") | Some("voltage") => device_class.map(|v| v.into()),
         // Map non-supported device classes to a custom sensor and use device class as label
