@@ -463,10 +463,9 @@ jobs:
         run: |
           mkdir -p ./src/docker/app
           ls -lah
-          cd *${{ env.LINUX_ARTIFACT_SUFFIX }}
           for filename in *${{ env.LINUX_ARTIFACT_SUFFIX }}*.tar.gz; do
             echo "Extracting release file for Docker build: $filename"
-            tar xvzf $filename -C ../src/docker/app
+            tar xvzf $filename -C src/docker/app
             # there should only be one Linux release :-)
             break
           done;
@@ -514,6 +513,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker image
+        if: "contains(github.ref, 'tags/v')" # only publish releases!
         uses: docker/build-push-action@v3
         with:
           context: src/docker
