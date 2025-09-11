@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.13.1 - 2025-09-11
+### Fixed
+- Docker image build with updated GitHub actions.
+
 ## v0.13.0 - 2025-09-11
 ### Added
 - Expert option to disable certificate validation of the Home Assistant WebSocket server connection  ([#71](https://github.com/unfoldedcircle/integration-home-assistant/pull/71)).
