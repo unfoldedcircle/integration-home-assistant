@@ -32,7 +32,7 @@ fn get_git_version() -> Option<String> {
         && output.status.success()
         && let Ok(version) = String::from_utf8(output.stdout)
     {
-        return Some(version.trim().to_string());
+        return Some(version.trim().trim_start_matches('v').to_string());
     }
 
     // Fallback: try to get commit hash only

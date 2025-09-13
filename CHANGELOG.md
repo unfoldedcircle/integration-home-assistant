@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Changed
+- Remove the 'v'-prefix from the version information.
+
 ---
 
 ## v0.13.1 - 2025-09-11
