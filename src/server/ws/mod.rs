@@ -92,15 +92,26 @@ pub async fn ws_index(
         .map(|addr| format!("{}:{}", addr.ip(), addr.port()))
         .unwrap_or_else(|| Uuid::new_v4().as_hyphenated().to_string());
 
-    actix_web_actors::ws::start(
-        WsConn::new(
-            client_id,
-            controller.get_ref().clone(),
-            websocket_settings.heartbeat,
-        ),
-        &request,
-        stream,
-    )
+    let (resp, session, msg_stream) = actix_ws::handle(&request, stream)?;
+
+    // Increase the maximum allowed frame size to 128KiB. Default is 64KiB.
+    // Note: there shouldn't be a need to increase this, since the Remote request message payloads are small.
+    // Also, aggregate continuation frames is just "future proofing" and not used at the moment in the Remote.
+    let stream = msg_stream
+        .max_frame_size(128 * 1024)
+        .aggregate_continuations();
+
+    let conn = WsConn::new(
+        client_id,
+        controller.get_ref().clone(),
+        websocket_settings.heartbeat,
+    );
+
+    actix_web::rt::spawn(async move {
+        conn.run(session, stream).await;
+    });
+
+    Ok(resp)
 }
 
 /// Custom Actix Web error handler

@@ -6,209 +6,278 @@
 use crate::controller::{NewR2Session, R2SessionDisconnect, SendWsMessage};
 use crate::errors::ServiceError;
 use crate::server::ws::WsConn;
-use actix::{
-    Actor, ActorContext, ActorFutureExt, AsyncContext, ContextFutureSpawner, Handler,
-    ResponseActFuture, Running, StreamHandler, WrapFuture, fut,
-};
-use actix_web_actors::ws::{CloseCode, CloseReason, Message, ProtocolError, WebsocketContext};
-use bytestring::ByteString;
+use actix::{Actor, Addr, Handler};
+use actix_ws::{AggregatedMessage, CloseCode, CloseReason, Session};
 use log::{debug, error, info, warn};
 use std::time::Instant;
 use uc_api::ws::{WsMessage, WsResultMsgData};
 
-/// Local Actix message to handle WebSocket text message.
-///
-/// This is a "one way" fire and forget message on purpose to simplify handling in the StreamHandler.
-/// Any errors must be handled in the receiver, e.g. sending error response messages back to
-/// the Remote Two!
-#[derive(actix::prelude::Message)]
-#[rtype(result = "()")]
-struct TextMsg(pub ByteString);
-
-impl Actor for WsConn {
-    type Context = WebsocketContext<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        // Noticed `send failed because receiver is full` errors with the default 16.
-        // Likely due to rapid entity updates from HA.
-        ctx.set_mailbox_capacity(32);
-
-        self.start_heartbeat(ctx);
-
-        // since we only implemented the header based authentication in server::ws_index we can send
-        // the authentication event right after startup
-        let json = serde_json::json!({
-            "kind": "resp",
-            "req_id": 0,
-            "code": 200,
-            "msg": "authentication"
-        });
-        ctx.text(json.to_string());
-
-        // register new WebSocket connection to our handler
-        self.controller_addr
-            .send(NewR2Session {
-                addr: ctx.address().recipient(),
-                id: self.id.clone(),
-            })
-            .into_actor(self)
-            .then(|res, _, ctx| {
-                if let Err(e) = res {
-                    error!("Error registering new WebSocket connection: {e}");
-                    ctx.stop();
-                }
-                fut::ready(())
-            })
-            .wait(ctx);
-
-        debug!("[{}] started", self.id);
-    }
-
-    fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        // remove WebSocket connection from our handler
-        self.controller_addr.do_send(R2SessionDisconnect {
-            id: self.id.clone(),
-        });
-        debug!("[{}] stopped", self.id);
-        Running::Stop
-    }
+pub(crate) struct WsSender {
+    pub id: String,
+    pub session: Session,
+    pub msg_tracing_out: bool,
 }
 
-impl StreamHandler<actix_web::Result<Message, ProtocolError>> for WsConn {
-    fn handle(&mut self, msg: actix_web::Result<Message, ProtocolError>, ctx: &mut Self::Context) {
-        if let Ok(msg) = msg {
-            match msg {
-                Message::Text(text) => ctx.notify(TextMsg(text)),
-                Message::Binary(_) => {
-                    self.close(CloseCode::Size, "Binary messages not supported!", ctx);
-                }
-                Message::Ping(bytes) => {
-                    self.hb = Instant::now();
-                    ctx.pong(&bytes);
-                }
-                Message::Pong(_) => self.hb = Instant::now(),
-                Message::Close(reason) => {
-                    info!("[{}] Remote closed connection. Reason: {reason:?}", self.id);
-                    ctx.stop();
-                }
-                Message::Continuation(_) => {
-                    self.close(CloseCode::Size, "Continuation frames not supported!", ctx);
-                }
-                Message::Nop => {}
-            }
-        } else {
-            info!("[{}] Closing WebSocket: {:?}", self.id, msg.unwrap_err());
-            ctx.stop();
-        }
-    }
+impl Actor for WsSender {
+    type Context = actix::Context<Self>;
 }
 
-impl Handler<TextMsg> for WsConn {
-    type Result = ResponseActFuture<Self, ()>;
-
-    fn handle(&mut self, text: TextMsg, ctx: &mut Self::Context) -> Self::Result {
-        if self.msg_tracing_in {
-            debug!("[{}] -> {}", self.id, text.0);
-        }
-
-        let msg: WsMessage = match serde_json::from_slice(text.0.as_ref()) {
-            Ok(v) => v,
-            Err(e) => {
-                warn!("[{}] Invalid JSON message: {e}", self.id);
-                self.close(CloseCode::Unsupported, "Invalid JSON message", ctx);
-                return Box::pin(fut::ready(()));
-            }
-        };
-
-        // clone required data for async context
-        let req_id = msg.id.unwrap_or_default();
-        let req_msg = msg.msg.clone().unwrap_or_default();
-        let session_id = self.id.clone();
-        let controller_addr = self.controller_addr.clone();
-
-        Box::pin(
-            async move {
-                match msg.kind {
-                    None => Err(ServiceError::BadRequest("Missing property: kind".into())),
-                    Some(ref k) => match k.as_str() {
-                        "req" => WsConn::on_request(&session_id, msg, controller_addr).await,
-                        "resp" => {
-                            WsConn::on_response(&session_id, msg, controller_addr).await?;
-                            Ok(None)
-                        }
-                        "event" => {
-                            WsConn::on_event(&session_id, msg, controller_addr).await?;
-                            Ok(None)
-                        }
-                        _ => Err(ServiceError::BadRequest(format!(
-                            "Unsupported message kind: {k}"
-                        ))),
-                    },
-                }
-            }
-            .into_actor(self) // converts future to ActorFuture
-            .map(
-                move |result: Result<Option<WsMessage>, ServiceError>, act, ctx| match result {
-                    Ok(Some(response)) => {
-                        ctx.notify(SendWsMessage(response));
-                    }
-                    Err(e) => {
-                        warn!(
-                            "[{}] Error processing received message '{req_msg}': {e}",
-                            act.id
-                        );
-                        let response = service_error_to_ws_message(&act.id, req_id, e);
-                        ctx.notify(SendWsMessage(response));
-                    }
-                    _ => {}
-                },
-            ),
-        )
-    }
-}
-
-impl Handler<SendWsMessage> for WsConn {
+impl Handler<SendWsMessage> for WsSender {
     type Result = ();
 
-    fn handle(&mut self, msg: SendWsMessage, ctx: &mut Self::Context) {
-        if let Ok(msg) = serde_json::to_string(&msg.0) {
-            if self.msg_tracing_out {
-                debug!("[{}] <- {msg}", self.id);
+    fn handle(&mut self, msg: SendWsMessage, _ctx: &mut Self::Context) {
+        match serde_json::to_string(&msg.0) {
+            Ok(text) => {
+                if self.msg_tracing_out {
+                    debug!("[{}] <- {text}", self.id);
+                }
+                let mut session = self.session.clone();
+                actix_web::rt::spawn(async move {
+                    if let Err(e) = session.text(text).await {
+                        error!("WebSocket send error: {e}");
+                    }
+                });
             }
-            ctx.text(msg);
-        } else {
-            error!("[{}] Error serializing {:?}", self.id, msg.0)
+            Err(e) => error!("[{}] Error serializing outgoing message: {e}", self.id),
         }
     }
 }
 
 impl WsConn {
-    fn start_heartbeat(&self, ctx: &mut WebsocketContext<Self>) {
-        ctx.run_interval(self.heartbeat.interval, |act, ctx| {
-            if Instant::now().duration_since(act.hb) > act.heartbeat.timeout {
-                info!("[{}] Closing connection due to failed heartbeat", act.id);
-                // remove WebSocket connection from our handler
-                act.controller_addr
-                    .do_send(R2SessionDisconnect { id: act.id.clone() });
+    /// Runs the message processing of the UC Remote WebSocket connection.
+    ///
+    /// This asynchronous function is responsible for managing the WebSocket
+    /// session between the client and the server. It handles the initialization
+    /// of the session, processes incoming messages, sends outgoing messages.
+    /// This function is meant to run in a Tokio task.
+    ///
+    /// - Periodically sends WebSocket ping frames to maintain the connection.
+    /// - Closes the connection if the heartbeat timeout is exceeded, indicating
+    ///   the client is unresponsive.
+    /// - If errors occur during registration, outgoing message handling, heartbeat
+    ///   checks, or message processing, the WebSocket connection will be closed
+    ///   with an appropriate close reason if provided.
+    ///
+    /// **Actix messages**
+    /// - Registers the session with the controller by sending a `NewR2Session`
+    ///   message. If this fails, the connection is closed with an error code.
+    /// - Incoming WebSocket messages will trigger `R2RequestMsg`, `R2Event`, or `R2ResponseMsg`
+    ///   messages to be sent to the controller.
+    /// - After the processing loop terminates, the function notifies the
+    ///   controller that the session has been closed by sending an
+    ///   `R2SessionDisconnect` message.
+    ///
+    /// # Parameters
+    /// - `session`: The `Session` object representing the WebSocket connection
+    ///   with the client, used to send and receive messages.
+    /// - `stream`: An `AggregatedMessageStream` from `actix_ws` for receiving
+    ///   incoming WebSocket messages from the client.
+    ///
+    pub(crate) async fn run(
+        mut self,
+        mut session: Session,
+        mut stream: actix_ws::AggregatedMessageStream,
+    ) {
+        use actix_web::rt::time;
+        use futures::StreamExt;
 
-                ctx.stop();
-                return;
-            }
-
-            ctx.ping(b"");
+        // send initial authentication response
+        let auth = serde_json::json!({
+            "kind": "resp",
+            "req_id": 0,
+            "code": 200,
+            "msg": "authentication"
         });
+        let _ = session.text(auth.to_string()).await;
+
+        // Create sender actor for outgoing messages
+        let sender = WsSender {
+            id: self.id.clone(),
+            session: session.clone(),
+            msg_tracing_out: self.msg_tracing_out,
+        }
+        .start();
+
+        // register new session
+        if let Err(e) = self
+            .controller_addr
+            .send(NewR2Session {
+                addr: sender.clone().recipient(),
+                id: self.id.clone(),
+            })
+            .await
+        {
+            error!("Error registering new WebSocket connection: {e}");
+            let _ = session
+                .close(Some(CloseReason {
+                    code: CloseCode::Error,
+                    description: Some("internal error".into()),
+                }))
+                .await;
+            // Can't return an error since this runs in a separate task
+            return;
+        }
+
+        debug!("[{}] started", self.id);
+
+        let mut hb_interval = time::interval(self.heartbeat.interval);
+        loop {
+            tokio::select! {
+                _ = hb_interval.tick() => {
+                    if Instant::now().duration_since(self.hb) > self.heartbeat.timeout {
+                        info!("[{}] Closing connection due to failed heartbeat", self.id);
+                        self.controller_addr.do_send(R2SessionDisconnect { id: self.id.clone() });
+                        let _ = session.close(Some(CloseReason{
+                            code: CloseCode::Away,
+                            description: Some("heartbeat timeout".into())
+                        })).await;
+                        break;
+                    }
+                    let _ = session.ping(b"").await;
+                }
+                msg = stream.next() => {
+                    match msg {
+                        Some(Ok(msg)) => {
+                            if let Err(close_reason) =
+                                self.handle_stream_message(msg, &sender, &mut session).await {
+                                    if close_reason.is_some() {
+                                        let _ = session.close(close_reason).await;
+                                    }
+                                break;
+                            }
+                        }
+                        Some(Err(e)) => {
+                            info!("[{}] Closing WebSocket: {e:?}", self.id);
+                            let _ = session.close(None).await;
+                            break;
+                        }
+                        None => {
+                            debug!("[{}] Message stream ended, closing connection", self.id);
+                            // Not sure if required, but make sure the WS connection is closed
+                            let _ = session.close(None).await;
+                            break
+                        },
+                    }
+                }
+            }
+        }
+
+        // processing loop finished, notify controller that WS connection closed
+        self.controller_addr.do_send(R2SessionDisconnect {
+            id: self.id.clone(),
+        });
+        debug!("[{}] stopped", self.id);
     }
 
-    fn close(&mut self, code: CloseCode, description: &str, ctx: &mut WebsocketContext<WsConn>) {
-        info!(
-            "[{}] Closing connection with code {code:?}: {description}",
-            self.id
-        );
-        ctx.close(Some(CloseReason {
-            code,
-            description: Some(description.into()),
-        }));
-        ctx.stop();
+    async fn handle_stream_message(
+        &mut self,
+        msg: AggregatedMessage,
+        sender: &Addr<WsSender>,
+        session: &mut Session,
+    ) -> Result<(), Option<CloseReason>> {
+        match msg {
+            AggregatedMessage::Text(text) => {
+                self.hb = Instant::now();
+                if self.msg_tracing_in {
+                    debug!("[{}] -> {}", self.id, &text);
+                }
+
+                self.handle_text_message(&text, sender).await
+            }
+            AggregatedMessage::Binary(_) => Err(Some(CloseReason {
+                code: CloseCode::Size,
+                description: Some("Binary messages not supported!".into()),
+            })),
+            AggregatedMessage::Ping(bytes) => {
+                self.hb = Instant::now();
+                let _ = session.pong(&bytes).await;
+                Ok(())
+            }
+            AggregatedMessage::Pong(_) => {
+                self.hb = Instant::now();
+                Ok(())
+            }
+            AggregatedMessage::Close(reason) => {
+                info!("[{}] Remote closed connection. Reason: {reason:?}", self.id);
+                Err(None)
+            }
+        }
+    }
+
+    async fn handle_text_message(
+        &self,
+        text: &str,
+        sender: &Addr<WsSender>,
+    ) -> Result<(), Option<CloseReason>> {
+        match serde_json::from_str::<WsMessage>(text) {
+            Ok(msg) => {
+                self.process_ws_message(msg, sender).await;
+                Ok(())
+            }
+            Err(e) => {
+                warn!("[{}] Invalid JSON message: {e}", self.id);
+                Err(Some(CloseReason {
+                    code: CloseCode::Unsupported,
+                    description: Some("Invalid JSON message".into()),
+                }))
+            }
+        }
+    }
+
+    async fn process_ws_message(&self, msg: WsMessage, sender: &Addr<WsSender>) {
+        let req_id = msg.id.unwrap_or_default();
+        let req_msg = msg.msg.clone().unwrap_or_default();
+
+        match msg.kind.as_deref() {
+            Some("req") => {
+                match WsConn::on_request(&self.id, msg, self.controller_addr.clone()).await {
+                    Ok(Some(response)) => {
+                        sender.do_send(SendWsMessage(response));
+                    }
+                    Err(e) => {
+                        warn!(
+                            "[{}] Error processing received message '{req_msg}': {e}",
+                            self.id
+                        );
+                        self.send_error_response(req_id, e, sender);
+                    }
+                    _ => {}
+                }
+            }
+            Some("resp") => {
+                if let Err(e) =
+                    WsConn::on_response(&self.id, msg, self.controller_addr.clone()).await
+                {
+                    warn!("[{}] Error processing response: {e}", self.id);
+                }
+            }
+            Some("event") => {
+                if let Err(e) = WsConn::on_event(&self.id, msg, self.controller_addr.clone()).await
+                {
+                    warn!("[{}] Error processing event: {e}", self.id);
+                }
+            }
+            Some(other) => {
+                self.send_error_response(
+                    req_id,
+                    ServiceError::BadRequest(format!("Unsupported message kind: {other}")),
+                    sender,
+                );
+                warn!("[{}] Unsupported message kind: {other}", self.id);
+            }
+            None => {
+                self.send_error_response(
+                    req_id,
+                    ServiceError::BadRequest("Missing property: kind".into()),
+                    sender,
+                );
+            }
+        }
+    }
+
+    fn send_error_response(&self, req_id: u32, error: ServiceError, sender: &Addr<WsSender>) {
+        let response = service_error_to_ws_message(&self.id, req_id, error);
+        sender.do_send(SendWsMessage(response));
     }
 }
 

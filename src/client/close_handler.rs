@@ -6,7 +6,7 @@
 use std::time::Duration;
 
 use actix::{ActorContext, AsyncContext, Handler};
-use actix_web_actors::ws;
+use awc::ws;
 use awc::ws::CloseReason;
 use log::info;
 

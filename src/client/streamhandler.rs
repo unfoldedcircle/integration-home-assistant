@@ -4,7 +4,8 @@
 //! StreamHandler trait implementation to receive WebSocket frames.
 
 use actix::{ActorContext, AsyncContext, Context, StreamHandler};
-use actix_web_actors::ws::{Frame, ProtocolError as WsProtocolError};
+use awc::error::WsProtocolError;
+use awc::ws::Frame;
 use log::{debug, error, info};
 
 use crate::client::HomeAssistantClient;

@@ -1,6 +1,9 @@
 // Copyright (c) 2024 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
+#![forbid(unsafe_code)]
+#![forbid(non_ascii_idents)]
+
 pub mod client;
 pub mod controller;
 pub mod server;
