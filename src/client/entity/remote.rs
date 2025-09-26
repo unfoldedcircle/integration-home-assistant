@@ -131,6 +131,101 @@ mod tests {
     }
 
     #[test]
+    fn convert_ha_entity_without_friendly_name_defaults_name() {
+        let mut ha_entity = json!({
+          "entity_id": "remote.office_tv",
+          "state": "on",
+          "attributes": {
+            "supported_features": 4
+          }
+        });
+        let ha_entity = ha_entity.as_object_mut().unwrap();
+
+        let entity_id = ha_entity
+            .get("entity_id")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+        let state = ha_entity
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+        let attr = ha_entity
+            .get_mut("attributes")
+            .and_then(|v| v.as_object_mut())
+            .unwrap();
+
+        let result = convert_remote_entity(entity_id.clone(), state, attr);
+        assert!(result.is_ok(), "Expected successful entity conversion");
+        let entity = result.unwrap();
+
+        // Name should default to entity_id when friendly_name is missing
+        assert_eq!(Some(&entity_id), entity.name.get("en"));
+        assert_eq!(EntityType::Remote, entity.entity_type);
+        assert!(entity.features.is_some());
+        assert!(entity.attributes.is_some());
+    }
+
+    #[test]
+    fn convert_ha_entity_off_state() {
+        let mut ha_entity = json!({
+          "entity_id": "remote.office_tv",
+          "state": "off",
+          "attributes": {
+            "friendly_name": "Office TV",
+            "supported_features": 4
+          }
+        });
+        let ha_entity = ha_entity.as_object_mut().unwrap();
+        let entity_id = ha_entity.get("entity_id").and_then(|v| v.as_str()).unwrap().to_string();
+        let state = ha_entity.get("state").and_then(|v| v.as_str()).unwrap().to_string();
+        let attr = ha_entity.get_mut("attributes").and_then(|v| v.as_object_mut()).unwrap();
+        let result = convert_remote_entity(entity_id, state, attr).unwrap();
+
+        // Expect OFF mapping
+        let attr = result.attributes.unwrap();
+        assert_eq!(Some(&json!("OFF")), attr.get("state"));
+        // Features vector should contain 3 entries as defined
+        assert_eq!(Some(3), result.features.as_ref().map(|f| f.len()));
+    }
+
+    #[test]
+    fn convert_ha_entity_unknown_state() {
+        let mut ha_entity = json!({
+          "entity_id": "remote.office_tv",
+          "state": "unknown",
+          "attributes": {
+            "friendly_name": "Office TV"
+          }
+        });
+        let ha_entity = ha_entity.as_object_mut().unwrap();
+        let entity_id = ha_entity.get("entity_id").and_then(|v| v.as_str()).unwrap().to_string();
+        let state = ha_entity.get("state").and_then(|v| v.as_str()).unwrap().to_string();
+        let attr = ha_entity.get_mut("attributes").and_then(|v| v.as_object_mut()).unwrap();
+        let result = convert_remote_entity(entity_id, state, attr).unwrap();
+        let attr = result.attributes.unwrap();
+        assert_eq!(Some(&json!("UNKNOWN")), attr.get("state"));
+    }
+
+    #[test]
+    fn convert_ha_entity_invalid_state_error() {
+        let mut ha_entity = json!({
+          "entity_id": "remote.office_tv",
+          "state": "playing",
+          "attributes": {
+            "friendly_name": "Office TV"
+          }
+        });
+        let ha_entity = ha_entity.as_object_mut().unwrap();
+        let entity_id = ha_entity.get("entity_id").and_then(|v| v.as_str()).unwrap().to_string();
+        let state = ha_entity.get("state").and_then(|v| v.as_str()).unwrap().to_string();
+        let attr = ha_entity.get_mut("attributes").and_then(|v| v.as_object_mut()).unwrap();
+        let result = convert_remote_entity(entity_id, state, attr);
+        assert!(result.is_err(), "Expected error for invalid state");
+    }
+
+    #[test]
     fn remote_event_on() {
         let event = json!({
           "event_type": "state_changed",

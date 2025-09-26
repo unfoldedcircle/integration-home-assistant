@@ -328,9 +328,11 @@ fn extract_rgb_color(
 
 #[cfg(test)]
 mod tests {
-    use crate::client::entity::light::color_temp_mired_to_percent;
+    use super::*;
     use crate::errors::ServiceError;
     use rstest::rstest;
+    use serde_json::json;
+    use uc_api::{EntityType, LightFeature};
 
     #[rstest]
     #[case(0, 0)]
@@ -375,5 +377,341 @@ mod tests {
         let result = color_temp_mired_to_percent(input, min_mireds, max_mireds);
 
         assert_eq!(Ok(expected), result);
+    }
+
+    #[test]
+    fn convert_light_entity_basic() {
+        let entity_id = "light.living_room".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Living Room Light"
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id.clone(), state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert_eq!(entity_id, entity.entity_id);
+        assert_eq!(EntityType::Light, entity.entity_type);
+        assert_eq!(None, entity.device_class);
+        assert_eq!(
+            Some(&"Living Room Light".to_string()),
+            entity.name.get("en")
+        );
+        assert!(entity.features.is_some());
+        assert!(entity.attributes.is_some());
+
+        // Should have at least the toggle feature
+        let features = entity.features.unwrap();
+        assert!(features.contains(&LightFeature::Toggle.to_string()));
+    }
+
+    #[test]
+    fn convert_light_entity_no_friendly_name() {
+        let entity_id = "light.bedroom".to_string();
+        let state = "off".to_string();
+        let mut ha_attr = serde_json::from_value(json!({})).unwrap();
+
+        let result = convert_light_entity(entity_id.clone(), state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert_eq!(Some(&entity_id), entity.name.get("en"));
+    }
+
+    #[rstest]
+    #[case("on")]
+    #[case("off")]
+    #[case("unavailable")]
+    #[case("unknown")]
+    fn convert_light_entity_all_states(#[case] state: &str) {
+        let entity_id = format!("light.state_test_{}", state);
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": format!("State Test {}", state)
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state.to_string(), &mut ha_attr);
+
+        assert!(result.is_ok(), "Failed for state: {}", state);
+        let entity = result.unwrap();
+        assert!(entity.attributes.is_some());
+    }
+
+    #[test]
+    fn convert_light_entity_with_brightness_only() {
+        let entity_id = "light.dimmable".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Dimmable Light",
+            "supported_color_modes": ["brightness"]
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&LightFeature::Toggle.to_string()));
+        assert!(features.contains(&LightFeature::Dim.to_string()));
+        assert!(!features.contains(&LightFeature::Color.to_string()));
+        assert!(!features.contains(&LightFeature::ColorTemperature.to_string()));
+    }
+
+    #[test]
+    fn convert_light_entity_with_color_temperature() {
+        let entity_id = "light.temp_light".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Temperature Light",
+            "supported_color_modes": ["color_temp"]
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&LightFeature::Toggle.to_string()));
+        assert!(features.contains(&LightFeature::Dim.to_string()));
+        assert!(features.contains(&LightFeature::ColorTemperature.to_string()));
+        assert!(!features.contains(&LightFeature::Color.to_string()));
+    }
+
+    #[rstest]
+    #[case("hs")]
+    #[case("rgb")]
+    #[case("rgbw")]
+    #[case("rgbww")]
+    #[case("xy")]
+    fn convert_light_entity_with_color_modes(#[case] color_mode: &str) {
+        let entity_id = format!("light.color_{}", color_mode);
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": format!("Color Light {}", color_mode),
+            "supported_color_modes": [color_mode]
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Failed for color mode: {}", color_mode);
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&LightFeature::Toggle.to_string()));
+        assert!(features.contains(&LightFeature::Dim.to_string()));
+        assert!(features.contains(&LightFeature::Color.to_string()));
+        assert!(!features.contains(&LightFeature::ColorTemperature.to_string()));
+    }
+
+    #[test]
+    fn convert_light_entity_with_all_color_modes() {
+        let entity_id = "light.full_featured".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Full Featured Light",
+            "supported_color_modes": ["brightness", "color_temp", "hs", "rgb", "xy"]
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&LightFeature::Toggle.to_string()));
+        assert!(features.contains(&LightFeature::Dim.to_string()));
+        assert!(features.contains(&LightFeature::Color.to_string()));
+        assert!(features.contains(&LightFeature::ColorTemperature.to_string()));
+    }
+
+    #[test]
+    fn convert_light_entity_no_color_modes() {
+        let entity_id = "light.simple".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Simple Light"
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Should only have toggle feature
+        assert_eq!(1, features.len());
+        assert!(features.contains(&LightFeature::Toggle.to_string()));
+    }
+
+    #[test]
+    fn convert_light_entity_empty_color_modes() {
+        let entity_id = "light.empty_modes".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Empty Modes Light",
+            "supported_color_modes": []
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Should only have toggle feature
+        assert_eq!(1, features.len());
+        assert!(features.contains(&LightFeature::Toggle.to_string()));
+    }
+
+    #[test]
+    fn convert_light_entity_invalid_color_modes() {
+        let entity_id = "light.invalid_modes".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Invalid Modes Light",
+            "supported_color_modes": ["unknown_mode", "invalid"]
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Should only have toggle feature since no valid modes
+        assert_eq!(1, features.len());
+        assert!(features.contains(&LightFeature::Toggle.to_string()));
+    }
+
+    #[test]
+    fn convert_light_entity_structure() {
+        let entity_id = "light.structure_test".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Structure Test Light"
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id.clone(), state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+
+        // Verify required fields
+        assert_eq!(entity_id, entity.entity_id);
+        assert_eq!(None, entity.device_id);
+        assert_eq!(EntityType::Light, entity.entity_type);
+        assert_eq!(None, entity.device_class);
+        assert_eq!(None, entity.area);
+        assert_eq!(None, entity.options);
+        assert!(entity.name.contains_key("en"));
+        assert!(entity.features.is_some());
+        assert!(entity.attributes.is_some());
+    }
+
+    #[test]
+    fn convert_light_entity_with_brightness_attribute() {
+        let entity_id = "light.bright_light".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Bright Light",
+            "supported_color_modes": ["brightness"],
+            "brightness": 128
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert!(entity.attributes.is_some());
+
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(Some(&json!("ON")), attributes.get("state"));
+        assert_eq!(Some(&json!(128)), attributes.get("brightness"));
+    }
+
+    #[test]
+    fn convert_light_entity_with_color_attributes() {
+        let entity_id = "light.color_light".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Color Light",
+            "supported_color_modes": ["hs"],
+            "color_mode": "hs",
+            "hs_color": [120.0, 75.0]
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert!(entity.attributes.is_some());
+
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(Some(&json!("ON")), attributes.get("state"));
+        assert_eq!(Some(&json!(120)), attributes.get("hue"));
+        // saturation converted from 0-100 to 0-255 range
+        assert_eq!(Some(&json!(191)), attributes.get("saturation"));
+    }
+
+    #[test]
+    fn convert_light_entity_with_color_temp_attributes() {
+        let entity_id = "light.temp_light".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Temperature Light",
+            "supported_color_modes": ["color_temp"],
+            "color_mode": "color_temp",
+            "color_temp": 300,
+            "min_mireds": 150,
+            "max_mireds": 500
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert!(entity.attributes.is_some());
+
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(Some(&json!("ON")), attributes.get("state"));
+        assert_eq!(Some(&json!(42)), attributes.get("color_temperature"));
+    }
+
+    #[test]
+    fn convert_light_entity_mixed_brightness_and_color() {
+        let entity_id = "light.mixed".to_string();
+        let state = "on".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Mixed Light",
+            "supported_color_modes": ["brightness", "hs", "color_temp"]
+        }))
+        .unwrap();
+
+        let result = convert_light_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&LightFeature::Toggle.to_string()));
+        assert!(features.contains(&LightFeature::Dim.to_string()));
+        assert!(features.contains(&LightFeature::Color.to_string()));
+        assert!(features.contains(&LightFeature::ColorTemperature.to_string()));
+        assert_eq!(4, features.len());
     }
 }
