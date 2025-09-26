@@ -178,9 +178,20 @@ mod tests {
           }
         });
         let ha_entity = ha_entity.as_object_mut().unwrap();
-        let entity_id = ha_entity.get("entity_id").and_then(|v| v.as_str()).unwrap().to_string();
-        let state = ha_entity.get("state").and_then(|v| v.as_str()).unwrap().to_string();
-        let attr = ha_entity.get_mut("attributes").and_then(|v| v.as_object_mut()).unwrap();
+        let entity_id = ha_entity
+            .get("entity_id")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+        let state = ha_entity
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+        let attr = ha_entity
+            .get_mut("attributes")
+            .and_then(|v| v.as_object_mut())
+            .unwrap();
         let result = convert_remote_entity(entity_id, state, attr).unwrap();
 
         // Expect OFF mapping
@@ -200,9 +211,20 @@ mod tests {
           }
         });
         let ha_entity = ha_entity.as_object_mut().unwrap();
-        let entity_id = ha_entity.get("entity_id").and_then(|v| v.as_str()).unwrap().to_string();
-        let state = ha_entity.get("state").and_then(|v| v.as_str()).unwrap().to_string();
-        let attr = ha_entity.get_mut("attributes").and_then(|v| v.as_object_mut()).unwrap();
+        let entity_id = ha_entity
+            .get("entity_id")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+        let state = ha_entity
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+        let attr = ha_entity
+            .get_mut("attributes")
+            .and_then(|v| v.as_object_mut())
+            .unwrap();
         let result = convert_remote_entity(entity_id, state, attr).unwrap();
         let attr = result.attributes.unwrap();
         assert_eq!(Some(&json!("UNKNOWN")), attr.get("state"));
@@ -218,9 +240,20 @@ mod tests {
           }
         });
         let ha_entity = ha_entity.as_object_mut().unwrap();
-        let entity_id = ha_entity.get("entity_id").and_then(|v| v.as_str()).unwrap().to_string();
-        let state = ha_entity.get("state").and_then(|v| v.as_str()).unwrap().to_string();
-        let attr = ha_entity.get_mut("attributes").and_then(|v| v.as_object_mut()).unwrap();
+        let entity_id = ha_entity
+            .get("entity_id")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+        let state = ha_entity
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+        let attr = ha_entity
+            .get_mut("attributes")
+            .and_then(|v| v.as_object_mut())
+            .unwrap();
         let result = convert_remote_entity(entity_id, state, attr);
         assert!(result.is_err(), "Expected error for invalid state");
     }
