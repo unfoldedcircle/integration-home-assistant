@@ -216,3 +216,406 @@ pub(crate) fn convert_media_player_entity(
         attributes,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use url::Url;
+
+    fn create_test_server() -> Url {
+        Url::parse("http://homeassistant.local:8123").unwrap()
+    }
+
+    #[test]
+    fn convert_media_player_basic() {
+        let server = create_test_server();
+        let entity_id = "media_player.living_room_tv".to_string();
+        let state = "playing".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Living Room TV"
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id.clone(), state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert_eq!(entity_id, entity.entity_id);
+        assert_eq!(EntityType::MediaPlayer, entity.entity_type);
+        assert_eq!(None, entity.device_class);
+        assert_eq!(Some(&"Living Room TV".to_string()), entity.name.get("en"));
+        assert!(entity.features.is_some());
+        assert!(entity.attributes.is_some());
+    }
+
+    #[test]
+    fn convert_media_player_no_friendly_name() {
+        let server = create_test_server();
+        let entity_id = "media_player.bedroom_speaker".to_string();
+        let state = "idle".to_string();
+        let mut ha_attr = serde_json::from_value(json!({})).unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id.clone(), state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert_eq!(Some(&entity_id), entity.name.get("en"));
+    }
+
+    #[test]
+    fn convert_media_player_with_device_class() {
+        let server = create_test_server();
+        let entity_id = "media_player.spotify".to_string();
+        let state = "paused".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Spotify",
+            "device_class": "speaker"
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert_eq!(Some("speaker".to_string()), entity.device_class);
+    }
+
+    #[test]
+    fn convert_media_player_invalid_device_class() {
+        let server = create_test_server();
+        let entity_id = "media_player.test".to_string();
+        let state = "off".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "device_class": "invalid_class"
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert_eq!(None, entity.device_class);
+    }
+
+    #[test]
+    fn convert_media_player_all_features() {
+        let server = create_test_server();
+        let entity_id = "media_player.full_featured".to_string();
+        let state = "playing".to_string();
+        let supported_features = SUPPORT_TURN_ON
+            | SUPPORT_TURN_OFF
+            | SUPPORT_VOLUME_SET
+            | SUPPORT_VOLUME_STEP
+            | SUPPORT_SELECT_SOURCE
+            | SUPPORT_VOLUME_MUTE
+            | SUPPORT_PAUSE
+            | SUPPORT_PLAY
+            | SUPPORT_STOP
+            | SUPPORT_NEXT_TRACK
+            | SUPPORT_PREVIOUS_TRACK
+            | SUPPORT_REPEAT_SET
+            | SUPPORT_SHUFFLE_SET
+            | SUPPORT_SELECT_SOUND_MODE
+            | SUPPORT_SEEK;
+
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Full Featured Player",
+            "supported_features": supported_features
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Check that all expected features are present
+        assert!(features.contains(&MediaPlayerFeature::OnOff.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Volume.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::VolumeUpDown.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::SelectSource.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Mute.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Unmute.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::PlayPause.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Stop.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Next.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Previous.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Repeat.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Shuffle.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::SelectSoundMode.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Seek.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
+
+        // Always present features
+        assert!(features.contains(&MediaPlayerFeature::MediaTitle.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaArtist.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaAlbum.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaImageUrl.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaType.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_no_features() {
+        let server = create_test_server();
+        let entity_id = "media_player.basic".to_string();
+        let state = "off".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Basic Player",
+            "supported_features": 0
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Only the always-present features should be there
+        assert_eq!(5, features.len());
+        assert!(features.contains(&MediaPlayerFeature::MediaTitle.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaArtist.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaAlbum.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaImageUrl.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaType.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_partial_features() {
+        let server = create_test_server();
+        let entity_id = "media_player.partial".to_string();
+        let state = "playing".to_string();
+        let supported_features = SUPPORT_VOLUME_SET | SUPPORT_PLAY | SUPPORT_PAUSE;
+
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Partial Player",
+            "supported_features": supported_features
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&MediaPlayerFeature::Volume.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::PlayPause.to_string()));
+        assert!(!features.contains(&MediaPlayerFeature::OnOff.to_string()));
+        assert!(!features.contains(&MediaPlayerFeature::Stop.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_mute_feature() {
+        let server = create_test_server();
+        let entity_id = "media_player.mute_test".to_string();
+        let state = "playing".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "supported_features": SUPPORT_VOLUME_MUTE
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Both mute and unmute should be present
+        assert!(features.contains(&MediaPlayerFeature::Mute.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Unmute.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_seek_feature() {
+        let server = create_test_server();
+        let entity_id = "media_player.seek_test".to_string();
+        let state = "playing".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "supported_features": SUPPORT_SEEK
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Seek feature should add seek, duration, and position
+        assert!(features.contains(&MediaPlayerFeature::Seek.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_turn_on_off_combined() {
+        let server = create_test_server();
+        let entity_id = "media_player.onoff_test".to_string();
+        let state = "off".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "supported_features": SUPPORT_TURN_ON | SUPPORT_TURN_OFF
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&MediaPlayerFeature::OnOff.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_turn_on_only() {
+        let server = create_test_server();
+        let entity_id = "media_player.on_only_test".to_string();
+        let state = "off".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "supported_features": SUPPORT_TURN_ON
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&MediaPlayerFeature::OnOff.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_with_attributes() {
+        let server = create_test_server();
+        let entity_id = "media_player.with_attrs".to_string();
+        let state = "playing".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Attributes Player",
+            "volume_level": 0.5,
+            "is_volume_muted": false,
+            "media_title": "Test Song",
+            "media_artist": "Test Artist"
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert!(entity.attributes.is_some());
+
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(Some(&json!("PLAYING")), attributes.get("state"));
+        assert_eq!(Some(&json!(50)), attributes.get("volume"));
+        assert_eq!(Some(&json!(false)), attributes.get("muted"));
+        assert_eq!(Some(&json!("Test Song")), attributes.get("media_title"));
+        assert_eq!(Some(&json!("Test Artist")), attributes.get("media_artist"));
+    }
+
+    #[test]
+    fn convert_media_player_missing_supported_features() {
+        let server = create_test_server();
+        let entity_id = "media_player.no_features".to_string();
+        let state = "off".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "No Features Player"
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Should only have the always-present features
+        assert_eq!(5, features.len());
+        assert!(features.contains(&MediaPlayerFeature::MediaTitle.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaArtist.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaAlbum.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaImageUrl.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaType.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_invalid_supported_features() {
+        let server = create_test_server();
+        let entity_id = "media_player.invalid_features".to_string();
+        let state = "off".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Invalid Features Player",
+            "supported_features": "not_a_number"
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Should default to 0 and only have always-present features
+        assert_eq!(5, features.len());
+    }
+
+    #[test]
+    fn convert_media_player_all_states() {
+        let server = create_test_server();
+        let states = vec![
+            "playing",
+            "paused",
+            "standby",
+            "buffering",
+            "idle",
+            "off",
+            "on",
+            "unknown",
+        ];
+
+        for state in states {
+            let entity_id = format!("media_player.state_test_{}", state);
+            let mut ha_attr = serde_json::from_value(json!({
+                "friendly_name": format!("State Test {}", state)
+            }))
+            .unwrap();
+
+            let result =
+                convert_media_player_entity(&server, entity_id, state.to_string(), &mut ha_attr);
+
+            assert!(result.is_ok(), "Failed for state: {}", state);
+            let entity = result.unwrap();
+            assert!(entity.attributes.is_some());
+        }
+    }
+
+    #[test]
+    fn convert_media_player_entity_structure() {
+        let server = create_test_server();
+        let entity_id = "media_player.structure_test".to_string();
+        let state = "playing".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Structure Test"
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id.clone(), state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+
+        // Verify required fields
+        assert_eq!(entity_id, entity.entity_id);
+        assert_eq!(None, entity.device_id);
+        assert_eq!(EntityType::MediaPlayer, entity.entity_type);
+        assert_eq!(None, entity.area);
+        assert_eq!(None, entity.options);
+        assert!(entity.name.contains_key("en"));
+        assert!(entity.features.is_some());
+        assert!(entity.attributes.is_some());
+    }
+}

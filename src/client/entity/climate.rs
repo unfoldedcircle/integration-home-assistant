@@ -164,11 +164,13 @@ pub(crate) fn convert_climate_entity(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::client::entity::climate_event_to_entity_change;
     use crate::client::model::EventData;
+    use rstest::rstest;
     use serde_json::{Value, json};
-    use uc_api::EntityType;
     use uc_api::intg::EntityChange;
+    use uc_api::{ClimateFeature, ClimateOptionField, EntityType};
 
     #[test]
     fn climate_event_heat() {
@@ -259,5 +261,460 @@ mod tests {
         assert_eq!(EntityType::Climate, entity_change.entity_type);
 
         entity_change
+    }
+
+    // Enhanced tests for convert_climate_entity function
+
+    #[test]
+    fn convert_climate_entity_basic() {
+        let entity_id = "climate.living_room_thermostat".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Living Room Thermostat"
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id.clone(), state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert_eq!(entity_id, entity.entity_id);
+        assert_eq!(EntityType::Climate, entity.entity_type);
+        assert_eq!(None, entity.device_class);
+        assert_eq!(
+            Some(&"Living Room Thermostat".to_string()),
+            entity.name.get("en")
+        );
+        assert!(entity.features.is_some());
+        assert!(entity.attributes.is_some());
+    }
+
+    #[test]
+    fn convert_climate_entity_no_friendly_name() {
+        let entity_id = "climate.bedroom_ac".to_string();
+        let state = "cool".to_string();
+        let mut ha_attr = serde_json::from_value(json!({})).unwrap();
+
+        let result = convert_climate_entity(entity_id.clone(), state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert_eq!(Some(&entity_id), entity.name.get("en"));
+    }
+
+    #[rstest]
+    #[case("off")]
+    #[case("heat")]
+    #[case("cool")]
+    #[case("heat_cool")]
+    #[case("auto")]
+    #[case("fan_only")]
+    #[case("unavailable")]
+    #[case("unknown")]
+    fn convert_climate_entity_all_states(#[case] state: &str) {
+        let entity_id = format!("climate.state_test_{}", state);
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": format!("State Test {}", state)
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state.to_string(), &mut ha_attr);
+
+        assert!(result.is_ok(), "Failed for state: {}", state);
+        let entity = result.unwrap();
+        assert!(entity.attributes.is_some());
+
+        let attributes = entity.attributes.unwrap();
+        let expected_state = match state {
+            "fan_only" => "FAN".to_string(),
+            s => s.to_uppercase(),
+        };
+        if state != "unknown" {
+            // unknown states get warnings but still work
+            assert_eq!(Some(&json!(expected_state)), attributes.get("state"));
+        }
+    }
+
+    #[test]
+    fn convert_climate_entity_no_hvac_modes() {
+        let entity_id = "climate.basic".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Basic Climate",
+            "supported_features": 0
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Should have no HVAC mode features when hvac_modes is missing
+        assert!(!features.contains(&ClimateFeature::OnOff.to_string()));
+        assert!(!features.contains(&ClimateFeature::Heat.to_string()));
+        assert!(!features.contains(&ClimateFeature::Cool.to_string()));
+    }
+
+    #[rstest]
+    #[case("off", ClimateFeature::OnOff)]
+    #[case("heat", ClimateFeature::Heat)]
+    #[case("cool", ClimateFeature::Cool)]
+    fn convert_climate_entity_hvac_mode_features(
+        #[case] hvac_mode: &str,
+        #[case] expected_feature: ClimateFeature,
+    ) {
+        let entity_id = format!("climate.{}_test", hvac_mode);
+        let state = hvac_mode.to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": format!("{} Test", hvac_mode),
+            "hvac_modes": [hvac_mode]
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Failed for HVAC mode: {}", hvac_mode);
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&expected_feature.to_string()));
+    }
+
+    #[test]
+    fn convert_climate_entity_all_hvac_modes() {
+        let entity_id = "climate.full_hvac".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Full HVAC System",
+            "hvac_modes": ["off", "heat", "cool", "auto", "fan_only"]
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&ClimateFeature::OnOff.to_string()));
+        assert!(features.contains(&ClimateFeature::Heat.to_string()));
+        assert!(features.contains(&ClimateFeature::Cool.to_string()));
+        // Note: fan_only and auto are not currently mapped to features
+    }
+
+    #[test]
+    fn convert_climate_entity_with_target_temperature_feature() {
+        let entity_id = "climate.target_temp".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Target Temperature Climate",
+            "supported_features": SUPPORT_TARGET_TEMPERATURE
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&ClimateFeature::TargetTemperature.to_string()));
+    }
+
+    #[test]
+    fn convert_climate_entity_with_current_temperature() {
+        let entity_id = "climate.current_temp".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Current Temperature Climate",
+            "current_temperature": 22.5
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&ClimateFeature::CurrentTemperature.to_string()));
+    }
+
+    #[test]
+    fn convert_climate_entity_with_all_features() {
+        let entity_id = "climate.full_featured".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Full Featured Climate",
+            "hvac_modes": ["off", "heat", "cool"],
+            "supported_features": SUPPORT_TARGET_TEMPERATURE,
+            "current_temperature": 22.0
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(features.contains(&ClimateFeature::OnOff.to_string()));
+        assert!(features.contains(&ClimateFeature::Heat.to_string()));
+        assert!(features.contains(&ClimateFeature::Cool.to_string()));
+        assert!(features.contains(&ClimateFeature::TargetTemperature.to_string()));
+        assert!(features.contains(&ClimateFeature::CurrentTemperature.to_string()));
+    }
+
+    #[test]
+    fn convert_climate_entity_no_options() {
+        let entity_id = "climate.no_options".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "No Options Climate"
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+
+        // Should have no options when temperature limits are not provided
+        assert_eq!(None, entity.options);
+    }
+
+    #[test]
+    fn convert_climate_entity_with_temperature_options() {
+        let entity_id = "climate.with_options".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Options Climate",
+            "min_temp": 10,
+            "max_temp": 30,
+            "target_temp_step": 0.5,
+            "temperature_unit": "°C"
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert!(entity.options.is_some());
+
+        let options = entity.options.unwrap();
+        assert_eq!(
+            Some(&json!(10)),
+            options.get(&ClimateOptionField::MinTemperature.to_string())
+        );
+        assert_eq!(
+            Some(&json!(30)),
+            options.get(&ClimateOptionField::MaxTemperature.to_string())
+        );
+        assert_eq!(
+            Some(&json!(0.5)),
+            options.get(&ClimateOptionField::TargetTemperatureStep.to_string())
+        );
+        assert_eq!(
+            Some(&json!("°C")),
+            options.get(&ClimateOptionField::TemperatureUnit.to_string())
+        );
+    }
+
+    #[test]
+    fn convert_climate_entity_partial_options() {
+        let entity_id = "climate.partial_options".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Partial Options Climate",
+            "min_temp": 15,
+            "max_temp": 25
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert!(entity.options.is_some());
+
+        let options = entity.options.unwrap();
+        assert_eq!(2, options.len());
+        assert_eq!(
+            Some(&json!(15)),
+            options.get(&ClimateOptionField::MinTemperature.to_string())
+        );
+        assert_eq!(
+            Some(&json!(25)),
+            options.get(&ClimateOptionField::MaxTemperature.to_string())
+        );
+        assert!(
+            options
+                .get(&ClimateOptionField::TargetTemperatureStep.to_string())
+                .is_none()
+        );
+        assert!(
+            options
+                .get(&ClimateOptionField::TemperatureUnit.to_string())
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn convert_climate_entity_structure() {
+        let entity_id = "climate.structure_test".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Structure Test Climate"
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id.clone(), state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+
+        // Verify required fields
+        assert_eq!(entity_id, entity.entity_id);
+        assert_eq!(None, entity.device_id);
+        assert_eq!(EntityType::Climate, entity.entity_type);
+        assert_eq!(None, entity.device_class);
+        assert_eq!(None, entity.area);
+        assert!(entity.name.contains_key("en"));
+        assert!(entity.features.is_some());
+        assert!(entity.attributes.is_some());
+    }
+
+    #[test]
+    fn convert_climate_entity_with_attributes() {
+        let entity_id = "climate.with_attrs".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Attributes Climate",
+            "current_temperature": 21.5,
+            "temperature": 24.0,
+            "target_temperature_high": 26.0,
+            "target_temperature_low": 18.0,
+            "fan_mode": "auto"
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        assert!(entity.attributes.is_some());
+
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(Some(&json!("HEAT")), attributes.get("state"));
+        assert_eq!(Some(&json!(21.5)), attributes.get("current_temperature"));
+        assert_eq!(Some(&json!(24.0)), attributes.get("target_temperature"));
+        assert_eq!(
+            Some(&json!(26.0)),
+            attributes.get("target_temperature_high")
+        );
+        assert_eq!(Some(&json!(18.0)), attributes.get("target_temperature_low"));
+        assert_eq!(Some(&json!("AUTO")), attributes.get("fan_mode"));
+    }
+
+    #[test]
+    fn convert_climate_entity_missing_supported_features() {
+        let entity_id = "climate.no_features".to_string();
+        let state = "off".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "No Features Climate"
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Should not have target temperature feature when supported_features is missing
+        assert!(!features.contains(&ClimateFeature::TargetTemperature.to_string()));
+    }
+
+    #[test]
+    fn convert_climate_entity_invalid_supported_features() {
+        let entity_id = "climate.invalid_features".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Invalid Features Climate",
+            "supported_features": "not_a_number"
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Should default to 0 and not have target temperature feature
+        assert!(!features.contains(&ClimateFeature::TargetTemperature.to_string()));
+    }
+
+    #[test]
+    fn convert_climate_entity_invalid_hvac_modes() {
+        let entity_id = "climate.invalid_hvac".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Invalid HVAC Modes Climate",
+            "hvac_modes": ["unknown_mode", "invalid", "heat"]
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        // Should only have heat feature, ignoring invalid modes
+        assert!(features.contains(&ClimateFeature::Heat.to_string()));
+        assert!(!features.contains(&ClimateFeature::OnOff.to_string()));
+        assert!(!features.contains(&ClimateFeature::Cool.to_string()));
+    }
+
+    #[test]
+    fn convert_climate_entity_current_temperature_not_float() {
+        let entity_id = "climate.non_float_temp".to_string();
+        let state = "heat".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Non Float Temperature Climate",
+            "current_temperature": "not_a_number"
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(!features.contains(&ClimateFeature::CurrentTemperature.to_string()));
+    }
+
+    #[test]
+    fn convert_climate_entity_with_target_temperature_range_feature() {
+        let entity_id = "climate.temp_range".to_string();
+        let state = "heat_cool".to_string();
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Temperature Range Climate",
+            "supported_features": SUPPORT_TARGET_TEMPERATURE_RANGE
+        }))
+        .unwrap();
+
+        let result = convert_climate_entity(entity_id, state, &mut ha_attr);
+
+        assert!(result.is_ok(), "Expected converted entity: {result:?}");
+        let entity = result.unwrap();
+        let features = entity.features.unwrap();
+
+        assert!(!features.contains(&"TargetTemperatureRange".to_string()));
     }
 }
