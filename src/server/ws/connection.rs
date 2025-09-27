@@ -6,13 +6,18 @@
 use crate::controller::{NewR2Session, R2SessionDisconnect, SendWsMessage};
 use crate::errors::ServiceError;
 use crate::server::ws::WsConn;
-use actix::{Actor, Addr, Handler};
+use actix::{Actor, Handler};
 use actix_ws::{AggregatedMessage, CloseCode, CloseReason, Session};
 use log::{debug, error, info, warn};
 use std::time::Instant;
 use uc_api::ws::{WsMessage, WsResultMsgData};
 
-pub(crate) struct WsSender {
+/// Adapter for sending WebSocket messages from the controller actor.
+///
+/// Allows sending WebSocket messages with the `SendWsMessage` Actix message from the controller
+/// to the UCR WebSocket connection running in a separate Tokio task.
+// TODO After switching to actix-ws, using a message channel would make more sense than an actor.
+struct WsSender {
     pub id: String,
     pub session: Session,
     pub msg_tracing_out: bool,
@@ -20,26 +25,25 @@ pub(crate) struct WsSender {
 
 impl Actor for WsSender {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        // Noticed `send failed because receiver is full` errors with the default 16.
+        // Likely due to rapid entity updates from HA.
+        ctx.set_mailbox_capacity(32);
+    }
 }
 
 impl Handler<SendWsMessage> for WsSender {
     type Result = ();
 
     fn handle(&mut self, msg: SendWsMessage, _ctx: &mut Self::Context) {
-        match serde_json::to_string(&msg.0) {
-            Ok(text) => {
-                if self.msg_tracing_out {
-                    debug!("[{}] <- {text}", self.id);
-                }
-                let mut session = self.session.clone();
-                actix_web::rt::spawn(async move {
-                    if let Err(e) = session.text(text).await {
-                        error!("WebSocket send error: {e}");
-                    }
-                });
-            }
-            Err(e) => error!("[{}] Error serializing outgoing message: {e}", self.id),
-        }
+        let id = self.id.clone();
+        let msg_tracing_out = self.msg_tracing_out;
+        let mut session = self.session.clone();
+
+        actix_web::rt::spawn(async move {
+            let _ = WsConn::send(&id, msg_tracing_out, msg.0, &mut session).await;
+        });
     }
 }
 
@@ -81,7 +85,8 @@ impl WsConn {
         use actix_web::rt::time;
         use futures::StreamExt;
 
-        // send initial authentication response
+        // since we only implemented the header-based authentication in server::ws_index we can send
+        // the authentication event right after startup
         let auth = serde_json::json!({
             "kind": "resp",
             "req_id": 0,
@@ -90,7 +95,7 @@ impl WsConn {
         });
         let _ = session.text(auth.to_string()).await;
 
-        // Create sender actor for outgoing messages
+        // Create sender actor for outgoing messages from the Controller to the UCR WebSocket connection.
         let sender = WsSender {
             id: self.id.clone(),
             session: session.clone(),
@@ -139,7 +144,7 @@ impl WsConn {
                     match msg {
                         Some(Ok(msg)) => {
                             if let Err(close_reason) =
-                                self.handle_stream_message(msg, &sender, &mut session).await {
+                                self.handle_stream_message(msg, &mut session).await {
                                     if close_reason.is_some() {
                                         let _ = session.close(close_reason).await;
                                     }
@@ -169,10 +174,21 @@ impl WsConn {
         debug!("[{}] stopped", self.id);
     }
 
+    /// Process a received WebSocket message.
+    ///
+    /// Only text messages are supported.
+    /// Native ping and pong frames are handled, and only text messages are supported and must
+    /// correspond to Integration-API JSON messages.
+    ///
+    /// # Arguments
+    ///
+    /// * `msg`: WebSocket message to process.
+    /// * `session`: WebSocket connection to use for sending responses.
+    ///
+    /// returns: Ok if processing was successful or continues, Err if the connection must be closed.
     async fn handle_stream_message(
         &mut self,
         msg: AggregatedMessage,
-        sender: &Addr<WsSender>,
         session: &mut Session,
     ) -> Result<(), Option<CloseReason>> {
         match msg {
@@ -182,7 +198,7 @@ impl WsConn {
                     debug!("[{}] -> {}", self.id, &text);
                 }
 
-                self.handle_text_message(&text, sender).await
+                self.handle_text_message(&text, session).await
             }
             AggregatedMessage::Binary(_) => Err(Some(CloseReason {
                 code: CloseCode::Size,
@@ -204,16 +220,21 @@ impl WsConn {
         }
     }
 
+    /// Handle a received WebSocket text message.
+    ///
+    /// # Arguments
+    ///
+    /// * `text`: received text message, must be a parsable `WsMessage`.
+    /// * `session`: WebSocket connection to use for sending responses.
+    ///
+    /// returns: Ok if processing was successful or continues, Err if the connection must be closed.
     async fn handle_text_message(
         &self,
         text: &str,
-        sender: &Addr<WsSender>,
+        session: &mut Session,
     ) -> Result<(), Option<CloseReason>> {
         match serde_json::from_str::<WsMessage>(text) {
-            Ok(msg) => {
-                self.process_ws_message(msg, sender).await;
-                Ok(())
-            }
+            Ok(msg) => self.process_intg_api_message(msg, session).await,
             Err(e) => {
                 warn!("[{}] Invalid JSON message: {e}", self.id);
                 Err(Some(CloseReason {
@@ -224,7 +245,19 @@ impl WsConn {
         }
     }
 
-    async fn process_ws_message(&self, msg: WsMessage, sender: &Addr<WsSender>) {
+    /// Process a received Integration-API message
+    ///
+    /// # Arguments
+    ///
+    /// * `msg`: the WebSocket message to process. Must be a request, response, or an event.
+    /// * `session`: WebSocket connection to use for sending responses.
+    ///
+    /// returns: Ok if processing was successful or continues, Err if the connection must be closed.
+    async fn process_intg_api_message(
+        &self,
+        msg: WsMessage,
+        session: &mut Session,
+    ) -> Result<(), Option<CloseReason>> {
         let req_id = msg.id.unwrap_or_default();
         let req_msg = msg.msg.clone().unwrap_or_default();
 
@@ -232,16 +265,16 @@ impl WsConn {
             Some("req") => {
                 match WsConn::on_request(&self.id, msg, self.controller_addr.clone()).await {
                     Ok(Some(response)) => {
-                        sender.do_send(SendWsMessage(response));
+                        WsConn::send(&self.id, self.msg_tracing_out, response, session).await
                     }
                     Err(e) => {
                         warn!(
                             "[{}] Error processing received message '{req_msg}': {e}",
                             self.id
                         );
-                        self.send_error_response(req_id, e, sender);
+                        self.send_error_response(req_id, e, session).await
                     }
-                    _ => {}
+                    _ => Ok(()),
                 }
             }
             Some("resp") => {
@@ -250,34 +283,88 @@ impl WsConn {
                 {
                     warn!("[{}] Error processing response: {e}", self.id);
                 }
+                Ok(())
             }
             Some("event") => {
                 if let Err(e) = WsConn::on_event(&self.id, msg, self.controller_addr.clone()).await
                 {
                     warn!("[{}] Error processing event: {e}", self.id);
                 }
+                Ok(())
             }
             Some(other) => {
+                warn!("[{}] Unsupported message kind: {other}", self.id);
                 self.send_error_response(
                     req_id,
                     ServiceError::BadRequest(format!("Unsupported message kind: {other}")),
-                    sender,
-                );
-                warn!("[{}] Unsupported message kind: {other}", self.id);
+                    session,
+                )
+                .await
             }
             None => {
                 self.send_error_response(
                     req_id,
                     ServiceError::BadRequest("Missing property: kind".into()),
-                    sender,
-                );
+                    session,
+                )
+                .await
             }
         }
     }
 
-    fn send_error_response(&self, req_id: u32, error: ServiceError, sender: &Addr<WsSender>) {
+    /// Send an error response to the given WebSocket session.
+    ///
+    /// # Arguments
+    ///
+    /// * `req_id`: corresponding request id
+    /// * `error`: the service error to convert into a JSON message
+    /// * `session`: WebSocket connection
+    ///
+    /// returns: Ok if the message could be sent
+    async fn send_error_response(
+        &self,
+        req_id: u32,
+        error: ServiceError,
+        session: &mut Session,
+    ) -> Result<(), Option<CloseReason>> {
         let response = service_error_to_ws_message(&self.id, req_id, error);
-        sender.do_send(SendWsMessage(response));
+        WsConn::send(&self.id, self.msg_tracing_out, response, session).await
+    }
+
+    /// Send a web socket message to the given WebSocket session.
+    ///
+    /// # Arguments
+    ///
+    /// * `id`: Logging id
+    /// * `msg_tracing_out`: Message logging flag
+    /// * `msg`: Message to send
+    /// * `session`: WebSocket connection
+    ///
+    /// returns: Ok if the message could be sent
+    // static function because of the WsSender Actix actor adapter
+    async fn send(
+        id: &str,
+        msg_tracing_out: bool,
+        msg: WsMessage,
+        session: &mut Session,
+    ) -> Result<(), Option<CloseReason>> {
+        match serde_json::to_string(&msg) {
+            Ok(text) => {
+                if msg_tracing_out {
+                    debug!("[{id}] <- {text}");
+                }
+                session.text(text).await.map_err(|e| {
+                    error!("WebSocket send error: {e}");
+                    // session is closed, so we can't close it with a close reason
+                    None
+                })
+            }
+            Err(e) => {
+                // should not happen: log & proceed
+                error!("[{id}] Error serializing outgoing message: {e}");
+                Ok(())
+            }
+        }
     }
 }
 

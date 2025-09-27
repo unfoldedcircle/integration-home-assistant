@@ -46,7 +46,8 @@ actix-codec = "0.5"
 awc = { version = "3.8", features = ["rustls-0_23"] }
 bytes = "1"
 futures = "0.3"
-tokio = { version = "1", features = ["macros", "rt", "time"] }
+# Tokio is used by actix, but AFAIK the select! macro is not re-exported
+tokio = { version = "1", features = ["macros"] }
 
 # see mdns-sd patch at the end of this file
 mdns-sd = { version = "0.9.3", optional = true }
