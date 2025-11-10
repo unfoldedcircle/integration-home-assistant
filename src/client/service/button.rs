@@ -3,7 +3,7 @@
 
 //! Button entity specific HA service call logic.
 
-use crate::client::service::cmd_from_str;
+use crate::client::cmd_from_str;
 use crate::errors::ServiceError;
 use serde_json::Value;
 use uc_api::ButtonCommand;

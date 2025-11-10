@@ -5,22 +5,28 @@
 
 use crate::APP_VERSION;
 use crate::built_info;
-use crate::client::messages::{CallService, GetAvailableEntities, GetStates};
+use crate::client::HomeAssistantClient;
+use crate::client::messages::{
+    CallRunAssistPipeline, CallService, GetAvailableEntities, GetStates,
+};
 use crate::configuration::get_driver_metadata;
 use crate::controller::handler::{
     SetDriverUserDataMsg, SetupDriverMsg, SubscribeHaEventsMsg, UnsubscribeHaEventsMsg,
 };
-use crate::controller::{Controller, OperationModeInput, R2RequestMsg, SendWsMessage};
+use crate::controller::{
+    Controller, OperationModeInput, R2AudioChunkMsg, R2RequestMsg, SendWsMessage,
+};
 use crate::errors::ServiceError;
 use crate::util::{DeserializeMsgData, return_fut_err, return_fut_ok};
-use actix::{AsyncContext, Handler, ResponseFuture, fut};
+use actix::{Addr, AsyncContext, Handler, ResponseFuture, fut};
 use lazy_static::lazy_static;
-use log::{debug, error};
+use log::{debug, error, warn};
 use serde_json::{Value, json};
 use strum::EnumMessage;
 use uc_api::intg::ws::{AvailableEntitiesMsgData, DriverVersionMsgData, R2Request};
-use uc_api::intg::{EntityCommand, IntegrationVersion};
+use uc_api::intg::{EntityCommand, IntegrationVersion, IntgVoiceAssistantCommand};
 use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
+use uc_api::{AudioConfiguration, EntityType};
 
 lazy_static! {
     /// Integration-API version.
@@ -225,27 +231,127 @@ impl Handler<R2RequestMsg> for Controller {
                     .map(|_| ok),
                 R2Request::EntityCommand => {
                     if let Some(addr) = ha_client {
-                        let req_id = msg.req_id;
-                        let command: EntityCommand = msg.deserialize()?;
-                        match addr.send(CallService { command }).await? {
-                            Err(e) => {
-                                error!("CallService failed: {:?}", e);
-                                Err(e)
-                            }
-                            Ok(_) => {
-                                // plain and simple for now. We could (or better should) also wait for the HA response message...
-                                let response = WsMessage::response(
-                                    req_id,
-                                    "result",
-                                    WsResultMsgData::new("OK", "Service call sent"),
-                                );
-                                Ok(Some(response))
-                            }
-                        }
+                        handle_entity_command(addr, msg).await
                     } else {
                         Ok(None)
                     }
                 }
+            }
+        })
+    }
+}
+
+async fn handle_entity_command(
+    ha_client: Addr<HomeAssistantClient>,
+    msg: R2RequestMsg,
+) -> Result<Option<WsMessage>, ServiceError> {
+    let req_id = msg.req_id;
+    let command: EntityCommand = msg.deserialize()?;
+
+    // Special handling for UC voice assistant entity:
+    // this is not a HA service call, but an assist pipeline call.
+    if command.entity_type == EntityType::VoiceAssistant {
+        handle_voice_assistant_command(ha_client, req_id, command).await
+    } else {
+        // regular HA service call
+        match ha_client.send(CallService { command }).await? {
+            Err(e) => {
+                error!("CallService failed: {:?}", e);
+                Err(e)
+            }
+            Ok(_) => {
+                // plain and simple for now. We could (or better should) also wait for the HA response message...
+                let response = WsMessage::response(
+                    req_id,
+                    "result",
+                    WsResultMsgData::new("OK", "Service call sent"),
+                );
+                Ok(Some(response))
+            }
+        }
+    }
+}
+
+async fn handle_voice_assistant_command(
+    ha_client: Addr<HomeAssistantClient>,
+    req_id: u32,
+    command: EntityCommand,
+) -> Result<Option<WsMessage>, ServiceError> {
+    let cmd: IntgVoiceAssistantCommand = crate::client::cmd_from_str(&command.cmd_id)?;
+
+    match cmd {
+        IntgVoiceAssistantCommand::VoiceStart => {
+            // the compiler will let us know as soon as there are new commands!
+        }
+    }
+
+    let params = crate::client::get_required_params(&command)?;
+
+    let session_id = match params
+        .get("session_id")
+        .and_then(|v| v.as_i64().map(|v| v as u32))
+    {
+        Some(v) => v,
+        None => {
+            return Err(ServiceError::BadRequest(
+                "Missing session_id parameter".into(),
+            ));
+        }
+    };
+    let audio_cfg = params
+        .get("audio_cfg")
+        .and_then(|v| serde_json::from_value::<AudioConfiguration>(v.clone()).ok())
+        .unwrap_or_default();
+    let timeout = params
+        .get("timeout")
+        .and_then(|v| v.as_i64().map(|v| v as u16));
+    let speech_response = params
+        .get("speech_response")
+        .and_then(|v| v.as_bool())
+        .unwrap_or_default();
+    let pipeline_id = params
+        .get("profile_id")
+        .and_then(|v| v.as_str())
+        .map(|v| v.to_string());
+
+    match ha_client
+        .send(CallRunAssistPipeline {
+            entity_id: command.entity_id,
+            session_id,
+            sample_rate: audio_cfg.sample_rate,
+            timeout,
+            speech_response,
+            pipeline_id,
+        })
+        .await?
+    {
+        Err(e) => {
+            warn!("Running assist pipeline failed: {:?}", e);
+            Err(e)
+        }
+        Ok(()) => {
+            let response = WsMessage::response(
+                req_id,
+                "result",
+                WsResultMsgData::new("OK", "AssistPipeline call sent"),
+            );
+            Ok(Some(response))
+        }
+    }
+}
+
+impl Handler<R2AudioChunkMsg> for Controller {
+    type Result = ResponseFuture<Result<(), ServiceError>>;
+
+    fn handle(&mut self, msg: R2AudioChunkMsg, _ctx: &mut Self::Context) -> Self::Result {
+        let ha_client = self.ha_client.clone();
+
+        // simply forward to HA client
+        Box::pin(async move {
+            if let Some(ha_client) = ha_client {
+                ha_client.send(msg).await?
+            } else {
+                Err(ServiceError::NotConnected)
             }
         })
     }

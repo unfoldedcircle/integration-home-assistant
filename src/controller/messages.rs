@@ -11,6 +11,8 @@ use crate::controller::Controller;
 use crate::errors::ServiceError;
 use crate::util::DeserializeMsgData;
 use actix::prelude::{Message, Recipient};
+use bytes::Bytes;
+use derive_more::Constructor;
 use uc_api::intg::ws::{R2Event, R2Request, R2Response};
 use uc_api::ws::WsMessage;
 
@@ -63,7 +65,6 @@ pub struct R2RequestMsg {
 /// Actor message for a Remote Two response.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-#[allow(dead_code)] // response not used
 pub struct R2ResponseMsg {
     pub ws_id: String,
     pub msg: R2Response,
@@ -92,4 +93,14 @@ pub struct R2EventMsg {
     pub ws_id: String,
     pub event: R2Event,
     pub msg_data: Option<serde_json::Value>,
+}
+
+/// Actor message containing a received audio chunk.
+#[derive(Constructor, Message)]
+#[rtype(result = "Result<(), ServiceError>")]
+pub struct R2AudioChunkMsg {
+    /// Remote audio session ID
+    pub session_id: u32,
+    /// Audio chunk
+    pub data: Bytes,
 }

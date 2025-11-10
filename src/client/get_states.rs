@@ -131,6 +131,10 @@ impl HomeAssistantClient {
                     info!("[{}] skipping internal entity {entity_type}", self.id);
                     continue;
                 }
+                EntityType::VoiceAssistant => {
+                    // mapped from HA assist pipeline to UC entity
+                    continue;
+                }
             };
 
             match avail_entity {

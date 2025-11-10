@@ -3,13 +3,19 @@
 
 //! Actix WebSocket actor for an established Remote Two client connection.
 
-use crate::controller::{NewR2Session, R2SessionDisconnect, SendWsMessage};
+use crate::client::assist::DEF_SAMPLE_RATE;
+use crate::controller::{NewR2Session, R2AudioChunkMsg, R2SessionDisconnect, SendWsMessage};
 use crate::errors::ServiceError;
 use crate::server::ws::WsConn;
 use actix::{Actor, Handler};
 use actix_ws::{AggregatedMessage, CloseCode, CloseReason, Session};
+use bytes::Bytes;
 use log::{debug, error, info, warn};
+use prost::Message;
 use std::time::Instant;
+use uc_api::intg::proto::{
+    AudioFormat, IntegrationMessage, SampleFormat, integration_message::Message as ProtoMsg,
+};
 use uc_api::ws::{WsMessage, WsResultMsgData};
 
 /// Adapter for sending WebSocket messages from the controller actor.
@@ -200,10 +206,7 @@ impl WsConn {
 
                 self.handle_text_message(&text, session).await
             }
-            AggregatedMessage::Binary(_) => Err(Some(CloseReason {
-                code: CloseCode::Size,
-                description: Some("Binary messages not supported!".into()),
-            })),
+            AggregatedMessage::Binary(data) => self.handle_binary_message(data, session).await,
             AggregatedMessage::Ping(bytes) => {
                 self.hb = Instant::now();
                 let _ = session.pong(&bytes).await;
@@ -308,6 +311,85 @@ impl WsConn {
                     session,
                 )
                 .await
+            }
+        }
+    }
+
+    async fn handle_binary_message(
+        &self,
+        data: Bytes,
+        _session: &mut Session,
+    ) -> Result<(), Option<CloseReason>> {
+        // - parse protobuf message
+        let msg = IntegrationMessage::decode(data).map_err(|e| {
+            error!("[{}] Invalid binary message: {e:?}", self.id);
+            None
+        })?;
+
+        let msg = msg.message.ok_or_else(|| {
+            error!("[{}] Unable to decode binary message", self.id);
+            None
+        })?;
+
+        // - if audio chunk msg: send to controller
+        match msg {
+            ProtoMsg::VoiceBegin(begin) => {
+                // make sure we got the right format
+                if let Some(cfg) = begin.configuration {
+                    info!(
+                        "[{}] => voice_begin({}): {cfg:?}",
+                        self.id, begin.session_id
+                    );
+                    if cfg.format != AudioFormat::Pcm as i32
+                        && cfg.sample_format != SampleFormat::I16 as i32
+                        && cfg.sample_rate != DEF_SAMPLE_RATE
+                        && cfg.channels != 1
+                    {
+                        // stop assist pipeline
+                        let msg = R2AudioChunkMsg::new(begin.session_id, Bytes::new());
+                        self.controller_addr.do_send(msg);
+
+                        error!(
+                            "[{}] Got invalid audio format, closing connection: {cfg:?}",
+                            self.id
+                        );
+                        return Err(Some(CloseReason {
+                            code: CloseCode::Unsupported,
+                            description: Some("Invalid audio format".into()),
+                        }));
+                    }
+                } else {
+                    warn!(
+                        "[{}] => voice_begin({}) with missing audio format, assuming requested format",
+                        self.id, begin.session_id
+                    )
+                }
+                Ok(())
+            }
+            ProtoMsg::VoiceData(data) => {
+                let msg = R2AudioChunkMsg::new(data.session_id, data.samples);
+                match self.controller_addr.send(msg).await {
+                    Ok(Ok(())) => Ok(()),
+                    Ok(Err(e)) => {
+                        warn!("[{}] Error processing audio chunk: {e:?}", self.id);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        let msg = format!("Internal Error sending audio chunk: {e:?}");
+                        error!("[{}] {msg}", self.id);
+                        Err(Some(CloseReason {
+                            code: CloseCode::Error,
+                            description: Some(msg),
+                        }))
+                    }
+                }
+            }
+            ProtoMsg::VoiceEnd(end) => {
+                info!("[{}] => voice_end({})", self.id, end.session_id);
+                // end of audio stream
+                let msg = R2AudioChunkMsg::new(end.session_id, Bytes::new());
+                self.controller_addr.do_send(msg);
+                Ok(())
             }
         }
     }

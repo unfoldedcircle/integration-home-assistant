@@ -6,7 +6,7 @@
 use crate::client::messages::SetRemoteId;
 use crate::controller::{Controller, R2ResponseMsg};
 use actix::Handler;
-use log::{error, info};
+use log::{debug, error, info};
 use uc_api::intg::ws::R2Response;
 
 impl Handler<R2ResponseMsg> for Controller {
@@ -40,10 +40,7 @@ impl Handler<R2ResponseMsg> for Controller {
                 }
             }
             _ => {
-                info!(
-                    "[{}] TODO implement remote response: {}",
-                    msg.ws_id, msg.msg
-                );
+                debug!("[{}] Ignoring remote response: {}", msg.ws_id, msg.msg);
             }
         }
     }

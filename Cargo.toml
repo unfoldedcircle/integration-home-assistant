@@ -22,17 +22,23 @@ path = "src/main.rs"
 name = "ha-test"
 path = "src/bin/ha_test.rs"
 
+[[bin]]
+name = "voice-command"
+path = "src/bin/voice_command.rs"
+required-features = ["audio"]
+
 [features]
 default = []
 mdns-sd = ["dep:mdns-sd"]
 zeroconf = ["dep:zeroconf"]
+audio = ["dep:hound"]
 
 [dependencies]
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.14.0" }
+#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.14.0", features = ["prost"] }
 # for local development:
-#uc_api = { path = "../api-model-rs" }
+#uc_api = { path = "../api-model-rs", features = ["prost"] }
 # Using a GitHub revision:
-#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "cb59e2f1f703f8d9fdca09937b318c55256b27c4" }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "cefdc27a33c6ddd7db76516719dc4f835d2983b6", features = ["prost"] }
 
 # WebSockets server
 actix-web = { version = "4.11", features = ["rustls-0_23"] }
@@ -48,6 +54,7 @@ bytes = "1"
 futures = "0.3"
 # Tokio is used by actix, but AFAIK the select! macro is not re-exported
 tokio = { version = "1", features = ["macros"] }
+prost = "0.14"
 
 # see mdns-sd patch at the end of this file
 mdns-sd = { version = "0.9.3", optional = true }
@@ -62,7 +69,7 @@ serde_with = "3"
 
 rust-fsm = "0.6"
 
-clap = "4"
+clap = { version = "4", features = ["derive"] }
 config = { version = "0.15", default-features = false, features = ["yaml", "json"] }
 const_format = "0.2"
 env_logger = "0.11"
@@ -76,8 +83,11 @@ url = { version = "2", features = ["serde"] }
 # Attention: strum needs to be in sync with uc_api
 strum = "0.27"
 derive_more = { version = "2", features = ["constructor", "display"] }
+derive_builder = "0.20"
 
 anyhow = { version = "1", features = [] }
+
+hound = { version = "3.5", optional = true }
 
 [build-dependencies]
 # Warning: git2 feature causes a stack smashing error in cross-compilation, even with 16MB stack!

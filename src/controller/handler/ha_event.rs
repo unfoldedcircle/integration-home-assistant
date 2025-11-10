@@ -4,16 +4,20 @@
 //! Actix message handler for Home Assistant events.
 
 use crate::client::messages::{
-    AvailableEntities, EntityEvent, SetAvailableEntities, SubscribedEntities,
+    AssistEvent, AvailableEntities, EntityEvent, SetAvailableEntities, SubscribedEntities,
 };
+use crate::client::model::{AssistPipelineEvent, ResponseType};
 use crate::controller::handler::{SubscribeHaEventsMsg, UnsubscribeHaEventsMsg};
 use crate::controller::{Controller, OperationModeState, SendWsMessage};
 use crate::errors::ServiceError;
 use crate::util::DeserializeMsgData;
 use actix::Handler;
-use log::{debug, error};
-use uc_api::intg::ws::AvailableEntitiesMsgData;
-use uc_api::intg::{EntityChange, SubscribeEvents};
+use log::{debug, error, info};
+use uc_api::intg::ws::{AvailableEntitiesMsgData, DriverEvent};
+use uc_api::intg::{
+    AssistantError, AssistantErrorCode, AssistantEvent, AssistantSpeechResponse,
+    AssistantSttResponse, AssistantTextResponse, EntityChange, SubscribeEvents,
+};
 use uc_api::ws::{EventCategory, WsMessage};
 
 impl Handler<EntityEvent> for Controller {
@@ -28,6 +32,127 @@ impl Handler<EntityEvent> for Controller {
                     session,
                 );
             }
+        }
+    }
+}
+
+impl Handler<AssistEvent> for Controller {
+    type Result = ();
+
+    fn handle(&mut self, msg: AssistEvent, _ctx: &mut Self::Context) -> Self::Result {
+        // convert and propagate event to remote
+        let entity_id = msg.entity_id;
+        let session_id = msg.session_id;
+        let event = match msg.event {
+            AssistPipelineEvent::RunStart { .. } => AssistantEvent::Ready {
+                entity_id,
+                session_id,
+            },
+            AssistPipelineEvent::RunEnd => AssistantEvent::Finished {
+                entity_id,
+                session_id,
+            },
+            AssistPipelineEvent::WakeWordStart
+            | AssistPipelineEvent::WakeWordEnd
+            | AssistPipelineEvent::SttVadStart
+            | AssistPipelineEvent::SttVadEnd
+            | AssistPipelineEvent::SttStart { .. } => {
+                // not used
+                return;
+            }
+            AssistPipelineEvent::SttEnd { data } => {
+                if let Some(output) = data.stt_output {
+                    AssistantEvent::SttResponse {
+                        entity_id,
+                        session_id,
+                        data: AssistantSttResponse::new(output.text),
+                    }
+                } else {
+                    return;
+                }
+            }
+            AssistPipelineEvent::IntentStart { .. } => return,
+            AssistPipelineEvent::IntentProgress => return,
+            AssistPipelineEvent::IntentEnd { data } => {
+                if let Some(output) = data.intent_output
+                    && let Some(response) = output.response
+                {
+                    if let Some(text) = response
+                        .speech
+                        .as_ref()
+                        .and_then(|v| v.as_object())
+                        .and_then(|map| map.get("plain"))
+                        .and_then(|v| v.as_object())
+                        .and_then(|map| map.get("speech"))
+                        .and_then(|v| v.as_str())
+                    {
+                        let success = matches!(
+                            response.response_type,
+                            ResponseType::ActionDone | ResponseType::QueryAnswer
+                        );
+                        AssistantEvent::TextResponse {
+                            entity_id,
+                            session_id,
+                            data: AssistantTextResponse::new(success, text),
+                        }
+                    } else {
+                        info!(
+                            "[{}] Unsupported intent response {:?} without text or SSML format",
+                            self.remote_id, response.response_type
+                        );
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+            AssistPipelineEvent::TtsStart { .. } => return,
+            AssistPipelineEvent::TtsEnd { data } => {
+                if let Some(output) = data.tts_output {
+                    AssistantEvent::SpeechResponse {
+                        entity_id,
+                        session_id,
+                        data: AssistantSpeechResponse::new(output.url, output.mime_type),
+                    }
+                } else {
+                    return;
+                }
+            }
+            AssistPipelineEvent::Error { data } => {
+                let code = match data.code.as_str() {
+                    "timeout" => AssistantErrorCode::Timeout, // found while testing
+                    "wake-engine-missing"
+                    | "wake-provider-missing"
+                    | "wake-stream-failed"
+                    | "wake-word-timeout"
+                    | "stt-provider-missing"
+                    | "intent-not-supported"
+                    | "tts-not-supported" => AssistantErrorCode::ServiceUnavailable,
+                    "stt-provider-unsupported-metadata" => AssistantErrorCode::InvalidAudio,
+                    "stt-no-text-recognized" => AssistantErrorCode::NoTextRecognized,
+                    "stt-stream-failed" | "intent-failed" | "tts-failed" => {
+                        AssistantErrorCode::UnexpectedError
+                    }
+                    _ => AssistantErrorCode::UnexpectedError,
+                };
+                AssistantEvent::Error {
+                    entity_id,
+                    session_id,
+                    data: AssistantError::new(code, data.message),
+                }
+            }
+        };
+
+        let msg_data = serde_json::to_value(event).expect("BUG Failed to serialize AssistantEvent");
+        for session in self.sessions.keys() {
+            self.send_r2_msg(
+                WsMessage::event(
+                    DriverEvent::AssistantEvent.as_ref(),
+                    EventCategory::Entity,
+                    msg_data.clone(),
+                ),
+                session,
+            );
         }
     }
 }
