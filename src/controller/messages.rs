@@ -17,6 +17,7 @@ use uc_api::ws::WsMessage;
 /// Send a WebSocket message to Remote Two.
 ///
 /// The [`WsMessage`] is either an Integration-API request, response or event message.
+/// Sending is best-effort only!
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct SendWsMessage(pub WsMessage);

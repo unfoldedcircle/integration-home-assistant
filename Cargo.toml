@@ -36,9 +36,8 @@ uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.14.
 
 # WebSockets server
 actix-web = { version = "4.11", features = ["rustls-0_23"] }
-actix-web-actors = "4.2"
+actix-ws = "0.3"
 actix = "0.13"
-bytestring = "1"
 rustls = { version = "0.23" }
 rustls-platform-verifier = "0.6"
 rustls-pemfile = "2"
@@ -47,6 +46,8 @@ actix-codec = "0.5"
 awc = { version = "3.8", features = ["rustls-0_23"] }
 bytes = "1"
 futures = "0.3"
+# Tokio is used by actix, but AFAIK the select! macro is not re-exported
+tokio = { version = "1", features = ["macros"] }
 
 # see mdns-sd patch at the end of this file
 mdns-sd = { version = "0.9.3", optional = true }
