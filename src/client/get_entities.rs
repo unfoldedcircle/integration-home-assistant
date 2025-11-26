@@ -119,13 +119,22 @@ impl HomeAssistantClient {
             let profiles = assist
                 .pipelines
                 .iter()
-                .map(|p| VoiceAssistantProfile {
-                    id: p.id.clone(),
-                    name: p.name.clone(),
-                    language: Some(p.language.clone()),
-                    transcription: None, // always active afaik: set in entity features
-                    response_text: None, // always active afaik: set in entity features
-                    response_speech: Some(p.stt_engine.is_some()), // optional setting
+                .map(|p| {
+                    // afaik, transcription & text response are always active
+                    let mut prof_feat = vec![
+                        VoiceAssistantFeature::Transcription,
+                        VoiceAssistantFeature::ResponseText,
+                    ];
+                    // speech response can be configured in a pipeline and might not be active for all.
+                    if p.stt_engine.is_some() {
+                        prof_feat.push(VoiceAssistantFeature::ResponseSpeech);
+                    }
+                    VoiceAssistantProfile {
+                        id: p.id.clone(),
+                        name: p.name.clone(),
+                        language: Some(p.language.clone()),
+                        features: Some(prof_feat),
+                    }
                 })
                 .collect();
 

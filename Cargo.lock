@@ -3018,7 +3018,7 @@ dependencies = [
 [[package]]
 name = "uc_api"
 version = "0.14.0"
-source = "git+https://github.com/unfoldedcircle/api-model-rs?rev=cefdc27a33c6ddd7db76516719dc4f835d2983b6#cefdc27a33c6ddd7db76516719dc4f835d2983b6"
+source = "git+https://github.com/unfoldedcircle/api-model-rs?rev=20dda30b0614c9d886eea8c417c96b2f7b3bbf82#20dda30b0614c9d886eea8c417c96b2f7b3bbf82"
 dependencies = [
  "chrono",
  "once_cell",

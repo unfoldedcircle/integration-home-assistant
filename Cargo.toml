@@ -2,6 +2,7 @@
 name = "uc-intg-hass"
 version = "0.13.1"
 edition = "2024"
+rust-version = "1.85.0"
 authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
 license = "MPL-2.0"
 description = "Unfolded Circle Home-Assistant integration for Remote Two/3"
@@ -38,7 +39,7 @@ audio = ["dep:hound"]
 # for local development:
 #uc_api = { path = "../api-model-rs", features = ["prost"] }
 # Using a GitHub revision:
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "cefdc27a33c6ddd7db76516719dc4f835d2983b6", features = ["prost"] }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "20dda30b0614c9d886eea8c417c96b2f7b3bbf82", features = ["prost"] }
 
 # WebSockets server
 actix-web = { version = "4.11", features = ["rustls-0_23"] }
