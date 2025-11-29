@@ -8,10 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.14.0 - 2025-11-29
+
+### Added
+- Assist support with the new voice_assistant entity ([#78](https://github.com/unfoldedcircle/integration-home-assistant/pull/78)).
+
 ### Changed
 - Remove the 'v'-prefix from the version information.
-
----
+- Replace deprecated actix-web-actors with actix-ws ([#77](https://github.com/unfoldedcircle/integration-home-assistant/pull/77)).
 
 ## v0.13.1 - 2025-09-11
 ### Fixed
@@ -19,7 +25,7 @@ _Changes in the next release_
 
 ## v0.13.0 - 2025-09-11
 ### Added
-- Expert option to disable certificate validation of the Home Assistant WebSocket server connection  ([#71](https://github.com/unfoldedcircle/integration-home-assistant/pull/71)).
+- Expert option to disable certificate validation of the Home Assistant WebSocket server connection ([#71](https://github.com/unfoldedcircle/integration-home-assistant/pull/71)).
 
 ### Fixed
 - Initial setup with a wss:// Home Assistant URL or switching from ws to wss doesn't require a reboot anymore ([#73](https://github.com/unfoldedcircle/integration-home-assistant/pull/73)).
