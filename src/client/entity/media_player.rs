@@ -210,6 +210,7 @@ pub(crate) fn convert_media_player_entity(
         entity_type: EntityType::MediaPlayer,
         device_class,
         name,
+        icon: None,
         features: Some(media_feats.into_iter().map(|v| v.to_string()).collect()),
         area: None,
         options: None,

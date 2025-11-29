@@ -16,6 +16,7 @@ mod mdns;
 pub use mdns::publish_service;
 
 mod ws;
+
 pub use ws::{json_error_handler, ws_index};
 
 /// Fallback if no mDNS library is enabled

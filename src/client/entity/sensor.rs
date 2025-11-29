@@ -109,6 +109,7 @@ pub(crate) fn convert_sensor_entity(
         entity_type: EntityType::Sensor,
         device_class,
         name,
+        icon: None,
         features: None,
         area: None,
         options: None,

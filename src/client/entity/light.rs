@@ -195,6 +195,7 @@ pub(crate) fn convert_light_entity(
         entity_type: EntityType::Light,
         device_class: None,
         name,
+        icon: None,
         features: Some(light_feats.into_iter().map(|v| v.to_string()).collect()),
         area: None,
         options: None,

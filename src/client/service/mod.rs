@@ -13,9 +13,7 @@ use crate::client::model::{CallServiceMsg, Target};
 use crate::errors::ServiceError;
 use actix::Handler;
 use log::info;
-use serde_json::{Map, Value};
 use uc_api::EntityType;
-use uc_api::intg::EntityCommand;
 
 mod button;
 mod climate;
@@ -58,6 +56,10 @@ impl Handler<CallService> for HomeAssistantClient {
             EntityType::IrEmitter => Err(ServiceError::BadRequest(
                 "IR-emitter not supported! Ignoring call".to_string(),
             )),
+            EntityType::VoiceAssistant => Err(ServiceError::BadRequest(
+                "Voice Assistant doesn't support sending entity service commands! Ignoring call"
+                    .to_string(),
+            )),
         }?;
         info!(
             "[{}] Calling {} service '{service}'",
@@ -85,27 +87,5 @@ impl Handler<CallService> for HomeAssistantClient {
 
         // TODO wait for HA response message? If the service call fails we'll get a result back with "success: false"
         // However, some services take a long time to respond! E.g. Sonos might take 10 seconds if there's an issue with the network.
-    }
-}
-
-pub fn cmd_from_str<T: std::str::FromStr + strum::VariantNames>(
-    cmd: &str,
-) -> Result<T, ServiceError> {
-    T::from_str(cmd).map_err(|_| {
-        ServiceError::BadRequest(format!(
-            "Invalid cmd_id: {cmd}. Valid commands: {}",
-            T::VARIANTS.to_vec().join(",")
-        ))
-    })
-}
-
-/// Get a serde_json::Map reference of the params attribute of the provided EntityCommand.
-///
-/// A BadRequest error is returned if `params` is not set.
-fn get_required_params(cmd: &EntityCommand) -> Result<&Map<String, Value>, ServiceError> {
-    if let Some(params) = cmd.params.as_ref() {
-        Ok(params)
-    } else {
-        Err(ServiceError::BadRequest("Missing params object".into()))
     }
 }

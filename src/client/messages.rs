@@ -3,13 +3,13 @@
 
 //! Actix Actor message definitions for HomeAssistantClient
 
+use crate::client::model::{AssistPipelineEvent, GetPipelinesResult};
+use crate::errors::ServiceError;
 use actix::prelude::Message;
 use awc::ws::CloseCode;
+use derive_more::Constructor;
 use std::collections::HashSet;
-
 use uc_api::intg::{AvailableIntgEntity, EntityChange, EntityCommand};
-
-use crate::errors::ServiceError;
 
 /// Call a service in Home Assistant
 #[derive(Message)]
@@ -17,6 +17,38 @@ use crate::errors::ServiceError;
 pub struct CallService {
     /// Remote Two `msg_data` json object from `entity_command` message.
     pub command: EntityCommand,
+}
+
+/// Run an assist pipeline in Home Assistant and wait for the response.
+///
+/// See <https://developers.home-assistant.io/docs/voice/pipelines/>
+///
+/// Returns:
+/// - ServiceError::ServiceUnavailable if the pipeline failed to start
+/// - ServiceError::NotFound if the pipeline wasn't found
+#[derive(Message)]
+#[rtype(result = "Result<(), ServiceError>")]
+pub struct CallRunAssistPipeline {
+    pub entity_id: String,
+    pub session_id: u32,
+    pub sample_rate: u32,
+    pub timeout: Option<u16>,
+    pub speech_response: bool,
+    pub pipeline_id: Option<String>,
+}
+
+/// Retrieve all available assist pipelines from Home Assistant.
+#[derive(Message)]
+#[rtype(result = "Result<GetPipelinesResult, ServiceError>")]
+pub struct CallListAssistPipelines {
+    /// Speech to text is required. Pipelines without STT are filtered out.
+    pub stt_required: bool,
+}
+
+impl Default for CallListAssistPipelines {
+    fn default() -> Self {
+        Self { stt_required: true }
+    }
 }
 
 /// Fetch all states from Home Assistant
@@ -82,6 +114,17 @@ pub struct ConnectionEvent {
 pub struct EntityEvent {
     pub client_id: String,
     pub entity_change: EntityChange,
+}
+
+/// HA assist pipeline events
+#[derive(Constructor, Message)]
+#[rtype(result = "()")]
+pub struct AssistEvent {
+    /// Remote audio session ID
+    pub session_id: u32,
+    /// Remote voice assistant entity ID
+    pub entity_id: String,
+    pub event: AssistPipelineEvent,
 }
 
 /// Set remote id from remote to client

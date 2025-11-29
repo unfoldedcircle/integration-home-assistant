@@ -110,6 +110,7 @@ pub(crate) fn convert_cover_entity(
         entity_type: EntityType::Cover,
         device_class,
         name,
+        icon: None,
         features: Some(cover_feats.into_iter().map(|v| v.to_string()).collect()),
         area: None,
         options: None,

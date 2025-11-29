@@ -243,6 +243,7 @@ jobs:
             target: "Linux-x64",
             os: "ubuntu-22.04",
             artifact: "ha-test",
+            artifact2: "voice-command",
             archive: "ha-test_Linux-x64.tar.gz"
           }
           - {
@@ -250,6 +251,7 @@ jobs:
             target: "Windows-x64",
             os: "windows-latest",
             artifact: "ha-test.exe",
+            artifact2: "voice-command.exe",
             archive: "ha-test_Windows-x64.zip"
           }
           - {
@@ -257,6 +259,7 @@ jobs:
             target: "macOS-x64",
             os: "macos-latest",
             artifact: "ha-test",
+            artifact2: "voice-command",
             archive: "ha-test_macOS-x64.tar.gz"
           }
 
@@ -272,7 +275,7 @@ jobs:
           incremental: ${{ env.INCREMENTAL_BUILD }} && !contains(github.ref, 'tags/v')
 
       - name: Release build
-        run: cargo build --release --bin ha-test
+        run: cargo build --release --features audio --bin ha-test --bin voice-command
 
       # Archive is required to preserve file permissions
       - name: Prepare upload artifact
@@ -281,6 +284,7 @@ jobs:
           ls -la target/release
           mkdir -p ${{env.BIN_OUTPUT_PATH }}
           cp target/release/${{ matrix.config.artifact }} ${{ env.BIN_OUTPUT_PATH }}
+          cp target/release/${{ matrix.config.artifact2 }} ${{ env.BIN_OUTPUT_PATH }}
           cp resources/home-assistant.json ${{ env.BIN_OUTPUT_PATH }}
           ls -la ${{ env.BIN_OUTPUT_PATH }}
 

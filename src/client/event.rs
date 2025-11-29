@@ -8,15 +8,16 @@
 
 use crate::client::HomeAssistantClient;
 use crate::client::entity::*;
-use crate::client::messages::EntityEvent;
-use crate::client::model::Event;
+use crate::client::messages::{AssistEvent, EntityEvent};
+use crate::client::model::{AssistPipelineEvent, Event};
 use crate::errors::ServiceError;
-use log::debug;
+use log::{debug, warn};
 use serde_json::json;
+use std::time::Instant;
 
 impl HomeAssistantClient {
-    /// Whenever an `event` message is received from HA, this method is called to handle it.  
-    /// The event conversion is delegated to entity type specific functions for the supported entity
+    /// Whenever an entity `event` message is received from HA, this method is called to handle it.
+    /// The event conversion is delegated to entity-type-specific functions for the supported entity
     /// types.  
     ///
     /// The converted `EntityChange` is sent to the controller in an Actix `EntityEvent` message to
@@ -27,7 +28,7 @@ impl HomeAssistantClient {
     /// * `event`: Transformed `.event` json object containing only the required data.
     ///
     /// returns: Result<(), ServiceError>
-    pub(crate) fn handle_event(&mut self, event: Event) -> Result<(), ServiceError> {
+    pub(super) fn handle_entity_event(&mut self, event: Event) -> Result<(), ServiceError> {
         let entity_type = match event.data.entity_id.split_once('.') {
             None => return Err(ServiceError::BadRequest("Invalid entity_id format".into())),
             Some((l, _)) => l,
@@ -62,6 +63,75 @@ impl HomeAssistantClient {
             client_id: self.id.clone(),
             entity_change,
         })?;
+
+        Ok(())
+    }
+
+    pub(super) fn handle_assist_pipeline_event(
+        &mut self,
+        id: u32,
+        mut event: AssistPipelineEvent,
+    ) -> Result<(), ServiceError> {
+        self.remove_expired_assist_sessions();
+
+        let session = match self.assist_sessions.get_mut(&id) {
+            None => {
+                warn!(
+                    "[{}] no assist session found for id {id}: ignoring event {event:?}",
+                    self.id
+                );
+                return Ok(());
+            }
+            Some(session) => session,
+        };
+
+        debug!("[{}] assist pipeline event: {:?}", self.id, event);
+        // intercept events to update the session state or patch certain fields
+        match &mut event {
+            AssistPipelineEvent::RunStart { data } => {
+                let bin_id = data.runner_data.as_ref().map(|d| d.stt_binary_handler_id);
+                session.stt_binary_handler_id = bin_id;
+            }
+            AssistPipelineEvent::SttEnd { .. } => {}
+            AssistPipelineEvent::IntentEnd { .. } => {}
+            AssistPipelineEvent::RunEnd => {
+                // Don't remove session yet: we might still get an Error event AFTER RunEnd!
+                // Session will be removed in `remove_expired_assist_sessions`.
+                session.run_end = Some(Instant::now());
+            }
+            AssistPipelineEvent::Error { data } => {
+                // we might still get a RunEnd event after an Error event!
+                session.error = Some(data.clone());
+            }
+            // not (yet) interested in the remaining events:
+            AssistPipelineEvent::WakeWordStart => {}
+            AssistPipelineEvent::WakeWordEnd => {}
+            AssistPipelineEvent::SttStart { .. } => {}
+            AssistPipelineEvent::SttVadStart => {}
+            AssistPipelineEvent::SttVadEnd => {}
+            AssistPipelineEvent::IntentStart { .. } => {}
+            AssistPipelineEvent::IntentProgress => {}
+            AssistPipelineEvent::TtsStart { .. } => {}
+            AssistPipelineEvent::TtsEnd { data } => {
+                if let Some(output) = data.tts_output.as_mut()
+                    && output.url.starts_with('/')
+                {
+                    output.url = format!(
+                        "{}://{}:{}{}",
+                        self.server.scheme(),
+                        self.server.host_str().unwrap_or_default(),
+                        self.server.port_or_known_default().unwrap_or_default(),
+                        output.url
+                    );
+                }
+            }
+        }
+
+        let _ = self.controller_actor.try_send(AssistEvent::new(
+            session.session_id,
+            session.entity_id.clone(),
+            event,
+        ));
 
         Ok(())
     }

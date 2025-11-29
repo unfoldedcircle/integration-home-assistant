@@ -3,7 +3,7 @@
 
 //! Home Assistant client WebSocket API implementation with Actix actors.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::time::{Duration, Instant};
 
@@ -12,7 +12,9 @@ use crate::Controller;
 use crate::client::messages::{
     AvailableEntities, ConnectionEvent, ConnectionState, SetAvailableEntities,
 };
-use crate::client::model::Event;
+use crate::client::model::{
+    AssistPipelineEvent, AssistSession, Event, GetPipelinesResult, OpenRequest, ResponseMsg,
+};
 use crate::configuration::{ENV_HASS_MSG_TRACING, HeartbeatSettings};
 use crate::errors::ServiceError;
 use actix::io::SinkWrite;
@@ -24,18 +26,20 @@ use futures::stream::{SplitSink, SplitStream};
 use log::{debug, error, info, warn};
 use messages::Close;
 use serde::de::Error;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use std::sync::atomic::{AtomicU32, Ordering};
+use uc_api::intg::EntityCommand;
 use url::Url;
 
 mod actor;
+pub mod assist;
 mod close_handler;
 mod entity;
 mod event;
 mod get_entities;
 mod get_states;
 pub mod messages;
-mod model;
+pub mod model;
 mod service;
 mod set_remote_id;
 mod streamhandler;
@@ -63,12 +67,20 @@ pub struct HomeAssistantClient {
     uc_ha_comp_check_handle: Option<SpawnHandle>,
     /// True if subscription to standard events has been done request.
     subscribed_events: bool,
+
+    // TODO replace individual `subscribe_*_id` event ids with the generic `open_requests` callback
     /// request id of the last `subscribe_events` request. This id will be used in the result and event messages.
     subscribe_standard_events_id: Option<u32>,
     /// request id of the last `unfoldedcircle/event/entities/subscribe` request. This id will be used in the result and event messages.
     subscribe_uc_events_id: Option<u32>,
     /// request id of the last `unfoldedcircle/event/configure/subscribe` request. This id will be used in the result and event messages.
     subscribe_configure_id: Option<u32>,
+    // END replace
+    /// sent request messages waiting for a response. Map: HA request ID -> waiting receiver information
+    open_requests: HashMap<u32, OpenRequest>,
+    /// open assist pipeline sessions. Map: HA request ID -> assist session data
+    assist_sessions: HashMap<u32, AssistSession>,
+    assist_pipelines: Option<GetPipelinesResult>,
     entity_states_id: Option<u32>,
     sink: SinkWrite<ws::Message, SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>>,
     controller_actor: Addr<Controller>,
@@ -136,6 +148,9 @@ impl HomeAssistantClient {
                 uc_ha_component_check_interval: Duration::from_secs(5),
                 uc_ha_component_check_duration: None, // check forever
                 uc_ha_comp_check_handle: None,
+                open_requests: Default::default(),
+                assist_sessions: Default::default(),
+                assist_pipelines: None,
             }
         })
     }
@@ -204,79 +219,7 @@ impl HomeAssistantClient {
             .unwrap_or_default()
         {
             "event" => {
-                // debug!("[{}] Event received {}", self.id, text);
-                // TODO should we only check Event.event_type == "state_changed"? The id check worked well though in YIO v1
-                if Some(id) != self.subscribe_standard_events_id
-                    && Some(id) != self.subscribe_uc_events_id
-                    && Some(id) != self.subscribe_configure_id
-                {
-                    debug!(
-                        "[{}] Ignoring event with non matching event subscription id",
-                        self.id
-                    );
-                    return;
-                }
-                if Some(id) == self.subscribe_configure_id {
-                    debug!(
-                        "[{}] Received request from HA for configuring subscribed entities",
-                        self.id
-                    );
-                    if let Some(entities) =
-                        object_msg.get_mut("event").and_then(|v| v.as_object_mut())
-                    {
-                        // TODO : not sure about how it should be done => for @Markus
-                        //  - We send here a get_state_result notification to the controller in order to update available entities
-                        //  - But this request is at the initiative of the client, not the result of the "reload" entities request
-                        //  - Maybe this list should be stored on the client and sent when requested by the controller
-                        //  - But in that case how to reset the list of available entities to the full list from HA ?
-                        //    ex : after configuring entities from HA, the user may want to add an entity from the remote
-                        //         but in that case he won't have the full list (only the subscribed ones)
-                        //  Obviously the research of entities in the remote's form on HA integration page should be dynamic
-                        //  after each keypress/filter applied, a request should be done to the client then to HA to
-                        //  get corresponding results
-                        if let Some(entities) =
-                            entities.get_mut("data").and_then(|v| v.as_array_mut())
-                        {
-                            debug!("[{}] {}", self.id, "Sending new entities to subscribe to");
-                            // this looks ugly! Is there a better way to get ownership of the array?
-                            let entities: Vec<Value> =
-                                entities.iter_mut().map(|v| v.take()).collect();
-                            match self.handle_get_states_result(entities) {
-                                Ok(entities) => {
-                                    if let Err(e) =
-                                        self.controller_actor.try_send(SetAvailableEntities {
-                                            client_id: self.id.clone(),
-                                            entities,
-                                        })
-                                    {
-                                        error!(
-                                            "[{}] Error handling HA set available entities result: {e:?}",
-                                            self.id
-                                        );
-                                    }
-                                }
-                                Err(e) => {
-                                    error!(
-                                        "[{}] Error handling HA set available entities result: {e:?}",
-                                        self.id
-                                    );
-                                }
-                            }
-                        }
-                    }
-                    return;
-                }
-
-                // Otherwise this is an entity change event : same format received wether it is
-                // a standard event or a uc event
-                let event = serde_json::from_value::<Event>(
-                    object_msg.remove("event").unwrap_or(Value::Null),
-                );
-                if let Ok(event) = event
-                    && let Err(e) = self.handle_event(event)
-                {
-                    error!("[{}] Error handling HA state_changed event: {e:?}", self.id);
-                }
+                self.handle_event_message(id, object_msg);
             }
             // result messages : sent by HA in response of a previous request, including :
             // - Check for UC HA component (id=uc_ha_component_info_id) with unfoldedcircle/info,
@@ -284,6 +227,7 @@ impl HomeAssistantClient {
             //   with subscribe_events
             // - Request for all entity states (id=entity_states_id) with get_states
             "result" => {
+                self.remove_expired_requests();
                 let success = object_msg
                     .get("success")
                     .and_then(|v| v.as_bool())
@@ -374,7 +318,8 @@ impl HomeAssistantClient {
                         // this looks ugly! Is there a better way to get ownership of the array?
                         let entities: Vec<Value> = entities.iter_mut().map(|v| v.take()).collect();
                         match self.handle_get_states_result(entities) {
-                            Ok(entities) => {
+                            Ok(mut entities) => {
+                                entities.extend(self.get_voice_assistant_entities());
                                 if let Err(e) = self.controller_actor.try_send(AvailableEntities {
                                     client_id: self.id.clone(),
                                     entities,
@@ -389,6 +334,17 @@ impl HomeAssistantClient {
                                 error!("[{}] Error handling HA get_states result: {e:?}", self.id);
                             }
                         }
+                    }
+                } else if let Some(mut request) = self.open_requests.remove(&id)
+                    && let Some(tx) = request.tx.take()
+                {
+                    // Notify the waiting caller with the result
+                    let response = ResponseMsg { id, success, msg };
+                    if tx.send(response).is_ok() {
+                        debug!("[{}] Notified waiting request: {id}", self.id);
+                    } else {
+                        debug!("[{}] Waiting request went away: {id}", self.id);
+                        // most likely due to a timeout
                     }
                 }
             }
@@ -440,6 +396,92 @@ impl HomeAssistantClient {
             }
             "pong" => self.last_hb = Instant::now(),
             _ => {}
+        }
+    }
+
+    /// Handle received HA event
+    ///
+    /// # Arguments
+    ///
+    /// * `id`: event ID
+    /// * `object_msg`: JSON Map representation of the HA event message
+    fn handle_event_message(&mut self, id: u32, msg: &mut Map<String, Value>) {
+        // only handle events with matching event subscription id
+        match Some(id) {
+            // entity change event: same format received weather it is a standard event or a uc event
+            event_id
+                if event_id == self.subscribe_standard_events_id
+                    || event_id == self.subscribe_uc_events_id =>
+            {
+                let event =
+                    serde_json::from_value::<Event>(msg.remove("event").unwrap_or(Value::Null));
+                if let Ok(event) = event
+                    && let Err(e) = self.handle_entity_event(event)
+                {
+                    error!("[{}] Error handling HA state_changed event: {e:?}", self.id);
+                }
+            }
+            event_id if event_id == self.subscribe_configure_id => {
+                debug!(
+                    "[{}] Received request from HA for configuring subscribed entities",
+                    self.id
+                );
+                if let Some(entities) = msg.get_mut("event").and_then(|v| v.as_object_mut()) {
+                    // TODO : not sure about how it should be done => for @Markus
+                    //  - We send here a get_state_result notification to the controller in order to update available entities
+                    //  - But this request is at the initiative of the client, not the result of the "reload" entities request
+                    //  - Maybe this list should be stored on the client and sent when requested by the controller
+                    //  - But in that case how to reset the list of available entities to the full list from HA ?
+                    //    ex : after configuring entities from HA, the user may want to add an entity from the remote
+                    //         but in that case he won't have the full list (only the subscribed ones)
+                    //  Obviously the research of entities in the remote's form on HA integration page should be dynamic
+                    //  after each keypress/filter applied, a request should be done to the client then to HA to
+                    //  get corresponding results
+                    if let Some(entities) = entities.get_mut("data").and_then(|v| v.as_array_mut())
+                    {
+                        debug!("[{}] {}", self.id, "Sending new entities to subscribe to");
+                        // this looks ugly! Is there a better way to get ownership of the array?
+                        let entities: Vec<Value> = entities.iter_mut().map(|v| v.take()).collect();
+                        match self.handle_get_states_result(entities) {
+                            Ok(entities) => {
+                                if let Err(e) =
+                                    self.controller_actor.try_send(SetAvailableEntities {
+                                        client_id: self.id.clone(),
+                                        entities,
+                                    })
+                                {
+                                    error!(
+                                        "[{}] Error handling HA set available entities result: {e:?}",
+                                        self.id
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                error!(
+                                    "[{}] Error handling HA set available entities result: {e:?}",
+                                    self.id
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            _event_id if self.assist_sessions.contains_key(&id) => {
+                let event = serde_json::from_value::<AssistPipelineEvent>(
+                    msg.remove("event").unwrap_or(Value::Null),
+                );
+                if let Ok(event) = event
+                    && let Err(e) = self.handle_assist_pipeline_event(id, event)
+                {
+                    error!("[{}] Error handling assist pipeline event: {e:?}", self.id);
+                }
+            }
+            _ => {
+                debug!(
+                    "[{}] Ignoring event with non matching event subscription id {id}",
+                    self.id
+                );
+            }
         }
     }
 
@@ -495,6 +537,8 @@ impl HomeAssistantClient {
         if self.msg_tracing_out {
             if let ws::Message::Text(txt) = &msg {
                 debug!("[{}] <- {txt}", self.id);
+            } else if let ws::Message::Binary(bin) = &msg {
+                debug!("[{}] <- BINARY ({})", self.id, bin.len());
             } else {
                 debug!("[{}] <- {:?}", self.id, msg);
             }
@@ -727,6 +771,24 @@ impl HomeAssistantClient {
             },
         ));
     }
+
+    fn remove_expired_requests(&mut self) {
+        self.open_requests
+            .retain(|_, req| req.ts.elapsed() < Duration::from_secs(30));
+    }
+
+    fn remove_expired_assist_sessions(&mut self) {
+        self.assist_sessions.retain(|_, req| {
+            // keep session open after the RunEnd event for a few seconds to be able to receive any remaining Error events
+            if let Some(end) = req.run_end
+                && end.elapsed() > Duration::from_secs(10)
+            {
+                return false;
+            }
+            // remove all sessions older than 180 seconds
+            req.ts.elapsed() < Duration::from_secs(180)
+        });
+    }
 }
 
 pub fn json_object_from_text_msg(id: &str, txt: &[u8]) -> Result<Value, serde_json::Error> {
@@ -744,4 +806,26 @@ pub fn json_object_from_text_msg(id: &str, txt: &[u8]) -> Result<Value, serde_js
     }
 
     Ok(msg)
+}
+
+pub fn cmd_from_str<T: std::str::FromStr + strum::VariantNames>(
+    cmd: &str,
+) -> Result<T, ServiceError> {
+    T::from_str(cmd).map_err(|_| {
+        ServiceError::BadRequest(format!(
+            "Invalid cmd_id: {cmd}. Valid commands: {}",
+            T::VARIANTS.to_vec().join(",")
+        ))
+    })
+}
+
+/// Get a serde_json::Map reference of the params attribute of the provided EntityCommand.
+///
+/// A BadRequest error is returned if `params` is not set.
+pub fn get_required_params(cmd: &EntityCommand) -> Result<&Map<String, Value>, ServiceError> {
+    if let Some(params) = cmd.params.as_ref() {
+        Ok(params)
+    } else {
+        Err(ServiceError::BadRequest("Missing params object".into()))
+    }
 }

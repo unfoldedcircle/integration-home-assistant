@@ -3,11 +3,11 @@
 
 use std::env;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Result, Write};
 use std::path::Path;
 use std::process::Command;
 
-fn main() {
+fn main() -> Result<()> {
     // Get git version information
     let git_version = get_git_version();
     let git_dirty = is_git_dirty();
@@ -22,10 +22,12 @@ fn main() {
     if target == "arm-unknown-linux-gnueabihf" {
         println!("cargo:rustc-link-lib=dylib=atomic")
     }
+
+    Ok(())
 }
 
 fn get_git_version() -> Option<String> {
-    // First try to get version from git
+    // First, try to get version from git
     if let Ok(output) = Command::new("git")
         .args(["describe", "--match", "v[0-9]*", "--tags", "HEAD"])
         .output()

@@ -3,7 +3,7 @@
 
 //! Remote entity specific HA service call logic.
 
-use crate::client::service::{cmd_from_str, get_required_params};
+use crate::client::{cmd_from_str, get_required_params};
 use crate::errors::ServiceError;
 use serde_json::{Map, Value};
 use uc_api::intg::{EntityCommand, IntgRemoteCommand};
