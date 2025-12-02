@@ -8,13 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.14.1 - 2025-12-02
 ### Fixed
 - Voice assistant entity state updates and setting the correct "response_speech" attribute.
 
----
-
 ## v0.14.0 - 2025-11-29
-
 ### Added
 - Assist support with the new voice_assistant entity ([#78](https://github.com/unfoldedcircle/integration-home-assistant/pull/78)).
 
