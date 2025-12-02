@@ -63,11 +63,14 @@ impl Handler<GetAvailableEntities> for HomeAssistantClient {
                     );
                     act.send_json(
                         json!(
-                            {"id": id, "type": "unfoldedcircle/entities/states",
-                            "data": {
-                                "entity_ids": act.subscribed_entities,
-                                "client_id": act.remote_id
-                            }}
+                            {
+                                "id": id,
+                                "type": "unfoldedcircle/entities/states",
+                                "data": {
+                                    "entity_ids": act.subscribed_entities,
+                                    "client_id": act.remote_id
+                                }
+                            }
                         ),
                         ctx,
                     )

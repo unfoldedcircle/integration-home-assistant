@@ -7,50 +7,77 @@ use std::str::FromStr;
 
 use crate::client::HomeAssistantClient;
 use crate::client::entity::*;
-use crate::client::messages::GetStates;
+use crate::client::messages::{CallListAssistPipelines, GetStates};
 use crate::errors::ServiceError;
-use actix::Handler;
+use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
 use log::{debug, error, info, warn};
 use serde_json::{Value, json};
 use uc_api::EntityType;
 use uc_api::intg::AvailableIntgEntity;
 
 impl Handler<GetStates> for HomeAssistantClient {
-    type Result = Result<(), ServiceError>;
+    type Result = ResponseActFuture<Self, Result<(), ServiceError>>;
 
+    // TODO cleanup: almost same code as GetAvailableEntities, only difference is subscribed_entities vs parameter in GetStates
     fn handle(&mut self, msg: GetStates, ctx: &mut Self::Context) -> Self::Result {
         debug!("[{}] GetStates from '{}'", self.id, msg.remote_id);
         self.remote_id = msg.remote_id;
-        let entity_ids = msg.entity_ids;
-        let id = self.new_msg_id();
-        // Use the same message id for get states and get available entities (same result format)
-        self.entity_states_id = Some(id);
-        // Try to subsscribe again to custom events if not already done when GetStates command
-        // is received from the remote
-        self.send_uc_info_command(ctx);
-        // If UC HA component available, get states only on given (subscribed) entities
-        if self.uc_ha_component {
-            self.send_json(
-                json!(
-                    {
-                        "id": id,
-                        "type": "unfoldedcircle/entities/states",
-                        "data": {
-                            "entity_ids": entity_ids.clone(),
-                            "client_id": self.remote_id
-                        }
+
+        let ha_client = ctx.address();
+        Box::pin(
+            async move {
+                // Retrieve available assist pipelines and map them to UC voice-assistant entities
+                // This is best effort, old HA setups might return an error
+                match ha_client.send(CallListAssistPipelines::default()).await {
+                    Ok(Ok(result)) => Some(result),
+                    Ok(Err(e)) => {
+                        error!("Failed to retrieve Home Assistant assist pipelines: {e}");
+                        None
                     }
-                ),
-                ctx,
-            )
-        } else {
-            self.send_json(
-                json!(
-                    {"id": id, "type": "get_states"}
-                ),
-                ctx,
-            )
-        }
+                    Err(e) => {
+                        error!("Failed to send CallListAssistPipelines: {e}");
+                        None
+                    }
+                }
+            }
+            .into_actor(self) // converts future to ActorFuture
+            .map(move |result, act, ctx| {
+                if let Some(result) = result {
+                    info!("Got assist pipelines: {result:?}");
+                    act.assist_pipelines = Some(result);
+                }
+                // Retrieve Home Assistant entities
+                let id = act.new_msg_id();
+                // Use the same message id for get states and get available entities (same result format)
+                act.entity_states_id = Some(id);
+                // Try to subscribe again to custom events if not already done when
+                // GetStates command is received from the remote
+                act.send_uc_info_command(ctx);
+                // If UC HA component available, get states only on given (subscribed) entities
+                if act.uc_ha_component {
+                    act.send_json(
+                        json!(
+                            {
+                                "id": id,
+                                "type": "unfoldedcircle/entities/states",
+                                "data": {
+                                    "entity_ids": msg.entity_ids,
+                                    "client_id": act.remote_id
+                                }
+                            }
+                        ),
+                        ctx,
+                    )
+                } else {
+                    act.send_json(
+                        json!(
+                            {"id": id, "type": "get_states"}
+                        ),
+                        ctx,
+                    )
+                }
+            }),
+        )
     }
 }
 
