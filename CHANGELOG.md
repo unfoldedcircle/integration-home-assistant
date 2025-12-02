@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Fixed
+- Voice assistant "response_speech" attribute.
+
 ---
 
 ## v0.14.0 - 2025-11-29

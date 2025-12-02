@@ -10,6 +10,7 @@ use crate::client::model::{
     OpenRequest, ResponseMsg, RunAssistPipelineBuilder,
 };
 use crate::errors::ServiceError;
+use crate::errors::ServiceError::InternalServerError;
 use crate::util::return_fut_err;
 use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture, fut};
 use log::{error, info, warn};
@@ -34,7 +35,7 @@ impl Handler<CallRunAssistPipeline> for HomeAssistantClient {
         let (tx, rx) = oneshot::channel();
         self.open_requests.insert(msg_id, OpenRequest::new(tx));
 
-        let run = RunAssistPipelineBuilder::default()
+        let run = match RunAssistPipelineBuilder::default()
             .id(msg_id)
             .input(serde_json::json!({ "sample_rate": msg.sample_rate }))
             .timeout(msg.timeout)
@@ -45,7 +46,13 @@ impl Handler<CallRunAssistPipeline> for HomeAssistantClient {
             })
             .pipeline(msg.pipeline_id)
             .build()
-            .expect("BUG building pipeline run request");
+            .map_err(|e| InternalServerError(format!("Error building pipeline run request: {e}")))
+        {
+            Ok(run) => run,
+            Err(e) => {
+                return_fut_err!(e);
+            }
+        };
         let assist_pipeline_req = AssistPipelineRequest::Run(run);
 
         if let Err(e) = self.send_json(

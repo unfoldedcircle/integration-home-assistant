@@ -111,7 +111,7 @@ impl HomeAssistantClient {
             ];
 
             if let Some(pref_pipe) = pref_pipe
-                && pref_pipe.stt_engine.is_some()
+                && pref_pipe.tts_engine.is_some()
             {
                 features.push(VoiceAssistantFeature::ResponseSpeech.to_string());
             }
@@ -126,7 +126,7 @@ impl HomeAssistantClient {
                         VoiceAssistantFeature::ResponseText,
                     ];
                     // speech response can be configured in a pipeline and might not be active for all.
-                    if p.stt_engine.is_some() {
+                    if p.tts_engine.is_some() {
                         prof_feat.push(VoiceAssistantFeature::ResponseSpeech);
                     }
                     VoiceAssistantProfile {
@@ -147,7 +147,7 @@ impl HomeAssistantClient {
             let mut attributes = serde_json::Map::with_capacity(1);
             attributes.insert(VoiceAssistantAttribute::State.to_string(), "ON".into());
 
-            let entity = AvailableIntgEntity {
+            match (AvailableIntgEntity {
                 entity_id: "assist".to_string(),
                 device_id: None,
                 entity_type: EntityType::VoiceAssistant,
@@ -159,10 +159,13 @@ impl HomeAssistantClient {
                 options: None,
                 attributes: Some(attributes),
             }
-            .with_options(options)
-            .expect("BUG invalid voice assistant entity options");
-
-            return vec![entity];
+            .with_options(options))
+            {
+                Ok(entity) => return vec![entity],
+                Err(e) => {
+                    error!("Failed to create voice assistant entity: {e}");
+                }
+            }
         }
 
         vec![]
