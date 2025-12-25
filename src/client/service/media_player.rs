@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case(json!(0), json!(0.0))] // TODO find a safer way to compare floats, this might blow any time
+    #[case(json!(0), json!(0.0))]
     #[case(json!(1), json!(0.01))]
     #[case(json!(50), json!(0.5))]
     #[case(json!(100), json!(1.0))]
@@ -192,7 +192,23 @@ mod tests {
         let (cmd, param) = result.unwrap();
         assert_eq!("volume_set", &cmd);
         assert!(param.is_some(), "Param object missing");
-        assert_eq!(Some(&output), param.unwrap().get("volume_level"));
+
+        let params = param.unwrap();
+        let actual_volume = params
+            .get("volume_level")
+            .and_then(|v| v.as_f64())
+            .expect("volume_level missing or not a float");
+
+        let expected_volume = output
+            .as_f64()
+            .expect("Expected output case must be a float");
+
+        assert!(
+            (actual_volume - expected_volume).abs() < f64::EPSILON,
+            "Volume mismatch: expected {}, got {}",
+            expected_volume,
+            actual_volume
+        );
     }
 
     #[rstest]
