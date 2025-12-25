@@ -9,6 +9,7 @@ mod cover;
 mod light;
 mod media_player;
 mod remote;
+mod select;
 mod sensor;
 mod switch;
 
@@ -18,5 +19,6 @@ pub(crate) use cover::*;
 pub(crate) use light::*;
 pub(crate) use media_player::*;
 pub(crate) use remote::*;
+pub(crate) use select::*;
 pub(crate) use sensor::*;
 pub(crate) use switch::*;

@@ -49,6 +49,8 @@ impl HomeAssistantClient {
                 return Ok(());
             }
             "cover" => cover_event_to_entity_change(event.data),
+            // TODO(select) check HA about the other input_select integration: does it send `select` or `input_select`?
+            "select" => select_event_to_entity_change(event.data),
             "sensor" | "binary_sensor" => sensor_event_to_entity_change(event.data),
             "climate" => climate_event_to_entity_change(event.data),
             "media_player" => media_player_event_to_entity_change(&self.server, event.data),
