@@ -1,10 +1,19 @@
 name: Security audit
 on:
   push:
+    # only build on pushes to main
+    branches:
+      - main
     paths:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
       - '.github/**/audit-on-push.yml'
+
+# prevent concurrent runs of this workflow for open pull requests
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   security_audit:
     runs-on: ubuntu-latest
