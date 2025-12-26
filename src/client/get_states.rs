@@ -108,10 +108,9 @@ impl HomeAssistantClient {
                     "input_boolean" => "switch",
                     "binary_sensor" => "sensor",
                     "input_button" => "button",
+                    "input_select" => "select",
                     "script" => "button",
                     "scene" => "button",
-                    // TODO(select) check HA about the other input_select integration: does it send `select` or `input_select`?
-                    // "input_select" => "select",
                     v => v,
                 },
             };
