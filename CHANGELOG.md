@@ -8,10 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.15.0 - 2026-01-13
 ### Added
 - Select entity and input select support ([#83](https://github.com/unfoldedcircle/integration-home-assistant/pull/83)).
-
----
 
 ## v0.14.1 - 2025-12-02
 ### Fixed
