@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Unfolded Circle ApS, Markus Zehnder <markus.z@unfoldedcircle.com>
 // SPDX-License-Identifier: MPL-2.0
 
-//! Select entity specific logic.
+//! Select-entity specific logic.
 
 use serde_json::{Map, Value};
 use std::collections::HashMap;
@@ -87,7 +87,7 @@ pub(crate) fn convert_select_entity(
         entity_type: EntityType::Select,
         device_class: None,
         name,
-        icon: None,
+        icon: Some("uc:list-dropdown".to_string()),
         features: None,
         area: None,
         options: None,
@@ -100,6 +100,98 @@ mod tests {
     use super::*;
     use serde_json::json;
     use uc_api::SelectAttribute;
+
+    #[test]
+    fn test_input_select_event_to_entity_change() {
+        let full_event_json = json!(
+        {
+          "type": "event",
+          "event": {
+            "event_type": "state_changed",
+            "data": {
+              "entity_id": "input_select.input_select_test",
+              "old_state": {
+                "entity_id": "input_select.input_select_test",
+                "state": "Option 1",
+                "attributes": {
+                  "options": [
+                    "Option 1",
+                    "Option 2",
+                    "Option 3"
+                  ],
+                  "editable": true,
+                  "icon": "mdi:gauge",
+                  "friendly_name": "Input select test"
+                },
+                "last_changed": "2025-12-26T23:30:50.490383+00:00",
+                "last_reported": "2025-12-26T23:30:50.491155+00:00",
+                "last_updated": "2025-12-26T23:30:50.490383+00:00",
+                "context": {
+                  "id": "01KDEG0AFTND3FZH5MM6SD97EA",
+                  "parent_id": null,
+                  "user_id": null
+                }
+              },
+              "new_state": {
+                "entity_id": "input_select.input_select_test",
+                "state": "Option 2",
+                "attributes": {
+                  "options": [
+                    "Option 1",
+                    "Option 2",
+                    "Option 3"
+                  ],
+                  "editable": true,
+                  "icon": "mdi:gauge",
+                  "friendly_name": "Input select test"
+                },
+                "last_changed": "2025-12-26T23:37:40.686448+00:00",
+                "last_reported": "2025-12-26T23:37:40.686448+00:00",
+                "last_updated": "2025-12-26T23:37:40.686448+00:00",
+                "context": {
+                  "id": "01KDEGCV2DCTRCSGZCZMDFB6Z0",
+                  "parent_id": null,
+                  "user_id": "08f6dc9d675e49ce8454a647e8216e4d"
+                }
+              }
+            },
+            "origin": "LOCAL",
+            "time_fired": "2025-12-26T23:37:40.686448+00:00",
+            "context": {
+              "id": "01KDEGCV2DCTRCSGZCZMDFB6Z0",
+              "parent_id": null,
+              "user_id": "08f6dc9d675e49ce8454a647e8216e4d"
+            }
+          },
+          "id": 2
+        }
+                );
+
+        let event_json = full_event_json
+            .pointer("/event/data")
+            .expect("Missing .event.data object");
+        let event_data: EventData = serde_json::from_value(event_json.to_owned()).unwrap();
+        let result = select_event_to_entity_change(event_data).unwrap();
+
+        assert_eq!(result.entity_id, "input_select.input_select_test");
+        assert_eq!(result.entity_type, EntityType::Select);
+
+        let attributes = result.attributes;
+        assert_eq!(
+            attributes.get(SelectAttribute::State.as_ref()).unwrap(),
+            &json!("ON")
+        );
+        assert_eq!(
+            attributes
+                .get(SelectAttribute::CurrentOption.as_ref())
+                .unwrap(),
+            &json!("Option 2")
+        );
+        assert_eq!(
+            attributes.get(SelectAttribute::Options.as_ref()).unwrap(),
+            &json!(["Option 1", "Option 2", "Option 3"])
+        );
+    }
 
     #[test]
     fn test_select_event_to_entity_change() {
