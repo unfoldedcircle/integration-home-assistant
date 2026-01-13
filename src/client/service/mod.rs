@@ -21,6 +21,7 @@ mod cover;
 mod light;
 mod media_player;
 mod remote;
+mod select;
 mod switch;
 
 impl Handler<CallService> for HomeAssistantClient {
@@ -46,6 +47,7 @@ impl Handler<CallService> for HomeAssistantClient {
             EntityType::Light => light::handle_light(&msg.command),
             EntityType::MediaPlayer => media_player::handle_media_player(&msg.command),
             EntityType::Remote => remote::handle_remote(&msg.command),
+            EntityType::Select => select::handle_select(&msg.command),
             EntityType::Sensor => Err(ServiceError::BadRequest(
                 "Sensor doesn't support sending commands to! Ignoring call".to_string(),
             )),

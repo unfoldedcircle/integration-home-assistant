@@ -39,6 +39,7 @@ The following HA entities are supported in the Unfolded Circle Remote:
 - [Remote](https://developers.home-assistant.io/docs/core/entity/remote)
   - Supported: on, off, toggle, command, sequence.
   - Activities and command learning / deleting are not supported.
+- [Select](https://developers.home-assistant.io/docs/core/entity/select)
 - [Sensor](https://developers.home-assistant.io/docs/core/entity/sensor)
 - [Binary sensor](https://www.home-assistant.io/integrations/binary_sensor/): mapped to sensor
   - Sensor entity device class: `binary`.
@@ -46,6 +47,7 @@ The following HA entities are supported in the Unfolded Circle Remote:
   - The `value` attribute contains the `on` and `off` sensor text values from Home Assistant.
 - [Switch](https://developers.home-assistant.io/docs/core/entity/switch)
 - [Input boolean](https://www.home-assistant.io/integrations/input_boolean/): mapped to switch
+- [Input select](https://www.home-assistant.io/integrations/input_select/): mapped to select
 
 The following HA integrations are mapped to a button. The functionality is limited to trigger the default action and no
 further interactions are possible:

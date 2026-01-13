@@ -108,6 +108,7 @@ impl HomeAssistantClient {
                     "input_boolean" => "switch",
                     "binary_sensor" => "sensor",
                     "input_button" => "button",
+                    "input_select" => "select",
                     "script" => "button",
                     "scene" => "button",
                     v => v,
@@ -158,6 +159,7 @@ impl HomeAssistantClient {
                     info!("[{}] skipping internal entity {entity_type}", self.id);
                     continue;
                 }
+                EntityType::Select => convert_select_entity(entity_id, state, attr),
                 EntityType::VoiceAssistant => {
                     // mapped from HA assist pipeline to UC entity
                     continue;
