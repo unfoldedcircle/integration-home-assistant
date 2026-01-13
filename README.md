@@ -40,6 +40,7 @@ The following HA entities are supported in the Unfolded Circle Remote:
   - Supported: on, off, toggle, command, sequence.
   - Activities and command learning / deleting are not supported.
 - [Select](https://developers.home-assistant.io/docs/core/entity/select)
+  - Requires core / Simulator version 0.68.0 or newer. Not yet available in a public firmware release.
 - [Sensor](https://developers.home-assistant.io/docs/core/entity/sensor)
 - [Binary sensor](https://www.home-assistant.io/integrations/binary_sensor/): mapped to sensor
   - Sensor entity device class: `binary`.
@@ -55,6 +56,13 @@ further interactions are possible:
 - [Input button](https://www.home-assistant.io/integrations/input_button/)
 - [Scripts](https://www.home-assistant.io/integrations/script/)
 - [Scenes](https://www.home-assistant.io/integrations/scene/)
+
+## Home Assistant Assist
+
+Home Assistant Assist voice commands are supported with Remote Two/3 firmware release 2.8.1 and newer.
+
+- [Using voice assistants](https://support.unfoldedcircle.com/hc/en-us/articles/24061019101596)
+- [Home Assistant voice support](https://support.unfoldedcircle.com/hc/en-us/articles/24064298749724)
 
 ## Network requirements
 
