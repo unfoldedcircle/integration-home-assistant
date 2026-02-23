@@ -7,7 +7,8 @@ use crate::APP_VERSION;
 use crate::built_info;
 use crate::client::HomeAssistantClient;
 use crate::client::messages::{
-    CallRunAssistPipeline, CallService, GetAvailableEntities, GetStates,
+    BrowseMedia, CallRunAssistPipeline, CallService, GetAvailableEntities, GetMediaQueue,
+    GetStates, SearchMedia,
 };
 use crate::configuration::get_driver_metadata;
 use crate::controller::handler::{
@@ -23,7 +24,10 @@ use lazy_static::lazy_static;
 use log::{debug, error, warn};
 use serde_json::{Value, json};
 use strum::EnumMessage;
-use uc_api::intg::ws::{AvailableEntitiesMsgData, DriverVersionMsgData, R2Request};
+use uc_api::intg::ws::{
+    AvailableEntitiesMsgData, BrowseMediaMsgData, DriverVersionMsgData, R2Request,
+    SearchMediaMsgData,
+};
 use uc_api::intg::{EntityCommand, IntegrationVersion, IntgVoiceAssistantCommand};
 use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
 use uc_api::{AudioConfiguration, EntityType};
@@ -236,6 +240,26 @@ impl Handler<R2RequestMsg> for Controller {
                         Ok(None)
                     }
                 }
+                R2Request::BrowseMedia => {
+                    if let Some(addr) = ha_client {
+                        handle_browse_media(addr, msg).await
+                    } else {
+                        Err(ServiceError::NotConnected)
+                    }
+                }
+                R2Request::SearchMedia => {
+                    if let Some(addr) = ha_client {
+                        handle_search_media(addr, msg).await
+                    } else {
+                        Err(ServiceError::NotConnected)
+                    }
+                } // R2Request::GetMediaQueue => {
+                  //     if let Some(addr) = ha_client {
+                  //         handle_get_media_queue(addr, msg).await
+                  //     } else {
+                  //         Err(ServiceError::NotConnected)
+                  //     }
+                  // }
             }
         })
     }
@@ -337,6 +361,68 @@ async fn handle_voice_assistant_command(
             );
             Ok(Some(response))
         }
+    }
+}
+
+async fn handle_browse_media(
+    ha_client: Addr<HomeAssistantClient>,
+    msg: R2RequestMsg,
+) -> Result<Option<WsMessage>, ServiceError> {
+    let req_id = msg.req_id;
+    let resp_msg = msg
+        .request
+        .get_message()
+        .expect("BUG: R2Request variants must have an associated message");
+    let command: BrowseMediaMsgData = msg.deserialize()?;
+
+    match ha_client.send(BrowseMedia(command)).await? {
+        Ok(resp) => {
+            let response = WsMessage::response(req_id, resp_msg, resp);
+            Ok(Some(response))
+        }
+        Err(e) => Err(e),
+    }
+}
+
+async fn handle_search_media(
+    ha_client: Addr<HomeAssistantClient>,
+    msg: R2RequestMsg,
+) -> Result<Option<WsMessage>, ServiceError> {
+    let req_id = msg.req_id;
+    let resp_msg = msg
+        .request
+        .get_message()
+        .expect("BUG: R2Request variants must have an associated message");
+    let command: SearchMediaMsgData = msg.deserialize()?;
+
+    match ha_client.send(SearchMedia(command)).await? {
+        Ok(resp) => {
+            let response = WsMessage::response(req_id, resp_msg, resp);
+            Ok(Some(response))
+        }
+        Err(e) => Err(e),
+    }
+}
+
+// TODO(media-browsing) implement media queue
+#[allow(unused)]
+async fn handle_get_media_queue(
+    ha_client: Addr<HomeAssistantClient>,
+    msg: R2RequestMsg,
+) -> Result<Option<WsMessage>, ServiceError> {
+    let req_id = msg.req_id;
+    let resp_msg = msg
+        .request
+        .get_message()
+        .expect("BUG: R2Request variants must have an associated message");
+    // let command: GetMediaQueueMsgData = msg.deserialize()?;
+
+    match ha_client.send(GetMediaQueue).await? {
+        Ok(resp) => {
+            let response = WsMessage::response(req_id, resp_msg, resp);
+            Ok(Some(response))
+        }
+        Err(e) => Err(e),
     }
 }
 
