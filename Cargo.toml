@@ -2,7 +2,7 @@
 name = "uc-intg-hass"
 version = "0.15.0"
 edition = "2024"
-rust-version = "1.85.0"
+rust-version = "1.88.0"
 authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]
 license = "MPL-2.0"
 description = "Unfolded Circle Home-Assistant integration for Remote Two/3"
