@@ -23,12 +23,11 @@ pub(crate) fn map_select_attributes(
         "unavailable" | "unknown" => state.to_uppercase(),
         _ => {
             let mut valid = false;
-            if let Some(ha_attr) = &ha_attr {
-                if let Some(options) = ha_attr.get("options").and_then(|v| v.as_array()) {
-                    if options.iter().any(|v| v.as_str() == Some(state)) {
-                        valid = true;
-                    }
-                }
+            if let Some(ha_attr) = &ha_attr
+                && let Some(options) = ha_attr.get("options").and_then(|v| v.as_array())
+                && options.iter().any(|v| v.as_str() == Some(state))
+            {
+                valid = true;
             }
             if valid {
                 "ON".to_string()
@@ -45,10 +44,10 @@ pub(crate) fn map_select_attributes(
         attributes.insert(SelectAttribute::CurrentOption.to_string(), state.into());
     }
 
-    if let Some(ha_attr) = ha_attr {
-        if let Some(options) = ha_attr.get("options") {
-            attributes.insert(SelectAttribute::Options.to_string(), options.clone());
-        }
+    if let Some(ha_attr) = ha_attr
+        && let Some(options) = ha_attr.get("options")
+    {
+        attributes.insert(SelectAttribute::Options.to_string(), options.clone());
     }
 
     Ok(attributes)

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Changed
+- Bump rust-version to 1.88.0 and update dependencies.
+
 ---
 
 ## v0.15.0 - 2026-01-13
