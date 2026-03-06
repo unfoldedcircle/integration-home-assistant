@@ -11,7 +11,9 @@ use crate::util::json;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::{AvailableIntgEntity, EntityChange};
-use uc_api::{EntityType, MediaPlayerDeviceClass, MediaPlayerFeature};
+use uc_api::{
+    EntityType, MediaClass, MediaPlayerAttribute, MediaPlayerDeviceClass, MediaPlayerFeature,
+};
 use url::Url;
 
 // https://developers.home-assistant.io/docs/core/entity/media-player#supported-features
@@ -178,6 +180,7 @@ pub(crate) fn convert_media_player_entity(
     }
     if supported_features & SUPPORT_SEARCH_MEDIA > 0 {
         media_feats.push(MediaPlayerFeature::SearchMedia);
+        media_feats.push(MediaPlayerFeature::SearchMediaClasses);
     }
     if supported_features & SUPPORT_CLEAR_PLAYLIST > 0 {
         media_feats.push(MediaPlayerFeature::ClearPlaylist);
@@ -196,12 +199,43 @@ pub(crate) fn convert_media_player_entity(
     // Note: volume_steps doesn't seem to be retrievable from HA (#14)
 
     // convert attributes
-    let attributes = Some(map_media_player_attributes(
+    let mut attributes = Some(map_media_player_attributes(
         server,
         &entity_id,
         &state,
         Some(ha_attr),
     )?);
+
+    // media classes are not provided from the HA entity
+    if media_feats.contains(&MediaPlayerFeature::SearchMediaClasses)
+        && let Some(attributes) = attributes.as_mut()
+    {
+        let classes = vec![
+            MediaClass::Album.as_str(),
+            MediaClass::App.as_str(),
+            MediaClass::Artist.as_str(),
+            MediaClass::Channel.as_str(),
+            MediaClass::Composer.as_str(),
+            MediaClass::Directory.as_str(),
+            MediaClass::Episode.as_str(),
+            MediaClass::Game.as_str(),
+            MediaClass::Genre.as_str(),
+            MediaClass::Image.as_str(),
+            MediaClass::Movie.as_str(),
+            MediaClass::Music.as_str(),
+            MediaClass::Playlist.as_str(),
+            MediaClass::Podcast.as_str(),
+            MediaClass::Season.as_str(),
+            MediaClass::Track.as_str(),
+            MediaClass::TvShow.as_str(),
+            MediaClass::Url.as_str(),
+            MediaClass::Video.as_str(),
+        ];
+        attributes.insert(
+            MediaPlayerAttribute::SearchMediaClasses.to_string(),
+            classes.into(),
+        );
+    }
 
     Ok(AvailableIntgEntity {
         entity_id,
