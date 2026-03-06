@@ -130,10 +130,10 @@ fn map_ha_browse(
                 .take(paging.limit() as usize)
                 .map(|c| c.into())
                 .map(|mut item: BrowseMediaItem| {
-                    if let Some(thumbnail) = item.thumbnail.as_deref() {
-                        if let Some(url) = set_album_art_proxy(&server, thumbnail) {
-                            item.thumbnail = Some(url);
-                        }
+                    if let Some(thumbnail) = item.thumbnail.as_deref()
+                        && let Some(url) = set_album_art_proxy(&server, thumbnail)
+                    {
+                        item.thumbnail = Some(url);
                     }
                     item
                 }),
@@ -141,10 +141,10 @@ fn map_ha_browse(
     }
 
     let mut root: BrowseMediaItem = ha_resp.into();
-    if let Some(thumbnail) = root.thumbnail.as_deref() {
-        if let Some(url) = set_album_art_proxy(&server, thumbnail) {
-            root.thumbnail = Some(url);
-        }
+    if let Some(thumbnail) = root.thumbnail.as_deref()
+        && let Some(url) = set_album_art_proxy(&server, thumbnail)
+    {
+        root.thumbnail = Some(url);
     }
     if !items.is_empty() {
         root.items = Some(items);
@@ -192,10 +192,10 @@ fn map_ha_search(
         .take(paging.limit() as usize)
         .map(|c| c.into())
         .map(|mut item: BrowseMediaItem| {
-            if let Some(thumbnail) = item.thumbnail.as_deref() {
-                if let Some(url) = set_album_art_proxy(&server, thumbnail) {
-                    item.thumbnail = Some(url);
-                }
+            if let Some(thumbnail) = item.thumbnail.as_deref()
+                && let Some(url) = set_album_art_proxy(&server, thumbnail)
+            {
+                item.thumbnail = Some(url);
             }
             item
         })

@@ -79,10 +79,10 @@ pub(crate) fn map_media_player_attributes(
         json::move_entry(ha_attr, &mut attributes, "sound_mode");
         json::move_entry(ha_attr, &mut attributes, "sound_mode_list");
 
-        if let Some(value) = ha_attr.get("entity_picture").and_then(|v| v.as_str()) {
-            if let Some(url) = set_album_art_proxy(server, value) {
-                attributes.insert("media_image_url".into(), url.into());
-            }
+        if let Some(value) = ha_attr.get("entity_picture").and_then(|v| v.as_str())
+            && let Some(url) = set_album_art_proxy(server, value)
+        {
+            attributes.insert("media_image_url".into(), url.into());
         }
     }
 
