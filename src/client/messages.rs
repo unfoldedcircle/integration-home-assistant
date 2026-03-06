@@ -9,6 +9,9 @@ use actix::prelude::Message;
 use awc::ws::CloseCode;
 use derive_more::Constructor;
 use std::collections::HashSet;
+use uc_api::intg::ws::{
+    BrowseMediaMsgData, BrowseMediaResponseMsgData, SearchMediaMsgData, SearchMediaResponseMsgData,
+};
 use uc_api::intg::{AvailableIntgEntity, EntityChange, EntityCommand};
 
 /// Call a service in Home Assistant
@@ -167,3 +170,19 @@ impl Close {
         }
     }
 }
+
+/// Browse media containers.
+#[derive(Message, serde::Deserialize)]
+#[rtype(result = "Result<BrowseMediaResponseMsgData, ServiceError>")]
+pub struct BrowseMedia(pub BrowseMediaMsgData);
+
+/// Search for media items.
+#[derive(Message, serde::Deserialize)]
+#[rtype(result = "Result<SearchMediaResponseMsgData, ServiceError>")]
+pub struct SearchMedia(pub SearchMediaMsgData);
+
+/// TODO(media-browsing) Get the current playback queue.
+#[allow(unused)]
+#[derive(Message, serde::Deserialize)]
+#[rtype(result = "Result<(), ServiceError>")]
+pub struct GetMediaQueue;

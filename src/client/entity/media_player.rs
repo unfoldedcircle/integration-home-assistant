@@ -5,35 +5,41 @@
 
 use crate::client::event::convert_ha_onoff_state;
 use crate::client::model::EventData;
+use crate::client::set_album_art_proxy;
 use crate::errors::ServiceError;
 use crate::util::json;
-use log::error;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::{AvailableIntgEntity, EntityChange};
-use uc_api::{EntityType, MediaPlayerDeviceClass, MediaPlayerFeature};
+use uc_api::{
+    EntityType, MediaClass, MediaPlayerAttribute, MediaPlayerDeviceClass, MediaPlayerFeature,
+};
 use url::Url;
 
 // https://developers.home-assistant.io/docs/core/entity/media-player#supported-features
+// https://github.com/home-assistant/core/blob/dev/homeassistant/components/media_player/const.py
 pub const SUPPORT_PAUSE: u32 = 1;
 pub const SUPPORT_SEEK: u32 = 2;
 pub const SUPPORT_VOLUME_SET: u32 = 4;
 pub const SUPPORT_VOLUME_MUTE: u32 = 8;
 pub const SUPPORT_PREVIOUS_TRACK: u32 = 16;
 pub const SUPPORT_NEXT_TRACK: u32 = 32;
+
 pub const SUPPORT_TURN_ON: u32 = 128;
 pub const SUPPORT_TURN_OFF: u32 = 256;
-// pub const SUPPORT_PLAY_MEDIA: u32 = 512;
+pub const SUPPORT_PLAY_MEDIA: u32 = 512;
 pub const SUPPORT_VOLUME_STEP: u32 = 1024;
 pub const SUPPORT_SELECT_SOURCE: u32 = 2048;
 pub const SUPPORT_STOP: u32 = 4096;
-// pub const SUPPORT_CLEAR_PLAYLIST: u32 = 8192;
+pub const SUPPORT_CLEAR_PLAYLIST: u32 = 8192;
 pub const SUPPORT_PLAY: u32 = 16384;
 pub const SUPPORT_SHUFFLE_SET: u32 = 32768;
 pub const SUPPORT_SELECT_SOUND_MODE: u32 = 65536;
-// pub const SUPPORT_BROWSE_MEDIA: u32 = 131072;
+pub const SUPPORT_BROWSE_MEDIA: u32 = 131072;
 pub const SUPPORT_REPEAT_SET: u32 = 262144;
 // pub const SUPPORT_GROUPING: u32 = 524288;
+pub const SUPPORT_MEDIA_ENQUEUE: u32 = 2097152;
+pub const SUPPORT_SEARCH_MEDIA: u32 = 4194304;
 
 pub(crate) fn map_media_player_attributes(
     server: &Url,
@@ -61,8 +67,10 @@ pub(crate) fn map_media_player_attributes(
         json::move_entry(ha_attr, &mut attributes, "media_title");
         json::move_entry(ha_attr, &mut attributes, "media_artist");
         json::move_value(ha_attr, &mut attributes, "media_album_name", "media_album");
+        json::move_entry(ha_attr, &mut attributes, "media_playlist");
+        json::move_entry(ha_attr, &mut attributes, "media_id");
         if let Some(value) = ha_attr.get("media_content_type").and_then(|v| v.as_str()) {
-            attributes.insert("media_type".into(), value.to_uppercase().into());
+            attributes.insert("media_type".into(), value.into());
         }
         json::move_entry(ha_attr, &mut attributes, "shuffle");
         if let Some(value) = ha_attr.get("repeat").and_then(|v| v.as_str()) {
@@ -73,28 +81,10 @@ pub(crate) fn map_media_player_attributes(
         json::move_entry(ha_attr, &mut attributes, "sound_mode");
         json::move_entry(ha_attr, &mut attributes, "sound_mode_list");
 
-        if let Some(value) = ha_attr.get("entity_picture").and_then(|v| v.as_str()) {
-            // let's hope it's only http, https or a local path :-)
-            if value.starts_with("http") {
-                attributes.insert("media_image_url".into(), value.into());
-            } else if value.starts_with('/') {
-                // `url.set_path(value)` doesn't work since the HA path contains query params as well
-                // or we'd have to decode `%3F` -> `?` (and maybe other chars as well).
-                // Let's try the simple (and dangerous) approach first which also worked in YIO v1
-                attributes.insert(
-                    "media_image_url".into(),
-                    format!(
-                        "{}://{}:{}{}",
-                        server.scheme(),
-                        server.host_str().unwrap_or_default(),
-                        server.port_or_known_default().unwrap_or_default(),
-                        value
-                    )
-                    .into(),
-                );
-            } else {
-                error!("Unexpected entity_picture format: {value}");
-            }
+        if let Some(value) = ha_attr.get("entity_picture").and_then(|v| v.as_str())
+            && let Some(url) = set_album_art_proxy(server, value)
+        {
+            attributes.insert("media_image_url".into(), url.into());
         }
     }
 
@@ -179,6 +169,22 @@ pub(crate) fn convert_media_player_entity(
     if supported_features & SUPPORT_SELECT_SOUND_MODE > 0 {
         media_feats.push(MediaPlayerFeature::SelectSoundMode);
     }
+    if supported_features & SUPPORT_PLAY_MEDIA > 0 {
+        media_feats.push(MediaPlayerFeature::PlayMedia);
+    }
+    if supported_features & SUPPORT_MEDIA_ENQUEUE > 0 {
+        media_feats.push(MediaPlayerFeature::PlayMediaAction);
+    }
+    if supported_features & SUPPORT_BROWSE_MEDIA > 0 {
+        media_feats.push(MediaPlayerFeature::BrowseMedia);
+    }
+    if supported_features & SUPPORT_SEARCH_MEDIA > 0 {
+        media_feats.push(MediaPlayerFeature::SearchMedia);
+        media_feats.push(MediaPlayerFeature::SearchMediaClasses);
+    }
+    if supported_features & SUPPORT_CLEAR_PLAYLIST > 0 {
+        media_feats.push(MediaPlayerFeature::ClearPlaylist);
+    }
     if supported_features & SUPPORT_SEEK > 0 {
         media_feats.push(MediaPlayerFeature::Seek);
         media_feats.push(MediaPlayerFeature::MediaDuration);
@@ -190,19 +196,46 @@ pub(crate) fn convert_media_player_entity(
     media_feats.push(MediaPlayerFeature::MediaImageUrl);
     media_feats.push(MediaPlayerFeature::MediaType);
 
-    /* TODO from YIO v1
-    features.push("APP_NAME"); ???
-     */
-
     // Note: volume_steps doesn't seem to be retrievable from HA (#14)
 
     // convert attributes
-    let attributes = Some(map_media_player_attributes(
+    let mut attributes = Some(map_media_player_attributes(
         server,
         &entity_id,
         &state,
         Some(ha_attr),
     )?);
+
+    // media classes are not provided from the HA entity
+    if media_feats.contains(&MediaPlayerFeature::SearchMediaClasses)
+        && let Some(attributes) = attributes.as_mut()
+    {
+        let classes = vec![
+            MediaClass::Album.as_str(),
+            MediaClass::App.as_str(),
+            MediaClass::Artist.as_str(),
+            MediaClass::Channel.as_str(),
+            MediaClass::Composer.as_str(),
+            MediaClass::Directory.as_str(),
+            MediaClass::Episode.as_str(),
+            MediaClass::Game.as_str(),
+            MediaClass::Genre.as_str(),
+            MediaClass::Image.as_str(),
+            MediaClass::Movie.as_str(),
+            MediaClass::Music.as_str(),
+            MediaClass::Playlist.as_str(),
+            MediaClass::Podcast.as_str(),
+            MediaClass::Season.as_str(),
+            MediaClass::Track.as_str(),
+            MediaClass::TvShow.as_str(),
+            MediaClass::Url.as_str(),
+            MediaClass::Video.as_str(),
+        ];
+        attributes.insert(
+            MediaPlayerAttribute::SearchMediaClasses.to_string(),
+            classes.into(),
+        );
+    }
 
     Ok(AvailableIntgEntity {
         entity_id,
@@ -318,7 +351,12 @@ mod tests {
             | SUPPORT_REPEAT_SET
             | SUPPORT_SHUFFLE_SET
             | SUPPORT_SELECT_SOUND_MODE
-            | SUPPORT_SEEK;
+            | SUPPORT_SEEK
+            | SUPPORT_PLAY_MEDIA
+            | SUPPORT_MEDIA_ENQUEUE
+            | SUPPORT_CLEAR_PLAYLIST
+            | SUPPORT_BROWSE_MEDIA
+            | SUPPORT_SEARCH_MEDIA;
 
         let mut ha_attr = serde_json::from_value(json!({
             "friendly_name": "Full Featured Player",
@@ -349,6 +387,11 @@ mod tests {
         assert!(features.contains(&MediaPlayerFeature::Seek.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::PlayMedia.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::PlayMediaAction.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::ClearPlaylist.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::BrowseMedia.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::SearchMedia.to_string()));
 
         // Always present features
         assert!(features.contains(&MediaPlayerFeature::MediaTitle.to_string()));

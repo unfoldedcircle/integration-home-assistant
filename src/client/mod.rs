@@ -38,6 +38,8 @@ mod entity;
 mod event;
 mod get_entities;
 mod get_states;
+mod media_player_browsing;
+mod media_player_queue;
 pub mod messages;
 pub mod model;
 mod service;
@@ -827,5 +829,28 @@ pub fn get_required_params(cmd: &EntityCommand) -> Result<&Map<String, Value>, S
         Ok(params)
     } else {
         Err(ServiceError::BadRequest("Missing params object".into()))
+    }
+}
+
+/// Check the album art image if it's missing a url scheme.
+/// If so, prepend it with the HA server URL to use the media image proxy.
+/// See: <https://developers.home-assistant.io/docs/core/entity/media-player/#proxy-album-art-for-media-browser>
+pub fn set_album_art_proxy(server: &Url, image: &str) -> Option<String> {
+    // let's hope it's only http, https or a local path :-)
+    if image.starts_with("http") {
+        Some(image.to_string())
+    } else if image.starts_with('/') {
+        // `url.set_path(value)` doesn't work since the HA path contains query params as well
+        // or we'd have to decode `%3F` -> `?` (and maybe other chars as well).
+        // Let's try the simple (and dangerous) approach first which also worked in YIO v1
+        Some(format!(
+            "{}://{}:{}{image}",
+            server.scheme(),
+            server.host_str().unwrap_or_default(),
+            server.port_or_known_default().unwrap_or_default(),
+        ))
+    } else {
+        error!("Unexpected album art format: {image}");
+        None
     }
 }

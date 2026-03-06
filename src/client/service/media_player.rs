@@ -147,6 +147,31 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
             }
             ("select_sound_mode".into(), Some(data.into()))
         }
+        MediaPlayerCommand::PlayMedia => {
+            let mut data = Map::new();
+            let params = get_required_params(msg)?;
+            if let Some(media_id) = params.get("media_id").and_then(|v| v.as_str()) {
+                data.insert("media_content_id".into(), media_id.into());
+            } else {
+                return Err(ServiceError::BadRequest(
+                    "Invalid or missing params.media_id attribute".into(),
+                ));
+            }
+            if let Some(media_type) = params.get("media_type").and_then(|v| v.as_str()) {
+                data.insert("media_content_type".into(), media_type.into());
+            }
+            if let Some(action) = params.get("play_media_action").and_then(|v| v.as_str()) {
+                let enqueue = match action {
+                    "PLAY_NOW" => "play",
+                    "PLAY_NEXT" => "next",
+                    "ADD_TO_QUEUE" => "add",
+                    _ => "play",
+                };
+                data.insert("enqueue".into(), enqueue.into());
+            }
+            ("play_media".into(), Some(data.into()))
+        }
+        MediaPlayerCommand::ClearPlaylist => ("clear_playlist".into(), None),
     };
 
     Ok(result)

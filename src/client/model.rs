@@ -3,11 +3,14 @@
 
 //! HA WebSocket data structure definitions for JSON serialization & deserialization.
 
+use crate::errors::ServiceError;
 use derive_builder::Builder;
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use std::time::Instant;
 use tokio::sync::oneshot;
+use uc_api::{BrowseMediaItem, MediaClass, MediaContentType};
 
 /// Internal message for handling a received WebSocket response message
 #[derive(Debug)]
@@ -361,4 +364,168 @@ pub(super) struct RunAssistPipeline {
 pub(super) struct AssistPipelineMsg {
     /// Message request ID.
     pub id: u32,
+}
+
+// --- Home Assistant specific media browsing messages ---
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize)]
+pub(super) struct HaBrowseMediaMsg {
+    pub id: u32,
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub entity_id: String,
+    pub media_content_id: Option<String>,
+    pub media_content_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HaBrowseMediaResponse {
+    #[allow(unused)]
+    pub id: u32,
+    pub success: bool,
+    pub result: Option<HaBrowseMediaResult>,
+    pub error: Option<ResultError>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize)]
+pub(super) struct HaSearchMediaMsg {
+    pub id: u32,
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub entity_id: String,
+    pub search_query: String,
+    pub media_content_id: Option<String>,
+    pub media_content_type: Option<String>,
+    pub media_filter_classes: Option<Vec<MediaClass>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HaSearchMediaResponse {
+    #[allow(unused)]
+    pub id: u32,
+    pub success: bool,
+    pub result: Option<HaSearchMediaResult>,
+    pub error: Option<ResultError>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HaSearchMediaResult {
+    pub result: Option<Vec<HaBrowseMediaResult>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResultError {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HaBrowseMediaResult {
+    pub title: String,
+    pub media_class: Option<String>,
+    pub media_content_type: Option<String>,
+    pub media_content_id: String,
+    pub children_media_class: Option<String>,
+    #[serde(default)]
+    pub can_play: bool,
+    #[serde(default)]
+    pub can_expand: bool,
+    #[serde(default)]
+    pub can_search: bool,
+    pub children: Option<Vec<HaBrowseMediaResult>>,
+    pub thumbnail: Option<String>,
+}
+
+impl From<HaBrowseMediaResult> for BrowseMediaItem {
+    fn from(m: HaBrowseMediaResult) -> Self {
+        BrowseMediaItem {
+            media_id: m.media_content_id,
+            title: m.title,
+            artist: None,
+            album: None,
+            media_class: map_ha_class_to_uc(m.media_class.as_deref()),
+            media_type: map_ha_type_to_uc(m.media_content_type.as_deref()),
+            can_browse: if m.can_expand { Some(true) } else { None },
+            can_play: if m.can_play { Some(true) } else { None },
+            can_search: if m.can_search { Some(true) } else { None },
+            thumbnail: m.thumbnail,
+            duration: None,
+            items: None,
+        }
+    }
+}
+
+fn map_ha_class_to_uc(ha_class: Option<&str>) -> Option<MediaClass> {
+    // https://github.com/home-assistant/core/blob/cb6d86f86dbe45feb9c2502e0fb61489d1c92cb6/homeassistant/components/media_player/const.py#L75
+    ha_class.map(|ha_class| match ha_class {
+        "album" => MediaClass::Album,
+        "app" => MediaClass::App,
+        "artist" => MediaClass::Artist,
+        "channel" => MediaClass::Channel,
+        "composer" => MediaClass::Composer,
+        "directory" => MediaClass::Directory,
+        "episode" => MediaClass::Episode,
+        "game" => MediaClass::Game,
+        "genre" => MediaClass::Genre,
+        "image" => MediaClass::Image,
+        "movie" => MediaClass::Movie,
+        "music" => MediaClass::Music,
+        "playlist" => MediaClass::Playlist,
+        "podcast" => MediaClass::Podcast,
+        "radio" => MediaClass::Radio, // not defined in HA MediaClass, but might be returned as a custom class
+        "season" => MediaClass::Season,
+        "track" => MediaClass::Track,
+        "tv_show" => MediaClass::TvShow,
+        "url" => MediaClass::Url,
+        "video" => MediaClass::Video,
+        t => MediaClass::Other(t.to_string()),
+    })
+}
+
+fn map_ha_type_to_uc(ha_type: Option<&str>) -> Option<MediaContentType> {
+    // https://github.com/home-assistant/core/blob/cb6d86f86dbe45feb9c2502e0fb61489d1c92cb6/homeassistant/components/media_player/const.py#L100
+    // Attention: an empty media content type may not be omitted, otherwise some HA integrations will fail when performing a follow-up browse/search!
+    ha_type.map(|ha_type| match ha_type {
+        "album" => MediaContentType::Album,
+        "app" => MediaContentType::App,
+        "apps" => MediaContentType::Apps,
+        "artist" => MediaContentType::Artist,
+        "channel" => MediaContentType::Channel,
+        "channels" => MediaContentType::Channels,
+        "composer" => MediaContentType::Composer,
+        "episode" => MediaContentType::Episode,
+        "game" => MediaContentType::Game,
+        "genre" => MediaContentType::Genre,
+        "image" => MediaContentType::Image,
+        "movie" => MediaContentType::Movie,
+        "music" => MediaContentType::Music,
+        "playlist" => MediaContentType::Playlist,
+        "podcast" => MediaContentType::Podcast,
+        "radio" => MediaContentType::Radio, // not defined in HA MediaType, but might be returned as a custom type
+        "season" => MediaContentType::Season,
+        "track" => MediaContentType::Track,
+        "tv_show" => MediaContentType::TvShow, // Attention: this is for consistent mapping! The HA `tvshow` is mapped to the `Other` variant
+        "url" => MediaContentType::Url,
+        "video" => MediaContentType::Video,
+        t => MediaContentType::Other(t.to_string()),
+    })
+}
+
+pub fn transform_media_error(error: ResultError) -> ServiceError {
+    match error.code.as_str() {
+        "entity_not_found" => ServiceError::NotFound(error.message),
+        "invalid_format" | "service_validation_error" => ServiceError::BadRequest(error.message),
+        "not_supported" => ServiceError::ServiceUnavailable(error.message),
+        "unknown_error"
+            if {
+                let msg = error.message.to_lowercase();
+                msg.contains("media not found") || msg.contains("invalid path")
+            } =>
+        {
+            ServiceError::NotFound(error.message)
+        }
+        code => ServiceError::InternalServerError(format!("{code}: {}", error.message)),
+    }
 }
