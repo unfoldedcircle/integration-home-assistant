@@ -35,7 +35,8 @@ The following HA entities are supported in the Unfolded Circle Remote:
   - Supported: on/off, dimming, set color, set color temperature.
   - Color effects are not supported.
 - [Media player](https://developers.home-assistant.io/docs/core/entity/media-player)
-  - Media browsing, playlist handling, group members are not supported.
+  - Media browsing and searching (if supported by the entity) were added in version 0.16.0.
+  - Group members are not supported.
 - [Remote](https://developers.home-assistant.io/docs/core/entity/remote)
   - Supported: on, off, toggle, command, sequence.
   - Activities and command learning / deleting are not supported.
