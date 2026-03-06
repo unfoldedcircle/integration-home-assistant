@@ -35,11 +35,11 @@ zeroconf = ["dep:zeroconf"]
 audio = ["dep:hound"]
 
 [dependencies]
-#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.16.0", features = ["prost"] }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.17.0", features = ["prost"] }
 # for local development:
 #uc_api = { path = "../api-model-rs", features = ["prost"] }
 # Using a GitHub revision:
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "2581fab9edb5e03ab65f5c1b4ec82043c3805f53", features = ["prost"] }
+#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "337fe787c8ccb220c676c788d4ef147dbefef747", features = ["prost"] }
 
 # WebSockets server
 actix-web = { version = "4.11", features = ["rustls-0_23"] }
