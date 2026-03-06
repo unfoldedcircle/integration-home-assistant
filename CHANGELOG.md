@@ -8,10 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
-### Changed
-- Bump rust-version to 1.88.0 and update dependencies.
-
 ---
+
+## v0.16.0 - 2026-03-06
+### Added
+- Media browsing, searching and playing media items for media-player entity ([#88](https://github.com/unfoldedcircle/integration-home-assistant/pull/88)).
+### Changed
+- Bump rust-version to 1.88.0 and update dependencies ([#87](https://github.com/unfoldedcircle/integration-home-assistant/pull/87)).
 
 ## v0.15.0 - 2026-01-13
 ### Added

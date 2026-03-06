@@ -1,6 +1,6 @@
 [package]
 name = "uc-intg-hass"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2024"
 rust-version = "1.88.0"
 authors = ["Markus Zehnder <markus.z@unfoldedcircle.com>"]

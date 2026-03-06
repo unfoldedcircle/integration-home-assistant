@@ -156,7 +156,7 @@ def main():
         tmp.write(initial_message.encode("utf-8"))
         tmp_path = tmp.name
 
-    editor = os.environ.get("EDITOR", "vim")
+    editor = os.environ.get("EDITOR", "nano")
     subprocess.call([editor, tmp_path])
 
     with open(tmp_path, "r") as f:
