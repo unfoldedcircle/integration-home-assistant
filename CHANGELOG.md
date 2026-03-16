@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.16.1 - 2026-03-16
+### Changed
+- Extend media-player functionality with PlayMedia actions ([#89](https://github.com/unfoldedcircle/integration-home-assistant/pull/89)).
+
 ## v0.16.0 - 2026-03-06
 ### Added
 - Media browsing, searching and playing media items for media-player entity ([#88](https://github.com/unfoldedcircle/integration-home-assistant/pull/88)).
