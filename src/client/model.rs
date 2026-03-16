@@ -443,6 +443,7 @@ impl From<HaBrowseMediaResult> for BrowseMediaItem {
         BrowseMediaItem {
             media_id: m.media_content_id,
             title: m.title,
+            subtitle: None,
             artist: None,
             album: None,
             media_class: map_ha_class_to_uc(m.media_class.as_deref()),
