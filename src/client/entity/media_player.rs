@@ -12,7 +12,8 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use uc_api::intg::{AvailableIntgEntity, EntityChange};
 use uc_api::{
-    EntityType, MediaClass, MediaPlayerAttribute, MediaPlayerDeviceClass, MediaPlayerFeature,
+    EntityType, MediaClass, MediaPlayAction, MediaPlayerAttribute, MediaPlayerDeviceClass,
+    MediaPlayerFeature,
 };
 use url::Url;
 
@@ -234,6 +235,21 @@ pub(crate) fn convert_media_player_entity(
         attributes.insert(
             MediaPlayerAttribute::SearchMediaClasses.to_string(),
             classes.into(),
+        );
+    }
+
+    if media_feats.contains(&MediaPlayerFeature::PlayMediaAction)
+        && let Some(attributes) = attributes.as_mut()
+    {
+        attributes.insert(
+            MediaPlayerAttribute::SearchMediaClasses.to_string(),
+            [
+                MediaPlayAction::PlayNow.as_str(),
+                MediaPlayAction::PlayNext.as_str(),
+                MediaPlayAction::AddToQueue.as_str(),
+                "replace",
+            ]
+            .into(),
         );
     }
 

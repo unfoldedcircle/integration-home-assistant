@@ -123,6 +123,7 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
         | MediaPlayerCommand::Settings => {
             return Err(ServiceError::BadRequest("Not supported".into()));
         }
+        // https://developers.home-assistant.io/docs/core/entity/media-player/#select-source
         MediaPlayerCommand::SelectSource => {
             let mut data = Map::new();
             let params = get_required_params(msg)?;
@@ -135,6 +136,7 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
             }
             ("select_source".into(), Some(data.into()))
         }
+        // https://developers.home-assistant.io/docs/core/entity/media-player/#select-sound-mode
         MediaPlayerCommand::SelectSoundMode => {
             let mut data = Map::new();
             let params = get_required_params(msg)?;
@@ -147,6 +149,7 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
             }
             ("select_sound_mode".into(), Some(data.into()))
         }
+        // https://developers.home-assistant.io/docs/core/entity/media-player/#play-media
         MediaPlayerCommand::PlayMedia => {
             let mut data = Map::new();
             let params = get_required_params(msg)?;
@@ -165,6 +168,7 @@ pub fn handle_media_player(msg: &EntityCommand) -> Result<(String, Option<Value>
                     "PLAY_NOW" => "play",
                     "PLAY_NEXT" => "next",
                     "ADD_TO_QUEUE" => "add",
+                    "replace" => "replace",
                     _ => "play",
                 };
                 data.insert("enqueue".into(), enqueue.into());
