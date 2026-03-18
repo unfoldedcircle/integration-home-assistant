@@ -10,6 +10,11 @@ _Changes in the next release_
 
 ---
 
+## v0.16.2 - 2026-03-18
+### Changed
+- Lax boolean parsing for HA browse media responses (([#91](https://github.com/unfoldedcircle/integration-home-assistant/pull/91)).
+- Update dependencies and GitHub build actions.
+
 ## v0.16.1 - 2026-03-16
 ### Changed
 - Extend media-player functionality with PlayMedia actions ([#89](https://github.com/unfoldedcircle/integration-home-assistant/pull/89)).
