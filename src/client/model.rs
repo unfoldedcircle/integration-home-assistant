@@ -383,6 +383,7 @@ pub(super) struct HaBrowseMediaMsg {
 pub struct HaBrowseMediaResponse {
     #[allow(unused)]
     pub id: u32,
+    #[serde(default, deserialize_with = "best_effort_bool")]
     pub success: bool,
     pub result: Option<HaBrowseMediaResult>,
     pub error: Option<ResultError>,
@@ -405,6 +406,7 @@ pub(super) struct HaSearchMediaMsg {
 pub struct HaSearchMediaResponse {
     #[allow(unused)]
     pub id: u32,
+    #[serde(default, deserialize_with = "best_effort_bool")]
     pub success: bool,
     pub result: Option<HaSearchMediaResult>,
     pub error: Option<ResultError>,
@@ -428,11 +430,12 @@ pub struct HaBrowseMediaResult {
     pub media_content_type: Option<String>,
     pub media_content_id: String,
     pub children_media_class: Option<String>,
-    #[serde(default)]
+    // Workaround for some bad behaving HA integrations sending back "can_play: ''"
+    #[serde(default, deserialize_with = "best_effort_bool")]
     pub can_play: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "best_effort_bool")]
     pub can_expand: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "best_effort_bool")]
     pub can_search: bool,
     pub children: Option<Vec<HaBrowseMediaResult>>,
     pub thumbnail: Option<String>,
@@ -528,5 +531,181 @@ pub fn transform_media_error(error: ResultError) -> ServiceError {
             ServiceError::NotFound(error.message)
         }
         code => ServiceError::InternalServerError(format!("{code}: {}", error.message)),
+    }
+}
+
+fn best_effort_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum BoolOrStrOrInt {
+        Bool(bool),
+        Int(i64),
+        Str(String),
+    }
+
+    match BoolOrStrOrInt::deserialize(deserializer)? {
+        BoolOrStrOrInt::Bool(b) => Ok(b),
+        BoolOrStrOrInt::Int(1) => Ok(true),
+        BoolOrStrOrInt::Int(_) => Ok(false),
+        BoolOrStrOrInt::Str(s) => Ok(matches!(s.to_lowercase().as_str(), "1" | "true")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HaBrowseMediaResult;
+    use serde::Deserialize;
+    use serde_json::json;
+
+    // Minimal wrapper to test the deserializer via serde_json
+    #[derive(Debug, Deserialize)]
+    struct Wrapper {
+        #[serde(deserialize_with = "super::best_effort_bool")]
+        value: bool,
+    }
+
+    fn parse(json: &str) -> Result<bool, serde_json::Error> {
+        serde_json::from_str::<Wrapper>(&format!(r#"{{"value": {json}}}"#)).map(|w| w.value)
+    }
+
+    // --- Native booleans ---
+
+    #[test]
+    fn test_best_effort_bool_true() {
+        assert_eq!(parse("true").unwrap(), true);
+    }
+
+    #[test]
+    fn test_best_effort_bool_false() {
+        assert_eq!(parse("false").unwrap(), false);
+    }
+
+    // --- Integers ---
+
+    #[test]
+    fn test_best_effort_bool_with_int_one() {
+        assert_eq!(parse("1").unwrap(), true);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_int_zero() {
+        assert_eq!(parse("0").unwrap(), false);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_int_invalid() {
+        assert_eq!(parse("2").unwrap(), false);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_int_negative() {
+        assert_eq!(parse("-1").unwrap(), false);
+    }
+
+    // --- String: truthy ---
+
+    #[test]
+    fn test_best_effort_bool_with_str_true() {
+        assert_eq!(parse(r#""true""#).unwrap(), true);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_str_one() {
+        assert_eq!(parse(r#""1""#).unwrap(), true);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_str_uppercase_true() {
+        // case-sensitive: "True" is not handled
+        assert_eq!(parse(r#""True""#).unwrap(), true);
+    }
+
+    // --- String: falsy ---
+
+    #[test]
+    fn test_best_effort_bool_with_str_false() {
+        assert_eq!(parse(r#""false""#).unwrap(), false);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_str_zero() {
+        assert_eq!(parse(r#""0""#).unwrap(), false);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_str_empty() {
+        assert_eq!(parse(r#""""#).unwrap(), false);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_str_uppercase_false() {
+        assert_eq!(parse(r#""False""#).unwrap(), false);
+    }
+
+    // --- String: invalid, maps to false  ---
+
+    #[test]
+    fn test_best_effort_bool_with_str_invalid_word() {
+        assert_eq!(parse(r#""yes""#).unwrap(), false);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_str_invalid_no() {
+        assert_eq!(parse(r#""no""#).unwrap(), false);
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_str_whitespace() {
+        assert_eq!(parse(r#"" ""#).unwrap(), false);
+    }
+
+    // --- Wrong types ---
+
+    #[test]
+    fn test_best_effort_bool_with_null() {
+        assert!(parse("null").is_err());
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_float() {
+        assert!(parse("1.0").is_err());
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_array() {
+        assert!(parse("[]").is_err());
+    }
+
+    #[test]
+    fn test_best_effort_bool_with_object() {
+        assert!(parse("{}").is_err());
+    }
+
+    // ---
+
+    #[test]
+    fn deserialize_ha_browse_media_result_with_invalid_bools_uses_default() {
+        let msg = json!(
+            {
+              "title": "Albums",
+              "media_class": "album",
+              "media_content_type": "album",
+              "media_content_id": "",
+              "children_media_class": "album",
+              "can_play": "",
+              "can_expand": 0,
+              "can_search": "False",
+              "thumbnail": null,
+              "not_shown": 0,
+            }
+        );
+
+        let result: HaBrowseMediaResult = serde_json::from_value(msg).unwrap();
+        assert_eq!(result.can_play, false);
+        assert_eq!(result.can_expand, false);
+        assert_eq!(result.can_search, false);
     }
 }
