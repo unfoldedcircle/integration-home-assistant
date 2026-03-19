@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.16.3 - 2026-03-19
+### Fixed
+- play_media_action attribute for play media action feature (((([#92](https://github.com/unfoldedcircle/integration-home-assistant/pull/92)).
+
 ## v0.16.2 - 2026-03-18
 ### Changed
 - Lax boolean parsing for HA browse media responses (([#91](https://github.com/unfoldedcircle/integration-home-assistant/pull/91)).
