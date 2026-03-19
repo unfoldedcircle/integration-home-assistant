@@ -242,7 +242,7 @@ pub(crate) fn convert_media_player_entity(
         && let Some(attributes) = attributes.as_mut()
     {
         attributes.insert(
-            MediaPlayerAttribute::SearchMediaClasses.to_string(),
+            MediaPlayerAttribute::PlayMediaAction.to_string(),
             [
                 MediaPlayAction::PlayNow.as_str(),
                 MediaPlayAction::PlayNext.as_str(),
