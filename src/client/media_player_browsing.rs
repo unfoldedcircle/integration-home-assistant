@@ -19,6 +19,14 @@ use uc_api::intg::ws::{BrowseMediaResponseMsgData, SearchMediaResponseMsgData};
 use uc_api::model::{Pagination, Paging};
 use url::Url;
 
+static FILTERED_MEDIA_CONTENT_ID: [&str; 5] = [
+    "media-source://camera",
+    "media-source://image",
+    "media-source://image_upload",
+    "media-source://synology_dsm", // Synology Photos
+    "media-source://tts",
+];
+
 impl Handler<BrowseMedia> for HomeAssistantClient {
     type Result = ResponseFuture<Result<BrowseMediaResponseMsgData, ServiceError>>;
 
@@ -122,6 +130,8 @@ fn map_ha_browse(
     });
 
     if let Some(mut children) = ha_resp.children.take() {
+        children.retain(|c| !FILTERED_MEDIA_CONTENT_ID.contains(&c.media_content_id.as_str()));
+
         // Fix invalid HA data: title is sometimes null! E.g., in the Squeezebox integration
         let original_total = children.len() as u32;
         children.retain(|c| c.title.is_some());
@@ -195,6 +205,8 @@ fn map_ha_search(
     mut ha_resp: Vec<HaBrowseMediaResult>,
     paging: Paging,
 ) -> SearchMediaResponseMsgData {
+    ha_resp.retain(|c| !FILTERED_MEDIA_CONTENT_ID.contains(&c.media_content_id.as_str()));
+
     let original_total = ha_resp.len() as u32;
     ha_resp.retain(|c| c.title.is_some());
     let total = ha_resp.len() as u32;

@@ -531,6 +531,14 @@ pub fn transform_media_error(error: ResultError) -> ServiceError {
         {
             ServiceError::NotFound(error.message)
         }
+        "home_assistant_error"
+            if {
+                let msg = error.message.to_lowercase();
+                msg.contains("media content type must be one of")
+            } =>
+        {
+            ServiceError::BadRequest(error.message)
+        }
         code => ServiceError::InternalServerError(format!("{code}: {}", error.message)),
     }
 }
