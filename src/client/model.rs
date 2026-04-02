@@ -425,7 +425,8 @@ pub struct ResultError {
 
 #[derive(Debug, Deserialize)]
 pub struct HaBrowseMediaResult {
-    pub title: String,
+    // title should be mandator, but some integrations send null!
+    pub title: Option<String>,
     pub media_class: Option<String>,
     pub media_content_type: Option<String>,
     pub media_content_id: String,
@@ -445,7 +446,7 @@ impl From<HaBrowseMediaResult> for BrowseMediaItem {
     fn from(m: HaBrowseMediaResult) -> Self {
         BrowseMediaItem {
             media_id: m.media_content_id,
-            title: m.title,
+            title: m.title.unwrap_or_default(),
             subtitle: None,
             artist: None,
             album: None,
