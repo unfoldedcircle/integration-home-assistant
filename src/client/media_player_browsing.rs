@@ -192,10 +192,19 @@ fn transform_search_response(
 
 fn map_ha_search(
     server: Url,
-    ha_resp: Vec<HaBrowseMediaResult>,
+    mut ha_resp: Vec<HaBrowseMediaResult>,
     paging: Paging,
 ) -> SearchMediaResponseMsgData {
+    let original_total = ha_resp.len() as u32;
+    ha_resp.retain(|c| c.title.is_some());
     let total = ha_resp.len() as u32;
+
+    if original_total != total {
+        warn!(
+            "Invalid HA search result: removed {} item(s) with null title",
+            original_total - total
+        );
+    }
 
     let items = ha_resp
         .into_iter()
