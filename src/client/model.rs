@@ -425,7 +425,7 @@ pub struct ResultError {
 
 #[derive(Debug, Deserialize)]
 pub struct HaBrowseMediaResult {
-    // title should be mandator, but some integrations send null!
+    // title should be mandatory, but some integrations send null!
     pub title: Option<String>,
     pub media_class: Option<String>,
     pub media_content_type: Option<String>,
