@@ -12,6 +12,7 @@ use crate::client::{HomeAssistantClient, set_album_art_proxy};
 use crate::errors::ServiceError;
 use crate::util::return_fut_err;
 use actix::{Handler, ResponseFuture, fut};
+use log::warn;
 use tokio::sync::oneshot;
 use uc_api::BrowseMediaItem;
 use uc_api::intg::ws::{BrowseMediaResponseMsgData, SearchMediaResponseMsgData};
@@ -120,8 +121,18 @@ fn map_ha_browse(
         0
     });
 
-    if let Some(children) = ha_resp.children.take() {
+    if let Some(mut children) = ha_resp.children.take() {
+        // Fix invalid HA data: title is sometimes null! E.g., in the Squeezebox integration
+        let original_total = children.len() as u32;
+        children.retain(|c| c.title.is_some());
         total = children.len() as u32;
+
+        if original_total != total {
+            warn!(
+                "Invalid HA browse result: removed {} child item(s) with null title",
+                original_total - total
+            );
+        }
 
         items.extend(
             children
@@ -181,10 +192,19 @@ fn transform_search_response(
 
 fn map_ha_search(
     server: Url,
-    ha_resp: Vec<HaBrowseMediaResult>,
+    mut ha_resp: Vec<HaBrowseMediaResult>,
     paging: Paging,
 ) -> SearchMediaResponseMsgData {
+    let original_total = ha_resp.len() as u32;
+    ha_resp.retain(|c| c.title.is_some());
     let total = ha_resp.len() as u32;
+
+    if original_total != total {
+        warn!(
+            "Invalid HA search result: removed {} item(s) with null title",
+            original_total - total
+        );
+    }
 
     let items = ha_resp
         .into_iter()
