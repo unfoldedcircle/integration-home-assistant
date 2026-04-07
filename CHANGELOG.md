@@ -10,13 +10,21 @@ _Changes in the next release_
 
 ---
 
+## v0.16.4 - 2026-04-07
+### Fixed
+- Ignore browse and search media items without a title ([#93](https://github.com/unfoldedcircle/integration-home-assistant/pull/93)).
+
+### Changed
+- Filter out non-playable media content ids ([#94](https://github.com/unfoldedcircle/integration-home-assistant/pull/94)).
+- Update dependencies.
+
 ## v0.16.3 - 2026-03-19
 ### Fixed
-- play_media_action attribute for play media action feature (((([#92](https://github.com/unfoldedcircle/integration-home-assistant/pull/92)).
+- play_media_action attribute for play media action feature ([#92](https://github.com/unfoldedcircle/integration-home-assistant/pull/92)).
 
 ## v0.16.2 - 2026-03-18
 ### Changed
-- Lax boolean parsing for HA browse media responses (([#91](https://github.com/unfoldedcircle/integration-home-assistant/pull/91)).
+- Lax boolean parsing for HA browse media responses ([#91](https://github.com/unfoldedcircle/integration-home-assistant/pull/91)).
 - Update dependencies and GitHub build actions.
 
 ## v0.16.1 - 2026-03-16
