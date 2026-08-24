@@ -21,6 +21,7 @@ impl Actor for HomeAssistantClient {
         debug!("[{}] HA client stopped", self.id);
         self.controller_actor.do_send(ConnectionEvent {
             client_id: self.id.clone(),
+            attempt: self.attempt,
             state: ConnectionState::Closed,
         });
     }

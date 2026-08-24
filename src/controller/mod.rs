@@ -3,6 +3,7 @@
 
 //! Central controller handling integration WS requests and HA client connection.
 
+mod connection_state;
 mod handler;
 mod messages;
 
@@ -10,6 +11,7 @@ pub use messages::*;
 
 use crate::client::HomeAssistantClient;
 use crate::configuration::{DEF_SETUP_TIMEOUT_SEC, ENV_SETUP_TIMEOUT, Settings};
+use crate::controller::connection_state::ConnectionLifecycle;
 use crate::controller::handler::AbortDriverSetup;
 use crate::errors::ServiceError;
 use crate::util::new_websocket_client;
@@ -113,6 +115,19 @@ pub struct Controller {
     ha_client: Option<Addr<HomeAssistantClient>>,
     /// HomeAssistant client identifier
     ha_client_id: Option<String>,
+    /// Lifecycle authority for HA connection/reconnect eligibility.
+    ///
+    /// `device_state` is only the Remote-facing projection. Reachable pairs are:
+    /// - Disconnected × Disconnected: initial/fully stopped;
+    /// - Connecting × Connecting: WebSocket attempt in progress;
+    /// - Connecting × Connected: actor exists before it is subscription-ready;
+    /// - Connected × Active: authenticated/subscription-ready client;
+    /// - Connecting × Disconnected: retry backoff is armed;
+    /// - Disconnected × Disconnecting: explicit teardown/reconfiguration;
+    /// - Error × Disconnecting or Disconnected: terminal authentication/retry error.
+    ///
+    /// The broader setup-flow FSM remains separate; see issue #39.
+    ha_connection: ConnectionLifecycle,
     ha_reconnect_duration: Duration,
     ha_reconnect_attempt: u32,
     drv_metadata: IntegrationDriverUpdate,
@@ -150,6 +165,7 @@ impl Controller {
             settings,
             ha_client: None,
             ha_client_id: None,
+            ha_connection: ConnectionLifecycle::default(),
             ha_reconnect_attempt: 0,
             drv_metadata,
             machine,

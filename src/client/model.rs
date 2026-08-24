@@ -584,91 +584,91 @@ mod tests {
 
     #[test]
     fn test_best_effort_bool_true() {
-        assert_eq!(parse("true").unwrap(), true);
+        assert!(parse("true").unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_false() {
-        assert_eq!(parse("false").unwrap(), false);
+        assert!(!parse("false").unwrap());
     }
 
     // --- Integers ---
 
     #[test]
     fn test_best_effort_bool_with_int_one() {
-        assert_eq!(parse("1").unwrap(), true);
+        assert!(parse("1").unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_int_zero() {
-        assert_eq!(parse("0").unwrap(), false);
+        assert!(!parse("0").unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_int_invalid() {
-        assert_eq!(parse("2").unwrap(), false);
+        assert!(!parse("2").unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_int_negative() {
-        assert_eq!(parse("-1").unwrap(), false);
+        assert!(!parse("-1").unwrap());
     }
 
     // --- String: truthy ---
 
     #[test]
     fn test_best_effort_bool_with_str_true() {
-        assert_eq!(parse(r#""true""#).unwrap(), true);
+        assert!(parse(r#""true""#).unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_str_one() {
-        assert_eq!(parse(r#""1""#).unwrap(), true);
+        assert!(parse(r#""1""#).unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_str_uppercase_true() {
         // case-sensitive: "True" is not handled
-        assert_eq!(parse(r#""True""#).unwrap(), true);
+        assert!(parse(r#""True""#).unwrap());
     }
 
     // --- String: falsy ---
 
     #[test]
     fn test_best_effort_bool_with_str_false() {
-        assert_eq!(parse(r#""false""#).unwrap(), false);
+        assert!(!parse(r#""false""#).unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_str_zero() {
-        assert_eq!(parse(r#""0""#).unwrap(), false);
+        assert!(!parse(r#""0""#).unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_str_empty() {
-        assert_eq!(parse(r#""""#).unwrap(), false);
+        assert!(!parse(r#""""#).unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_str_uppercase_false() {
-        assert_eq!(parse(r#""False""#).unwrap(), false);
+        assert!(!parse(r#""False""#).unwrap());
     }
 
     // --- String: invalid, maps to false  ---
 
     #[test]
     fn test_best_effort_bool_with_str_invalid_word() {
-        assert_eq!(parse(r#""yes""#).unwrap(), false);
+        assert!(!parse(r#""yes""#).unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_str_invalid_no() {
-        assert_eq!(parse(r#""no""#).unwrap(), false);
+        assert!(!parse(r#""no""#).unwrap());
     }
 
     #[test]
     fn test_best_effort_bool_with_str_whitespace() {
-        assert_eq!(parse(r#"" ""#).unwrap(), false);
+        assert!(!parse(r#"" ""#).unwrap());
     }
 
     // --- Wrong types ---
@@ -713,8 +713,8 @@ mod tests {
         );
 
         let result: HaBrowseMediaResult = serde_json::from_value(msg).unwrap();
-        assert_eq!(result.can_play, false);
-        assert_eq!(result.can_expand, false);
-        assert_eq!(result.can_search, false);
+        assert!(!result.can_play);
+        assert!(!result.can_expand);
+        assert!(!result.can_search);
     }
 }
