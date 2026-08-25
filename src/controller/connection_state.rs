@@ -30,6 +30,112 @@ pub(crate) enum ConnectionAction {
     IgnoreStale,
 }
 
+/// Runtime-selectable connection lifecycle used for a cautious rollout.
+///
+/// Legacy mode intentionally preserves the original flag-based behavior. State-machine mode
+/// delegates to the serialized, generation-aware lifecycle implemented for issue #39.
+#[derive(Debug)]
+pub(crate) enum ConnectionManager {
+    Legacy,
+    StateMachine(ConnectionLifecycle),
+}
+
+impl ConnectionManager {
+    pub(crate) fn new(use_state_machine: bool) -> Self {
+        if use_state_machine {
+            Self::StateMachine(ConnectionLifecycle::default())
+        } else {
+            Self::Legacy
+        }
+    }
+
+    pub(crate) fn is_state_machine(&self) -> bool {
+        matches!(self, Self::StateMachine(_))
+    }
+
+    pub(crate) fn strategy_name(&self) -> &'static str {
+        match self {
+            Self::Legacy => "legacy",
+            Self::StateMachine(_) => "state_machine",
+        }
+    }
+
+    pub(crate) fn begin_connect(&mut self) -> Option<u64> {
+        match self {
+            Self::Legacy => Some(0),
+            Self::StateMachine(lifecycle) => lifecycle.begin_connect(),
+        }
+    }
+
+    pub(crate) fn client_started(&mut self, attempt: u64) -> bool {
+        match self {
+            Self::Legacy => true,
+            Self::StateMachine(lifecycle) => lifecycle.client_started(attempt),
+        }
+    }
+
+    pub(crate) fn accepts_active_event(&self, attempt: u64) -> bool {
+        match self {
+            Self::Legacy => true,
+            Self::StateMachine(lifecycle) => lifecycle.accepts_active_event(attempt),
+        }
+    }
+
+    pub(crate) fn accepts_closed_event(&self, attempt: u64) -> bool {
+        match self {
+            Self::Legacy => true,
+            Self::StateMachine(lifecycle) => lifecycle.accepts_closed_event(attempt),
+        }
+    }
+
+    pub(crate) fn client_active(&mut self, attempt: u64) -> bool {
+        match self {
+            Self::Legacy => true,
+            Self::StateMachine(lifecycle) => lifecycle.client_active(attempt),
+        }
+    }
+
+    pub(crate) fn is_usable(&self, client_available: bool) -> bool {
+        match self {
+            Self::Legacy => client_available,
+            Self::StateMachine(lifecycle) => client_available && lifecycle.is_usable(),
+        }
+    }
+
+    pub(crate) fn connection_failed(&mut self, attempt: u64) -> ConnectionAction {
+        match self {
+            Self::Legacy => ConnectionAction::RetryAfterBackoff,
+            Self::StateMachine(lifecycle) => lifecycle.connection_failed(attempt),
+        }
+    }
+
+    pub(crate) fn stop(&mut self) {
+        if let Self::StateMachine(lifecycle) = self {
+            lifecycle.stop();
+        }
+    }
+
+    pub(crate) fn disconnect(&mut self) {
+        if let Self::StateMachine(lifecycle) = self {
+            lifecycle.disconnect();
+        }
+    }
+
+    pub(crate) fn queue_connect_when_closed(&mut self) -> bool {
+        match self {
+            Self::Legacy => false,
+            Self::StateMachine(lifecycle) => lifecycle.queue_connect_when_closed(),
+        }
+    }
+
+    pub(crate) fn client_closed(&mut self, attempt: u64) -> ConnectionAction {
+        match self {
+            Self::Legacy => ConnectionAction::RetryAfterBackoff,
+            Self::StateMachine(lifecycle) => lifecycle.client_closed(attempt),
+        }
+    }
+}
+
 impl ConnectionLifecycle {
     /// Starts one connection attempt only when no client exists or is closing.
     ///
@@ -170,7 +276,38 @@ impl ConnectionLifecycle {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConnectionAction, ConnectionLifecycle};
+    use super::{ConnectionAction, ConnectionLifecycle, ConnectionManager};
+
+    #[test]
+    fn rollout_defaults_to_the_legacy_connection_manager() {
+        let mut manager = ConnectionManager::new(false);
+
+        assert_eq!(manager.strategy_name(), "legacy");
+        assert_eq!(manager.begin_connect(), Some(0));
+        assert_eq!(manager.begin_connect(), Some(0));
+    }
+
+    #[test]
+    fn rollout_flag_enables_the_serialized_connection_manager() {
+        let mut manager = ConnectionManager::new(true);
+
+        assert_eq!(manager.strategy_name(), "state_machine");
+        assert!(manager.begin_connect().is_some());
+        assert!(manager.begin_connect().is_none());
+    }
+
+    #[test]
+    fn legacy_and_state_machine_modes_keep_their_original_request_gating() {
+        let legacy = ConnectionManager::new(false);
+        assert!(legacy.is_usable(true));
+
+        let mut state_machine = ConnectionManager::new(true);
+        let attempt = state_machine.begin_connect().unwrap();
+        assert!(!state_machine.is_usable(true));
+        assert!(state_machine.client_started(attempt));
+        assert!(state_machine.client_active(attempt));
+        assert!(state_machine.is_usable(true));
+    }
 
     #[test]
     fn issue_39_does_not_start_a_second_connection_while_first_is_pending() {

@@ -29,3 +29,4 @@ integration:
 #    interval_sec: 20
 #    timeout_sec: 40
 #  disconnect_in_standby: true
+#  experimental_connection_lifecycle: false

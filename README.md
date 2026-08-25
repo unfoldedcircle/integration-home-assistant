@@ -104,6 +104,17 @@ See [Docker image](./docker/README.md) for more information.
 Configuration file handling uses the Rust Crate [config](https://docs.rs/config/latest/config/#) which allows
 loading configuration values from multiple sources and overwrite default values.
 
+#### Experimental connection lifecycle
+
+The expert option `experimental_connection_lifecycle` enables the serialized, generation-aware Home Assistant
+connection lifecycle added for issue [#39](https://github.com/unfoldedcircle/integration-home-assistant/issues/39).
+It prevents overlapping connection attempts and ignores events from stale clients.
+
+- The option defaults to `false`, preserving the original connection behavior for a safer initial rollout.
+- Set it to `true` to opt into the new lifecycle.
+- Restart the integration after changing it. The active mode is logged at startup as `legacy` or `state_machine`.
+- To roll back, set it to `false` and restart the integration.
+
 The configuration values can be overwritten with ENV variables.
 
 - Keys containing `_` cannot be overridden. E.g. `websocket.heartbeat.interval_sec`.

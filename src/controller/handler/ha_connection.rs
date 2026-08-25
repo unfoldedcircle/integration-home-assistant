@@ -21,6 +21,11 @@ impl Handler<ConnectionEvent> for Controller {
     type Result = ();
 
     fn handle(&mut self, msg: ConnectionEvent, ctx: &mut Self::Context) -> Self::Result {
+        if !self.ha_connection.is_state_machine() {
+            self.handle_legacy_connection_event(msg, ctx);
+            return;
+        }
+
         let accepted = match msg.state {
             ConnectionState::Closed => self.ha_connection.accepts_closed_event(msg.attempt),
             ConnectionState::AuthenticationFailed | ConnectionState::Connected => {
@@ -73,7 +78,51 @@ impl Handler<DisconnectMsg> for Controller {
 }
 
 impl Controller {
+    fn complete_legacy_connection_attempt(&mut self) {
+        // The original handler cleared this for every completed connection future, including
+        // failures. Keep that behavior exact so compatibility mode remains a true fallback.
+        self.ha_client_id = None;
+    }
+
+    fn handle_legacy_connection_event(
+        &mut self,
+        msg: ConnectionEvent,
+        ctx: &mut Context<Controller>,
+    ) {
+        match msg.state {
+            ConnectionState::AuthenticationFailed => {
+                // Preserve the original behavior: the upcoming Closed event must not reconnect.
+                self.set_device_state(DeviceState::Error);
+            }
+            ConnectionState::Connected => {
+                self.ha_client_id = Some(msg.client_id);
+                self.set_device_state(DeviceState::Connected);
+            }
+            ConnectionState::Closed => {
+                if Some(&msg.client_id) == self.ha_client_id.as_ref() {
+                    info!("[{}] HA client disconnected", msg.client_id);
+                    self.ha_client = None;
+                    self.ha_client_id = None;
+                } else {
+                    info!("[{}] Old HA client disconnected: ignoring", msg.client_id);
+                    return;
+                }
+
+                if matches!(
+                    self.device_state,
+                    DeviceState::Connecting | DeviceState::Connected
+                ) {
+                    info!("[{}] Start reconnecting to HA", msg.client_id);
+                    self.set_device_state(DeviceState::Connecting);
+                    self.reconnect_handle =
+                        Some(ctx.notify_later(ConnectMsg::default(), self.ha_reconnect_duration));
+                }
+            }
+        }
+    }
+
     pub(crate) fn disconnect(&mut self, ctx: &mut Context<Controller>) {
+        info!("Disconnect request: forcing immediate disconnect from HA server");
         self.set_device_state(DeviceState::Disconnected);
 
         if let Some(handle) = self.reconnect_handle.take() {
@@ -131,6 +180,14 @@ impl Handler<ConnectMsg> for Controller {
                 ErrorKind::InvalidInput,
                 "Not in running state",
             ))));
+        }
+
+        if !self.ha_connection.is_state_machine()
+            && let Some(client_id) = self.ha_client_id.as_ref()
+            && self.ha_client.is_some()
+        {
+            warn!("[{client_id}] Ignoring connect request: already connected to HA server");
+            return Box::pin(fut::ok(()));
         }
 
         let Some(attempt) = self.ha_connection.begin_connect() else {
@@ -202,6 +259,9 @@ impl Handler<ConnectMsg> for Controller {
             .into_actor(self)
             .map(move |result, act, ctx| match result {
                 Ok(addr) => {
+                    if !act.ha_connection.is_state_machine() {
+                        act.complete_legacy_connection_attempt(); // set later by Connected
+                    }
                     if !act.ha_connection.client_started(attempt) {
                         info!("Discarding stale HA connection attempt {attempt}");
                         addr.do_send(Close::default());
@@ -234,6 +294,31 @@ impl Handler<ConnectMsg> for Controller {
                     Ok(())
                 }
                 Err(e) => {
+                    if !act.ha_connection.is_state_machine() {
+                        // Preserve the original flag-based retry behavior for the rollout fallback.
+                        act.complete_legacy_connection_attempt();
+                        act.ha_client = None;
+                        if act.device_state != DeviceState::Disconnected {
+                            act.ha_reconnect_attempt += 1;
+                            if act.settings.hass.reconnect.attempts > 0
+                                && act.ha_reconnect_attempt > act.settings.hass.reconnect.attempts
+                            {
+                                info!(
+                                    "Max reconnect attempts reached ({}). Giving up!",
+                                    act.settings.hass.reconnect.attempts
+                                );
+                                act.set_device_state(DeviceState::Error);
+                            } else {
+                                act.reconnect_handle = Some(ctx.notify_later(
+                                    ConnectMsg::default(),
+                                    act.ha_reconnect_duration,
+                                ));
+                                act.increment_reconnect_timeout();
+                            }
+                        }
+                        return Err(e);
+                    }
+
                     let action = act.ha_connection.connection_failed(attempt);
                     match action {
                         ConnectionAction::RetryAfterBackoff => {
@@ -354,7 +439,7 @@ mod tests {
 
         fn handle(&mut self, _msg: Snapshot, _ctx: &mut Context<Self>) -> Self::Result {
             MessageResult(ControllerSnapshot {
-                usable: self.ha_connection.is_usable(),
+                usable: self.ha_connection.is_usable(true),
                 device_state: self.device_state.to_string(),
             })
         }
@@ -362,7 +447,23 @@ mod tests {
 
     fn controller() -> actix::Addr<Controller> {
         let metadata = serde_json::from_str("{}").expect("empty driver metadata is valid");
-        Controller::new(Settings::default(), metadata).start()
+        let settings = Settings {
+            hass: crate::configuration::HomeAssistantSettings::default()
+                .with_connection_state_machine(),
+            ..Default::default()
+        };
+        Controller::new(settings, metadata).start()
+    }
+
+    #[test]
+    fn legacy_attempt_failure_clears_the_previous_client_id() {
+        let metadata = serde_json::from_str("{}").expect("empty driver metadata is valid");
+        let mut controller = Controller::new(Settings::default(), metadata);
+        controller.ha_client_id = Some("newer-client".into());
+
+        controller.complete_legacy_connection_attempt();
+
+        assert!(controller.ha_client_id.is_none());
     }
 
     #[actix::test]

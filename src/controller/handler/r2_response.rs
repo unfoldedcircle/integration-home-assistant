@@ -30,7 +30,7 @@ impl Handler<R2ResponseMsg> for Controller {
                 {
                     info!("Remote identifier: '{remote_id}'");
                     self.remote_id = remote_id.to_string();
-                    if self.ha_connection.is_usable()
+                    if self.ha_connection.is_usable(self.ha_client.is_some())
                         && let Some(ha_client) = &self.ha_client
                         && let Err(e) = ha_client.try_send(SetRemoteId {
                             remote_id: self.remote_id.clone(),

@@ -4,6 +4,7 @@
     "token": "",
     "connection_timeout": 6,
     "request_timeout": 6,
+    "experimental_connection_lifecycle": false,
     "max_frame_size_kb": 5120,
     "reconnect": {
       "attempts": 0,

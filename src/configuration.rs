@@ -141,6 +141,12 @@ pub struct HomeAssistantSettings {
     // for data migration of existing configurations
     #[serde(default = "default_disconnect_in_standby")]
     pub disconnect_in_standby: bool,
+    /// Use the serialized, generation-aware HA connection lifecycle.
+    ///
+    /// This remains opt-in during the initial rollout so existing installations keep the
+    /// original connection handling unless explicitly enabled.
+    #[serde(default)]
+    pub experimental_connection_lifecycle: bool,
     /// Disables certificate verification for the Home Assistant WS connection.
     // for data migration of existing configurations
     #[serde(default = "default_disable_cert_validation")]
@@ -158,8 +164,17 @@ impl Default for HomeAssistantSettings {
             reconnect: Default::default(),
             heartbeat: Default::default(),
             disconnect_in_standby: default_disconnect_in_standby(),
+            experimental_connection_lifecycle: false,
             disable_cert_validation: default_disable_cert_validation(),
         }
+    }
+}
+
+#[cfg(test)]
+impl HomeAssistantSettings {
+    pub(crate) fn with_connection_state_machine(mut self) -> Self {
+        self.experimental_connection_lifecycle = true;
+        self
     }
 }
 
@@ -444,4 +459,35 @@ pub fn save_user_settings(cfg: &HomeAssistantSettings) -> Result<(), ServiceErro
 fn user_settings_path() -> PathBuf {
     let file = env::var(ENV_USER_CFG_FILENAME).unwrap_or(DEV_USER_CFG_FILENAME.into());
     Path::new(&env::var(ENV_CONFIG_HOME).unwrap_or_default()).join(file)
+}
+
+#[cfg(test)]
+mod connection_lifecycle_rollout_tests {
+    use super::HomeAssistantSettings;
+
+    #[test]
+    fn existing_configuration_keeps_legacy_connection_lifecycle() {
+        let mut value = serde_json::to_value(HomeAssistantSettings::default()).unwrap();
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("experimental_connection_lifecycle");
+
+        let settings: HomeAssistantSettings = serde_json::from_value(value).unwrap();
+
+        assert!(!settings.experimental_connection_lifecycle);
+    }
+
+    #[test]
+    fn connection_state_machine_can_be_enabled_and_persisted() {
+        let settings = HomeAssistantSettings {
+            experimental_connection_lifecycle: true,
+            ..Default::default()
+        };
+
+        let value = serde_json::to_value(&settings).unwrap();
+        let restored: HomeAssistantSettings = serde_json::from_value(value).unwrap();
+
+        assert!(restored.experimental_connection_lifecycle);
+    }
 }
