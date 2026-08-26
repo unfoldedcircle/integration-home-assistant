@@ -129,7 +129,7 @@ impl Handler<R2RequestMsg> for Controller {
         // Only an authenticated/subscription-ready HA actor may receive requests.
         let ha_client = self
             .ha_connection
-            .is_usable(self.ha_client.is_some())
+            .is_usable()
             .then(|| self.ha_client.clone())
             .flatten();
 

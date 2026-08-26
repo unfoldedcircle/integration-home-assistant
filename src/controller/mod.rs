@@ -115,18 +115,7 @@ pub struct Controller {
     ha_client: Option<Addr<HomeAssistantClient>>,
     /// HomeAssistant client identifier
     ha_client_id: Option<String>,
-    /// Lifecycle authority for HA connection/reconnect eligibility.
-    ///
-    /// `device_state` is only the Remote-facing projection. Reachable pairs are:
-    /// - Disconnected × Disconnected: initial/fully stopped;
-    /// - Connecting × Connecting: WebSocket attempt in progress;
-    /// - Connecting × Connected: actor exists before it is subscription-ready;
-    /// - Connected × Active: authenticated/subscription-ready client;
-    /// - Connecting × Disconnected: retry backoff is armed;
-    /// - Disconnected × Disconnecting: explicit teardown/reconfiguration;
-    /// - Error × Disconnecting or Disconnected: terminal authentication/retry error.
-    ///
-    /// The broader setup-flow FSM remains separate; see issue #39.
+    /// Authoritative HA lifecycle; `device_state` is its Remote-facing projection.
     ha_connection: ConnectionManager,
     ha_reconnect_duration: Duration,
     ha_reconnect_attempt: u32,

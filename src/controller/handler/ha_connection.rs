@@ -26,40 +26,30 @@ impl Handler<ConnectionEvent> for Controller {
             return;
         }
 
-        let accepted = match msg.state {
-            ConnectionState::Closed => self.ha_connection.accepts_closed_event(msg.attempt),
-            ConnectionState::AuthenticationFailed | ConnectionState::Connected => {
-                self.ha_connection.accepts_active_event(msg.attempt)
-            }
-        };
-        if !accepted {
-            info!(
-                "[{}] Ignoring stale/inactive HA client event for connection attempt {}",
-                msg.client_id, msg.attempt
-            );
-            return;
-        }
-
         match msg.state {
             ConnectionState::AuthenticationFailed => {
+                if !self.ha_connection.authentication_failed(msg.attempt) {
+                    Self::log_stale_connection_event(&msg);
+                    return;
+                }
                 // Authentication errors are terminal for this configuration: a bad token
                 // cannot self-heal. An explicit reconfiguration/connect starts a new attempt.
                 self.set_device_state(DeviceState::Error);
-                self.ha_connection.disconnect();
                 self.close_ha_client();
             }
             ConnectionState::Connected => {
                 if !self.ha_connection.client_active(msg.attempt) {
+                    Self::log_stale_connection_event(&msg);
                     return;
                 }
-                self.ha_client_id = Some(msg.client_id);
                 self.set_device_state(DeviceState::Connected);
             }
             ConnectionState::Closed => {
-                // `accepts_closed_event` above is the primary stale-event filter. Keep
-                // client_closed defensive so future direct callers cannot revive an old attempt.
-                debug_assert!(self.ha_connection.accepts_closed_event(msg.attempt));
                 let action = self.ha_connection.client_closed(msg.attempt);
+                if action == ConnectionAction::IgnoreStale {
+                    Self::log_stale_connection_event(&msg);
+                    return;
+                }
                 info!("[{}] HA client disconnected", msg.client_id);
                 self.ha_client = None;
                 self.ha_client_id = None;
@@ -78,6 +68,13 @@ impl Handler<DisconnectMsg> for Controller {
 }
 
 impl Controller {
+    fn log_stale_connection_event(msg: &ConnectionEvent) {
+        info!(
+            "[{}] Ignoring stale/inactive HA client event for connection attempt {}",
+            msg.client_id, msg.attempt
+        );
+    }
+
     fn complete_legacy_connection_attempt(&mut self) {
         // The original handler cleared this for every completed connection future, including
         // failures. Keep that behavior exact so compatibility mode remains a true fallback.
@@ -294,32 +291,19 @@ impl Handler<ConnectMsg> for Controller {
                     Ok(())
                 }
                 Err(e) => {
-                    if !act.ha_connection.is_state_machine() {
+                    let action = if !act.ha_connection.is_state_machine() {
                         // Preserve the original flag-based retry behavior for the rollout fallback.
                         act.complete_legacy_connection_attempt();
                         act.ha_client = None;
-                        if act.device_state != DeviceState::Disconnected {
-                            act.ha_reconnect_attempt += 1;
-                            if act.settings.hass.reconnect.attempts > 0
-                                && act.ha_reconnect_attempt > act.settings.hass.reconnect.attempts
-                            {
-                                info!(
-                                    "Max reconnect attempts reached ({}). Giving up!",
-                                    act.settings.hass.reconnect.attempts
-                                );
-                                act.set_device_state(DeviceState::Error);
-                            } else {
-                                act.reconnect_handle = Some(ctx.notify_later(
-                                    ConnectMsg::default(),
-                                    act.ha_reconnect_duration,
-                                ));
-                                act.increment_reconnect_timeout();
-                            }
+                        if act.device_state == DeviceState::Disconnected {
+                            ConnectionAction::Stop
+                        } else {
+                            act.ha_connection.connection_failed(attempt)
                         }
-                        return Err(e);
-                    }
+                    } else {
+                        act.ha_connection.connection_failed(attempt)
+                    };
 
-                    let action = act.ha_connection.connection_failed(attempt);
                     match action {
                         ConnectionAction::RetryAfterBackoff => {
                             act.ha_reconnect_attempt += 1;
@@ -439,7 +423,7 @@ mod tests {
 
         fn handle(&mut self, _msg: Snapshot, _ctx: &mut Context<Self>) -> Self::Result {
             MessageResult(ControllerSnapshot {
-                usable: self.ha_connection.is_usable(true),
+                usable: self.ha_connection.is_usable(),
                 device_state: self.device_state.to_string(),
             })
         }

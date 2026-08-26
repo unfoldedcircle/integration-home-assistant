@@ -7,8 +7,7 @@
 pub(crate) struct ConnectionLifecycle {
     phase: ConnectionPhase,
     next_attempt: u64,
-    desired_connection: bool,
-    reconnect_when_closed: bool,
+    end_policy: EndPolicy,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
@@ -16,9 +15,16 @@ enum ConnectionPhase {
     #[default]
     Disconnected,
     Connecting(u64),
-    Connected(u64),
     Active(u64),
     Disconnecting(u64),
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
+enum EndPolicy {
+    #[default]
+    Stop,
+    RetryAfterBackoff,
+    ConnectImmediately,
 }
 
 /// What the controller must do after an HA connection attempt/client ends.
@@ -74,17 +80,10 @@ impl ConnectionManager {
         }
     }
 
-    pub(crate) fn accepts_active_event(&self, attempt: u64) -> bool {
+    pub(crate) fn authentication_failed(&mut self, attempt: u64) -> bool {
         match self {
             Self::Legacy => true,
-            Self::StateMachine(lifecycle) => lifecycle.accepts_active_event(attempt),
-        }
-    }
-
-    pub(crate) fn accepts_closed_event(&self, attempt: u64) -> bool {
-        match self {
-            Self::Legacy => true,
-            Self::StateMachine(lifecycle) => lifecycle.accepts_closed_event(attempt),
+            Self::StateMachine(lifecycle) => lifecycle.authentication_failed(attempt),
         }
     }
 
@@ -95,10 +94,10 @@ impl ConnectionManager {
         }
     }
 
-    pub(crate) fn is_usable(&self, client_available: bool) -> bool {
+    pub(crate) fn is_usable(&self) -> bool {
         match self {
-            Self::Legacy => client_available,
-            Self::StateMachine(lifecycle) => client_available && lifecycle.is_usable(),
+            Self::Legacy => true,
+            Self::StateMachine(lifecycle) => lifecycle.is_usable(),
         }
     }
 
@@ -142,28 +141,25 @@ impl ConnectionLifecycle {
     /// Calling this records an explicit desire for an HA connection. If a client is
     /// currently closing, [`Self::queue_connect_when_closed`] records the replacement.
     pub(crate) fn begin_connect(&mut self) -> Option<u64> {
-        self.desired_connection = true;
         if self.phase != ConnectionPhase::Disconnected {
             return None;
         }
 
         self.next_attempt += 1;
         self.phase = ConnectionPhase::Connecting(self.next_attempt);
+        self.end_policy = EndPolicy::RetryAfterBackoff;
         Some(self.next_attempt)
     }
 
     /// Marks a TCP/WebSocket attempt as having produced a client actor.
     pub(crate) fn client_started(&mut self, attempt: u64) -> bool {
-        match self.phase {
-            ConnectionPhase::Connecting(current) if current == attempt => {
-                self.phase = ConnectionPhase::Connected(attempt);
-                true
-            }
-            // The client actor can emit its first event before the controller has
-            // resumed the connect future. Preserve that already-active transition.
-            ConnectionPhase::Active(current) if current == attempt => true,
-            _ => false,
-        }
+        // The client actor can emit its first event before the controller has resumed the
+        // connect future, so an already-active attempt is also valid here.
+        matches!(
+            self.phase,
+            ConnectionPhase::Connecting(current) | ConnectionPhase::Active(current)
+                if current == attempt
+        )
     }
 
     /// Accepts non-close client events from the currently active attempt only.
@@ -171,7 +167,6 @@ impl ConnectionLifecycle {
         matches!(
             self.phase,
             ConnectionPhase::Connecting(current)
-                | ConnectionPhase::Connected(current)
                 | ConnectionPhase::Active(current)
                 if current == attempt
         )
@@ -182,7 +177,6 @@ impl ConnectionLifecycle {
         matches!(
             self.phase,
             ConnectionPhase::Connecting(current)
-                | ConnectionPhase::Connected(current)
                 | ConnectionPhase::Active(current)
                 | ConnectionPhase::Disconnecting(current)
                 if current == attempt
@@ -197,6 +191,16 @@ impl ConnectionLifecycle {
         } else {
             false
         }
+    }
+
+    /// Marks authentication failure as terminal for the current attempt.
+    pub(crate) fn authentication_failed(&mut self, attempt: u64) -> bool {
+        if !self.accepts_active_event(attempt) {
+            return false;
+        }
+
+        self.disconnect();
+        true
     }
 
     /// Whether controller business messages may be sent to the HA actor.
@@ -220,18 +224,16 @@ impl ConnectionLifecycle {
 
     /// Disables automatic reconnects after an unrecoverable error or retry exhaustion.
     pub(crate) fn stop(&mut self) {
-        self.desired_connection = false;
-        self.reconnect_when_closed = false;
+        self.end_policy = EndPolicy::Stop;
     }
 
     /// Starts explicit teardown. A replacement request must wait for this attempt to end.
     pub(crate) fn disconnect(&mut self) {
-        self.desired_connection = false;
-        self.reconnect_when_closed = false;
+        self.end_policy = EndPolicy::Stop;
         self.phase = match self.phase {
-            ConnectionPhase::Connecting(attempt)
-            | ConnectionPhase::Connected(attempt)
-            | ConnectionPhase::Active(attempt) => ConnectionPhase::Disconnecting(attempt),
+            ConnectionPhase::Connecting(attempt) | ConnectionPhase::Active(attempt) => {
+                ConnectionPhase::Disconnecting(attempt)
+            }
             phase => phase,
         };
     }
@@ -241,8 +243,7 @@ impl ConnectionLifecycle {
     /// cannot be mistaken for reconfiguration.
     pub(crate) fn queue_connect_when_closed(&mut self) -> bool {
         if matches!(self.phase, ConnectionPhase::Disconnecting(_)) {
-            self.desired_connection = true;
-            self.reconnect_when_closed = true;
+            self.end_policy = EndPolicy::ConnectImmediately;
             true
         } else {
             false
@@ -250,9 +251,6 @@ impl ConnectionLifecycle {
     }
 
     /// Handles a client stop and returns the required controller follow-up.
-    ///
-    /// The event handler normally calls this only after `accepts_closed_event`.
-    /// This defensive check protects future direct callers from stale close events.
     pub(crate) fn client_closed(&mut self, attempt: u64) -> ConnectionAction {
         if !self.accepts_closed_event(attempt) {
             return ConnectionAction::IgnoreStale;
@@ -263,13 +261,10 @@ impl ConnectionLifecycle {
     }
 
     fn ended_action(&mut self) -> ConnectionAction {
-        if self.reconnect_when_closed {
-            self.reconnect_when_closed = false;
-            ConnectionAction::ConnectImmediately
-        } else if self.desired_connection {
-            ConnectionAction::RetryAfterBackoff
-        } else {
-            ConnectionAction::Stop
+        match std::mem::take(&mut self.end_policy) {
+            EndPolicy::Stop => ConnectionAction::Stop,
+            EndPolicy::RetryAfterBackoff => ConnectionAction::RetryAfterBackoff,
+            EndPolicy::ConnectImmediately => ConnectionAction::ConnectImmediately,
         }
     }
 }
@@ -299,14 +294,14 @@ mod tests {
     #[test]
     fn legacy_and_state_machine_modes_keep_their_original_request_gating() {
         let legacy = ConnectionManager::new(false);
-        assert!(legacy.is_usable(true));
+        assert!(legacy.is_usable());
 
         let mut state_machine = ConnectionManager::new(true);
         let attempt = state_machine.begin_connect().unwrap();
-        assert!(!state_machine.is_usable(true));
+        assert!(!state_machine.is_usable());
         assert!(state_machine.client_started(attempt));
         assert!(state_machine.client_active(attempt));
-        assert!(state_machine.is_usable(true));
+        assert!(state_machine.is_usable());
     }
 
     #[test]
