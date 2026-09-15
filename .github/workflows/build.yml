@@ -45,11 +45,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
         with:
+          toolchain: stable
           components: rustfmt
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -60,7 +61,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - id: setup
         uses: ./.github/actions/rust-setup
@@ -82,7 +83,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # History of 200 should be more than enough to calculate commit count since last release tag.
           fetch-depth: 200
@@ -126,7 +127,7 @@ jobs:
           echo "TIMESTAMP=$(date +"%Y%m%d_%H%M%S")" >> ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }}/version.txt
           tar czvf ${{ env.ARTIFACT_NAME }}.tar.gz -C ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }} .
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         id: upload_artifact
         with:
           name: ${{ env.ARTIFACT_NAME }}
@@ -159,7 +160,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ env.PROJECT_NAME}}
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # History of 200 should be more than enough to calculate commit count since last release tag.
           fetch-depth: 200
@@ -234,7 +235,7 @@ jobs:
           tar czvf ${{ env.ARTIFACT_NAME }}.tar.gz -C ${GITHUB_WORKSPACE}/${{ env.BIN_OUTPUT_PATH }} .
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         id: upload_artifact
         with:
           name: ${{ env.ARTIFACT_NAME }}
@@ -276,7 +277,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ env.PROJECT_NAME}}
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - id: setup
         uses: ./.github/actions/rust-setup
@@ -313,7 +314,7 @@ jobs:
           tar czvf target/release/${{ matrix.config.archive }} -C ${{ env.BIN_OUTPUT_PATH }} .
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         id: upload_artifact
         with:
           name: ha-test-${{ matrix.config.target }}
@@ -327,12 +328,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "lts/*"
 
@@ -343,7 +344,7 @@ jobs:
           cat ${{ env.BUILD_CHANGELOG }}
 
       - name: Upload changelog
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: changelog
           path: ${{ env.BUILD_CHANGELOG }}
@@ -358,7 +359,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
 
       - name: Log
         if: env.DEBUG_OUTPUT == 'true'
@@ -400,7 +401,7 @@ jobs:
 
       # Checkout is required for the next `gh release delete` step
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: main
 
@@ -415,7 +416,7 @@ jobs:
 
       # Use conventional commit changelog, and append the GitHub generated changelog
       - name: Create Pre-Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: "!contains(github.ref, 'tags/v')"
         with:
           prerelease: true
@@ -436,7 +437,7 @@ jobs:
           ls -lah
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: "contains(github.ref, 'tags/v')"
         with:
           prerelease: false
@@ -454,7 +455,7 @@ jobs:
 
     steps:
       - name: Download Linux-x64 build artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: "uc-intg-hass-*-${{ env.LINUX_ARTIFACT_SUFFIX }}*"
 
@@ -468,7 +469,7 @@ jobs:
           printenv
 
       - name: Check out repo for Docker build
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # needs to be a subdirectory, otherwise the workspace gets erased
           path: src
@@ -522,14 +523,14 @@ jobs:
           echo "IMAGE_TAGS: ${{ env.IMAGE_TAGS }}"
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker image
         if: "contains(github.ref, 'tags/v')" # only publish releases!
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: src/docker
           push: true
