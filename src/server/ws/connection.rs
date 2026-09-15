@@ -201,7 +201,7 @@ impl WsConn {
             AggregatedMessage::Text(text) => {
                 self.hb = Instant::now();
                 if self.msg_tracing_in {
-                    debug!("[{}] -> {}", self.id, &text);
+                    debug!("[{}] -> {}", self.id, text);
                 }
 
                 self.handle_text_message(&text, session).await

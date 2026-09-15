@@ -122,6 +122,7 @@ The following environment variables exist in addition to the configuration file:
 | UC_DISABLE_CERT_VERIFICATION | `true` / `false`     | Disables certificate verification for the Home Assistant WS connection.<br>Default: `false`                 |
 | UC_API_MSG_TRACING           | `all` / `in` / `out` | Enables incoming and outgoing WS Core-API message tracing<br>Default: no tracing                            |
 | UC_HASS_MSG_TRACING          | `all` / `in` / `out` | Enables incoming and outgoing Home Assistant WS message tracing<br>Default: no tracing                      |
+| UC_SETUP_TIMEOUT             | _seconds_            | Driver setup flow timeout. `0` disables the timeout for an unlimited setup duration.<br>Default: `300`      |
 
 On the Unfolded Remote device, the integration is configured for the embedded runtime environment with several environment
 variables. Mainly `UC_DISABLE_MDNS_PUBLISH=true`, `UC_CONFIG_HOME` and some `UC_INTEGRATION_*` to listen on the local
