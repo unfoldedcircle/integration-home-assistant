@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Changed
+- Driver setup flow timeout `UC_SETUP_TIMEOUT` can be disabled with value `0` for an unlimited setup duration.
+
 ---
 
 ## v0.16.4 - 2026-04-07

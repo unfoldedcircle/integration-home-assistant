@@ -21,7 +21,13 @@ pub const DEF_CONFIG_FILE: &str = "configuration.yaml";
 
 pub const DEF_HA_URL: &str = "ws://homeassistant.local:8123/api/websocket";
 
+/// Environment variable for the driver setup flow timeout in seconds.
+///
+/// A running setup flow is automatically aborted after this duration. Value `0` disables the
+/// timeout: the setup flow may then run for an unlimited duration and is only ended by the Remote
+/// (setup keep-alive lease) or by the user.
 pub const ENV_SETUP_TIMEOUT: &str = "UC_SETUP_TIMEOUT";
+/// Default driver setup flow timeout in seconds. See [ENV_SETUP_TIMEOUT].
 pub const DEF_SETUP_TIMEOUT_SEC: u64 = 300;
 
 const ENV_USER_CFG_FILENAME: &str = "UC_USER_CFG_FILENAME";

@@ -259,18 +259,19 @@ impl Controller {
                 if let Some(handle) = self.setup_timeout.take() {
                     ctx.cancel_future(handle);
                 }
-                let timeout = env::var(ENV_SETUP_TIMEOUT)
-                    .ok()
-                    .and_then(|v| u64::from_str(&v).ok())
-                    .unwrap_or(DEF_SETUP_TIMEOUT_SEC);
-                debug!("Starting SetupFlowTimer: {timeout} sec");
-                self.setup_timeout = Some(ctx.notify_later(
-                    AbortDriverSetup {
-                        ws_id: ws_id.to_string(),
-                        timeout: true,
-                    },
-                    Duration::from_secs(timeout),
-                ));
+                match setup_timeout() {
+                    Some(timeout) => {
+                        debug!("Starting SetupFlowTimer: {} sec", timeout.as_secs());
+                        self.setup_timeout = Some(ctx.notify_later(
+                            AbortDriverSetup {
+                                ws_id: ws_id.to_string(),
+                                timeout: true,
+                            },
+                            timeout,
+                        ));
+                    }
+                    None => debug!("SetupFlowTimer disabled: unlimited setup flow duration"),
+                }
                 Ok(())
             }
             Ok(Some(OperationModeOutput::CancelSetupFlowTimer)) => {
@@ -285,6 +286,27 @@ impl Controller {
                 self.machine.state()
             ))),
         }
+    }
+}
+
+/// Get the driver setup flow timeout from the environment.
+///
+/// Returns `None` if the timeout is disabled with `UC_SETUP_TIMEOUT=0`. Invalid values fall back
+/// to the default timeout.
+fn setup_timeout() -> Option<Duration> {
+    let timeout = match env::var(ENV_SETUP_TIMEOUT) {
+        Ok(value) => u64::from_str(value.trim()).unwrap_or_else(|_| {
+            warn!(
+                    "Invalid {ENV_SETUP_TIMEOUT} value '{value}', using default: {DEF_SETUP_TIMEOUT_SEC}"
+                );
+            DEF_SETUP_TIMEOUT_SEC
+        }),
+        Err(_) => DEF_SETUP_TIMEOUT_SEC,
+    };
+    if timeout == 0 {
+        None
+    } else {
+        Some(Duration::from_secs(timeout))
     }
 }
 
