@@ -8,11 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.17.0 - 2026-09-15
 ### Changed
 - Driver setup flow timeout `UC_SETUP_TIMEOUT` can be disabled with value `0` for an unlimited setup duration ([#98](https://github.com/unfoldedcircle/integration-home-assistant/pull/98)).
+- Pin GitHub Actions to commit hashes ([#99](https://github.com/unfoldedcircle/integration-home-assistant/pull/99)).
 - Update dependencies.
-
----
 
 ## v0.16.4 - 2026-04-07
 ### Fixed
