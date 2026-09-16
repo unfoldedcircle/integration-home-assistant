@@ -126,8 +126,12 @@ impl Handler<R2RequestMsg> for Controller {
             ))));
         }
 
-        // prepare async context
-        let ha_client = self.ha_client.clone();
+        // Only an authenticated/subscription-ready HA actor may receive requests.
+        let ha_client = self
+            .ha_connection
+            .is_usable()
+            .then(|| self.ha_client.clone())
+            .flatten();
 
         // FIXME quick & dirty request id "mapping". This requires a rewrite with proper callback & timeout handling!
         let mut entity_ids = Default::default();

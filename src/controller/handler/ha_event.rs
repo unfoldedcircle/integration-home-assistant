@@ -243,7 +243,9 @@ impl Handler<SubscribeHaEventsMsg> for Controller {
             let subscribe: SubscribeEvents = msg.0.deserialize()?;
             session.subscribed_entities.extend(subscribe.entity_ids);
             debug!("Sending updated subscribed entities to client for events subscriptions");
-            if let Some(ha_client) = &self.ha_client {
+            if self.ha_connection.is_usable()
+                && let Some(ha_client) = &self.ha_client
+            {
                 ha_client.try_send(SubscribedEntities {
                     entity_ids: session.subscribed_entities.clone(),
                 })?;
@@ -268,7 +270,9 @@ impl Handler<UnsubscribeHaEventsMsg> for Controller {
             for i in unsubscribe.entity_ids {
                 session.subscribed_entities.remove(&i);
             }
-            if let Some(ha_client) = &self.ha_client {
+            if self.ha_connection.is_usable()
+                && let Some(ha_client) = &self.ha_client
+            {
                 ha_client.try_send(SubscribedEntities {
                     entity_ids: session.subscribed_entities.clone(),
                 })?;

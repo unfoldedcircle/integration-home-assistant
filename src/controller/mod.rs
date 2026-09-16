@@ -3,6 +3,7 @@
 
 //! Central controller handling integration WS requests and HA client connection.
 
+mod connection_state;
 mod handler;
 mod messages;
 
@@ -10,6 +11,7 @@ pub use messages::*;
 
 use crate::client::HomeAssistantClient;
 use crate::configuration::{DEF_SETUP_TIMEOUT_SEC, ENV_SETUP_TIMEOUT, Settings};
+use crate::controller::connection_state::ConnectionManager;
 use crate::controller::handler::AbortDriverSetup;
 use crate::errors::ServiceError;
 use crate::util::new_websocket_client;
@@ -113,6 +115,8 @@ pub struct Controller {
     ha_client: Option<Addr<HomeAssistantClient>>,
     /// HomeAssistant client identifier
     ha_client_id: Option<String>,
+    /// Authoritative HA lifecycle; `device_state` is its Remote-facing projection.
+    ha_connection: ConnectionManager,
     ha_reconnect_duration: Duration,
     ha_reconnect_attempt: u32,
     drv_metadata: IntegrationDriverUpdate,
@@ -138,6 +142,11 @@ impl Controller {
         } else {
             info!("Home Assistant connection requires setup");
         }
+        let ha_connection = ConnectionManager::new(settings.hass.experimental_connection_lifecycle);
+        info!(
+            "HA connection lifecycle strategy: {}",
+            ha_connection.strategy_name()
+        );
         Self {
             sessions: Default::default(),
             device_state: DeviceState::Disconnected,
@@ -150,6 +159,7 @@ impl Controller {
             settings,
             ha_client: None,
             ha_client_id: None,
+            ha_connection,
             ha_reconnect_attempt: 0,
             drv_metadata,
             machine,

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+- Opt-in, generation-aware Home Assistant connection lifecycle with a default-off expert compatibility flag for a safer rollout ([#97](https://github.com/unfoldedcircle/integration-home-assistant/pull/97)).
+
+### Fixed
+- Prevent overlapping Home Assistant WebSocket attempts and stale client events when the experimental connection lifecycle is enabled ([#39](https://github.com/unfoldedcircle/integration-home-assistant/issues/39)).
+
 ---
 
 ## v0.17.0 - 2026-09-15

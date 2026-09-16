@@ -96,6 +96,8 @@ pub struct HomeAssistantClient {
     msg_tracing_out: bool,
     subscribed_entities: HashSet<String>,
     authenticated: bool,
+    /// Controller-owned connection attempt identifier for stale-event filtering.
+    attempt: u64,
     remote_id: String,
 }
 
@@ -107,6 +109,7 @@ impl HomeAssistantClient {
         sink: SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>,
         stream: SplitStream<Framed<BoxedSocket, ws::Codec>>,
         heartbeat: HeartbeatSettings,
+        attempt: u64,
     ) -> Addr<Self> {
         HomeAssistantClient::create(|ctx| {
             ctx.add_stream(stream);
@@ -146,6 +149,7 @@ impl HomeAssistantClient {
                 uc_ha_component_info_id: None,
                 subscribed_entities: HashSet::new(),
                 authenticated: false,
+                attempt,
                 remote_id: "".to_string(),
                 uc_ha_component_check_interval: Duration::from_secs(5),
                 uc_ha_component_check_duration: None, // check forever
@@ -249,6 +253,7 @@ impl HomeAssistantClient {
                     } else {
                         self.controller_actor.do_send(ConnectionEvent {
                             client_id: self.id.clone(),
+                            attempt: self.attempt,
                             state: ConnectionState::Connected,
                         });
                     }
@@ -294,6 +299,7 @@ impl HomeAssistantClient {
                     } else {
                         self.controller_actor.do_send(ConnectionEvent {
                             client_id: self.id.clone(),
+                            attempt: self.attempt,
                             state: ConnectionState::Connected,
                         });
                     }
@@ -303,6 +309,7 @@ impl HomeAssistantClient {
                         debug!("[{}] Subscribed to state changes", self.id);
                         self.controller_actor.do_send(ConnectionEvent {
                             client_id: self.id.clone(),
+                            attempt: self.attempt,
                             state: ConnectionState::Connected,
                         });
                     } else {
@@ -370,6 +377,7 @@ impl HomeAssistantClient {
                 );
                 self.controller_actor.do_send(ConnectionEvent {
                     client_id: self.id.clone(),
+                    attempt: self.attempt,
                     state: ConnectionState::AuthenticationFailed,
                 });
             }
