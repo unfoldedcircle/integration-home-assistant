@@ -100,7 +100,24 @@ pub struct HomeAssistantClient {
 }
 
 impl HomeAssistantClient {
+    /// Create a new unique client identifier for the given HA server URL.
+    ///
+    /// The identifier is created by the controller before the connection is established, so the
+    /// controller can attribute all client events, including a `Closed` event before the client
+    /// was fully connected.
+    pub fn new_client_id(url: &Url) -> String {
+        let host = url.host_str().unwrap_or(url.as_str());
+        let port = url.port_or_known_default().unwrap_or_default();
+        format!(
+            "{}:{}-{}",
+            host,
+            port,
+            CLIENT_SEQ.fetch_add(1, Ordering::SeqCst)
+        )
+    }
+
     pub fn start(
+        id: String,
         url: Url,
         controller_actor: Addr<Controller>,
         access_token: String,
@@ -111,16 +128,9 @@ impl HomeAssistantClient {
         HomeAssistantClient::create(|ctx| {
             ctx.add_stream(stream);
             let scheme = url.scheme();
-            let host = url.host_str().unwrap_or(url.as_str());
-            let port = url.port_or_known_default().unwrap_or_default();
             let msg_tracing = env::var(ENV_HASS_MSG_TRACING).unwrap_or_default();
             HomeAssistantClient {
-                id: format!(
-                    "{}:{}-{}",
-                    host,
-                    port,
-                    CLIENT_SEQ.fetch_add(1, Ordering::SeqCst)
-                ),
+                id,
                 server: {
                     let mut server = url.clone();
                     server

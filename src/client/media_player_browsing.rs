@@ -13,11 +13,15 @@ use crate::errors::ServiceError;
 use crate::util::return_fut_err;
 use actix::{Handler, ResponseFuture, fut};
 use log::warn;
+use std::time::Duration;
 use tokio::sync::oneshot;
 use uc_api::BrowseMediaItem;
 use uc_api::intg::ws::{BrowseMediaResponseMsgData, SearchMediaResponseMsgData};
 use uc_api::model::{Pagination, Paging};
 use url::Url;
+
+/// Maximum time to wait for a browse or search response from Home Assistant.
+const MEDIA_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 static FILTERED_MEDIA_CONTENT_ID: [&str; 5] = [
     "media-source://camera",
@@ -51,9 +55,7 @@ impl Handler<BrowseMedia> for HomeAssistantClient {
 
         let server = self.server.clone();
         Box::pin(async move {
-            let resp = rx
-                .await
-                .map_err(|_| ServiceError::InternalServerError("Channel closed".into()))?;
+            let resp = await_response(rx).await?;
 
             let ha_resp: HaBrowseMediaResponse = serde_json::from_value(resp.msg)?;
             transform_browse_response(server, ha_resp, msg.paging.unwrap_or_default())
@@ -87,13 +89,24 @@ impl Handler<SearchMedia> for HomeAssistantClient {
 
         let server = self.server.clone();
         Box::pin(async move {
-            let resp = rx
-                .await
-                .map_err(|_| ServiceError::InternalServerError("Channel closed".into()))?;
+            let resp = await_response(rx).await?;
 
             let ha_resp: HaSearchMediaResponse = serde_json::from_value(resp.msg)?;
             transform_search_response(server, ha_resp, msg.paging.unwrap_or_default())
         })
+    }
+}
+
+/// Wait for the HA response with a timeout, so a hanging HA media source cannot block the caller forever.
+async fn await_response(
+    rx: oneshot::Receiver<crate::client::model::ResponseMsg>,
+) -> Result<crate::client::model::ResponseMsg, ServiceError> {
+    match tokio::time::timeout(MEDIA_REQUEST_TIMEOUT, rx).await {
+        Ok(Ok(resp)) => Ok(resp),
+        Ok(Err(_)) => Err(ServiceError::InternalServerError("Channel closed".into())),
+        Err(_) => Err(ServiceError::ServiceUnavailable(
+            "Timeout waiting for Home Assistant media response".into(),
+        )),
     }
 }
 

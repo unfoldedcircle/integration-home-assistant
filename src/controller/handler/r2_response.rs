@@ -22,10 +22,8 @@ impl Handler<R2ResponseMsg> for Controller {
                 if let Some(remote_id) = msg
                     .response
                     .msg_data
-                    .unwrap()
-                    .as_object_mut()
-                    .unwrap()
-                    .get_mut("hostname")
+                    .as_ref()
+                    .and_then(|v| v.get("hostname"))
                     .and_then(|v| v.as_str())
                 {
                     info!("Remote identifier: '{remote_id}'");

@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Fixed
+- Home Assistant connection handling ([#39](https://github.com/unfoldedcircle/integration-home-assistant/issues/39), analysis in [#97](https://github.com/unfoldedcircle/integration-home-assistant/pull/97)):
+  - A second connect request during a running connection attempt started a second HA client. This could happen after standby / wake, or when the remote sent a `connect` event while the driver was still connecting.
+  - A connection which closed before authentication and event subscription completed was ignored and no reconnection was scheduled. The driver remained in the `CONNECTING` state.
+  - An in-flight connection attempt was not invalidated by a disconnect request (standby, setup flow) and could establish the connection afterwards.
+  - Reconnect backoff is now reset after a fully established connection and applied when the connection is closed before being usable.
+- HA requests are only forwarded to the HA client after authentication and event subscription.
+- Respond with an error to `entity_command` requests if the HA connection is not available, instead of not responding at all.
+- Browse and search media requests time out after 10 seconds if Home Assistant doesn't respond.
+- Entity events are no longer dropped if an internal message queue is temporarily full.
+- Custom label and unit options of unsupported sensor device classes were not set.
+- The cached `available_entities` response was sent twice.
+- Panic when the remote's `version` response has no payload, or an entity id without a domain separator is used in a button command.
+
+### Changed
+- The `uc-intg-hass` binary uses the library crate instead of compiling all modules a second time.
+
 ---
 
 ## v0.17.0 - 2026-09-15

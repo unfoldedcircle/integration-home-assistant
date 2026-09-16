@@ -14,9 +14,7 @@ use crate::configuration::get_driver_metadata;
 use crate::controller::handler::{
     SetDriverUserDataMsg, SetupDriverMsg, SubscribeHaEventsMsg, UnsubscribeHaEventsMsg,
 };
-use crate::controller::{
-    Controller, OperationModeInput, R2AudioChunkMsg, R2RequestMsg, SendWsMessage,
-};
+use crate::controller::{Controller, OperationModeInput, R2AudioChunkMsg, R2RequestMsg};
 use crate::errors::ServiceError;
 use crate::util::{DeserializeMsgData, return_fut_err, return_fut_ok};
 use actix::{Addr, AsyncContext, Handler, ResponseFuture, fut};
@@ -28,7 +26,7 @@ use uc_api::intg::ws::{
     AvailableEntitiesMsgData, BrowseMediaMsgData, DriverVersionMsgData, R2Request,
     SearchMediaMsgData,
 };
-use uc_api::intg::{EntityCommand, IntegrationVersion, IntgVoiceAssistantCommand};
+use uc_api::intg::{DeviceState, EntityCommand, IntegrationVersion, IntgVoiceAssistantCommand};
 use uc_api::ws::{EventCategory, WsMessage, WsResultMsgData};
 use uc_api::{AudioConfiguration, EntityType};
 
@@ -126,8 +124,14 @@ impl Handler<R2RequestMsg> for Controller {
             ))));
         }
 
-        // prepare async context
-        let ha_client = self.ha_client.clone();
+        // prepare async context.
+        // Only hand out the HA client once it is authenticated and subscribed: HA drops the
+        // connection with `auth_invalid` if any other message arrives before authentication.
+        let ha_client = if self.device_state == DeviceState::Connected {
+            self.ha_client.clone()
+        } else {
+            None
+        };
 
         // FIXME quick & dirty request id "mapping". This requires a rewrite with proper callback & timeout handling!
         let mut entity_ids = Default::default();
@@ -146,19 +150,11 @@ impl Handler<R2RequestMsg> for Controller {
                         available_entities: available_entities.clone(),
                     };
                     if let Ok(msg_data_json) = serde_json::to_value(msg_data) {
-                        let message =
-                            WsMessage::response(id, "available_entities", msg_data_json.clone());
-                        match session.recipient.try_send(SendWsMessage(message.clone())) {
-                            Ok(_) => {
-                                session.get_available_entities_id = None;
-                                self.susbcribed_entity_ids = None;
-                                return_fut_ok!(Some(message));
-                            }
-                            Err(e) => error!(
-                                "[{}] Error sending set available_entities: {e:?}",
-                                msg.ws_id
-                            ),
-                        }
+                        let message = WsMessage::response(id, "available_entities", msg_data_json);
+                        // returning the message sends it as response to the request
+                        session.get_available_entities_id = None;
+                        self.susbcribed_entity_ids = None;
+                        return_fut_ok!(Some(message));
                     }
                 }
             } else if msg.request == R2Request::GetEntityStates {
@@ -237,7 +233,7 @@ impl Handler<R2RequestMsg> for Controller {
                     if let Some(addr) = ha_client {
                         handle_entity_command(addr, msg).await
                     } else {
-                        Ok(None)
+                        Err(ServiceError::NotConnected)
                     }
                 }
                 R2Request::BrowseMedia => {

@@ -12,12 +12,11 @@ use uc_api::intg::EntityCommand;
 pub(crate) fn handle_button(msg: &EntityCommand) -> Result<(String, Option<Value>), ServiceError> {
     let cmd: ButtonCommand = cmd_from_str(&msg.cmd_id)?;
 
-    let entity: Vec<&str> = msg.entity_id.split('.').collect();
-
-    let service_call: &str = match entity[0] {
-        "script" => entity[1],
-        "scene" => "turn_on",
-        &_ => "press",
+    let mut parts = msg.entity_id.split('.');
+    let service_call: &str = match (parts.next(), parts.next()) {
+        (Some("script"), Some(name)) => name,
+        (Some("scene"), _) => "turn_on",
+        _ => "press",
     };
 
     let result = match cmd {

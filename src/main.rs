@@ -15,30 +15,23 @@
 #![forbid(non_ascii_idents)]
 #![deny(unsafe_code)]
 
-use crate::configuration::{
-    CertificateSettings, ENV_DISABLE_MDNS_PUBLISH, IntegrationSettings, get_configuration,
-};
-use crate::controller::Controller;
-use crate::server::publish_service;
-use crate::util::{bool_from_env, create_single_cert_server_config};
 use actix::Actor;
 use actix_web::{App, HttpServer, middleware, web};
 use clap::{Command, arg};
-use configuration::DEF_CONFIG_FILE;
 use log::{error, info};
 use std::io;
 use std::net::TcpListener;
 use std::path::Path;
 use uc_api::intg::IntegrationDriverUpdate;
 use uc_api::util::text_from_language_map;
+use uc_intg_hass::configuration::{
+    self, CertificateSettings, DEF_CONFIG_FILE, ENV_DISABLE_MDNS_PUBLISH, IntegrationSettings,
+    get_configuration,
+};
+use uc_intg_hass::controller::Controller;
+use uc_intg_hass::server::{self, publish_service};
+use uc_intg_hass::util::{bool_from_env, create_single_cert_server_config};
 use uc_intg_hass::{APP_VERSION, built_info};
-
-mod client;
-mod configuration;
-mod controller;
-mod errors;
-mod server;
-mod util;
 
 #[actix_web::main]
 async fn main() -> io::Result<()> {
