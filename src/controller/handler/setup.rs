@@ -145,6 +145,9 @@ impl Handler<SetDriverUserDataMsg> for Controller {
             if let Some(value) = parse_value(&values, "disconnect_in_standby") {
                 cfg.disconnect_in_standby = value;
             }
+            if let Some(value) = parse_value(&values, "experimental_connection_lifecycle") {
+                cfg.experimental_connection_lifecycle = value;
+            }
             if let Some(value) = parse_value(&values, "max_frame_size_kb")
                 && value >= 1024
             {
@@ -401,6 +404,19 @@ impl Handler<RequestExpertOptionsMsg> for Controller {
                                 "field": {
                                     "checkbox": {
                                       "value": self.settings.hass.disconnect_in_standby
+                                    }
+                                }
+                            },
+                            {
+                                "id": "experimental_connection_lifecycle",
+                                "label": {
+                                    "en": "Use experimental connection state machine (requires integration restart)",
+                                    "de": "Experimentellen Verbindungszustandsautomaten verwenden (Integration-Neustart erforderlich)",
+                                    "fr": "Utiliser le cycle de connexion expérimental (redémarrage de l’intégration requis)"
+                                },
+                                "field": {
+                                    "checkbox": {
+                                      "value": self.settings.hass.experimental_connection_lifecycle
                                     }
                                 }
                             },

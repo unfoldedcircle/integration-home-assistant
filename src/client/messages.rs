@@ -107,6 +107,8 @@ pub enum ConnectionState {
 #[rtype(result = "()")]
 pub struct ConnectionEvent {
     pub client_id: String,
+    /// Monotonic controller-owned identifier for the connection attempt.
+    pub attempt: u64,
     pub state: ConnectionState,
 }
 
