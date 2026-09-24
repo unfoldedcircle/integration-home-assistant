@@ -112,7 +112,11 @@ pub(crate) fn convert_sensor_entity(
         icon: None,
         features: None,
         area: None,
-        options: None,
+        options: if options.is_empty() {
+            None
+        } else {
+            Some(options)
+        },
         attributes,
     })
 }
@@ -373,6 +377,15 @@ mod tests {
         assert_eq!(
             entity.device_class,
             Some(SensorDeviceClass::Custom.to_string())
+        );
+        let options = entity.options.expect("custom sensor options expected");
+        assert_eq!(
+            Some(&json!("Atmospheric pressure")),
+            options.get(SensorOptionField::CustomLabel.as_ref())
+        );
+        assert_eq!(
+            Some(&json!(unit)),
+            options.get(SensorOptionField::CustomUnit.as_ref())
         );
         let attributes = entity.attributes.unwrap();
         assert_eq!(

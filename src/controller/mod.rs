@@ -15,7 +15,7 @@ use crate::errors::ServiceError;
 use crate::util::new_websocket_client;
 use actix::prelude::{Actor, Context, Recipient};
 use actix::{Addr, AsyncContext, SpawnHandle};
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use rust_fsm::*;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
@@ -111,8 +111,14 @@ pub struct Controller {
     ws_client: awc::Client,
     /// HomeAssistant client actor
     ha_client: Option<Addr<HomeAssistantClient>>,
-    /// HomeAssistant client identifier
+    /// HomeAssistant client identifier. Set together with `ha_client` as soon as the client
+    /// actor exists (before authentication) so that every client event can be attributed.
     ha_client_id: Option<String>,
+    /// Sequence number of connection attempts. Used to detect superseded attempts.
+    ha_connect_seq: u32,
+    /// In-flight connection attempt (TCP / WebSocket handshake). `None` if no attempt is pending.
+    /// Cleared by [`Controller::disconnect`] to invalidate the attempt.
+    ha_connect_pending: Option<u32>,
     ha_reconnect_duration: Duration,
     ha_reconnect_attempt: u32,
     drv_metadata: IntegrationDriverUpdate,
@@ -150,6 +156,8 @@ impl Controller {
             settings,
             ha_client: None,
             ha_client_id: None,
+            ha_connect_seq: 0,
+            ha_connect_pending: None,
             ha_reconnect_attempt: 0,
             drv_metadata,
             machine,
@@ -167,13 +175,8 @@ impl Controller {
                 debug!("Remote is in standby, not sending message: {:?}", message);
                 return;
             }
-            let msg = message.msg.clone();
-            if let Err(e) = session.recipient.try_send(SendWsMessage(message)) {
-                error!(
-                    "[{ws_id}] Internal message send error of '{}': {e}",
-                    msg.unwrap_or_default()
-                );
-            }
+            // do_send: bursts of entity events must not be dropped on a full mailbox
+            session.recipient.do_send(SendWsMessage(message));
         } else {
             warn!("attempting to send message but couldn't find session: {ws_id}");
         }
