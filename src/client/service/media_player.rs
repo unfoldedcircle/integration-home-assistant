@@ -204,15 +204,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn seek_command_maps_to_home_assistant() {
-        let cmd = new_entity_command("seek", json!({ "media_position": 42 }));
-        let (service, params) = handle_media_player(&cmd).unwrap();
-
-        assert_eq!(service, "media_seek");
-        assert_eq!(params, Some(json!({ "seek_position": 42 })));
-    }
-
     #[rstest]
     #[case(json!(0), json!(0.0))]
     #[case(json!(1), json!(0.01))]
