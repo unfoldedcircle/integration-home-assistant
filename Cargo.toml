@@ -47,7 +47,7 @@ actix-ws = "0.3"
 actix = "0.13"
 rustls = { version = "0.23" }
 rustls-platform-verifier = "0.6"
-rustls-pemfile = "2"
+
 # WebSockets client
 actix-codec = "0.5"
 awc = { version = "3.8", features = ["rustls-0_23"] }
