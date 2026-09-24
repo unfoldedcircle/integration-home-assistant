@@ -188,9 +188,9 @@ pub(crate) fn convert_media_player_entity(
     }
     if supported_features & SUPPORT_SEEK > 0 {
         media_feats.push(MediaPlayerFeature::Seek);
-        media_feats.push(MediaPlayerFeature::MediaDuration);
-        media_feats.push(MediaPlayerFeature::MediaPosition);
     }
+    media_feats.push(MediaPlayerFeature::MediaDuration);
+    media_feats.push(MediaPlayerFeature::MediaPosition);
     media_feats.push(MediaPlayerFeature::MediaTitle);
     media_feats.push(MediaPlayerFeature::MediaArtist);
     media_feats.push(MediaPlayerFeature::MediaAlbum);
@@ -435,7 +435,9 @@ mod tests {
         let features = entity.features.unwrap();
 
         // Only the always-present features should be there
-        assert_eq!(5, features.len());
+        assert_eq!(7, features.len());
+        assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaTitle.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaArtist.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaAlbum.to_string()));
@@ -505,10 +507,133 @@ mod tests {
         let entity = result.unwrap();
         let features = entity.features.unwrap();
 
-        // Seek feature should add seek, duration, and position
+        // Seek-capable players retain all three features.
         assert!(features.contains(&MediaPlayerFeature::Seek.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_progress_without_seek() {
+        let server = create_test_server();
+        let timestamp = "2026-09-21T21:56:26.899358+00:00";
+        let mut ha_attr = serde_json::from_value(json!({
+            "supported_features": SUPPORT_PAUSE | SUPPORT_STOP,
+            "media_duration": 43.544,
+            "media_position": 0,
+            "media_position_updated_at": timestamp
+        }))
+        .unwrap();
+
+        let entity = convert_media_player_entity(
+            &server,
+            "media_player.no_seek".into(),
+            "playing".into(),
+            &mut ha_attr,
+        )
+        .unwrap();
+        let features = entity.features.unwrap();
+        assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::PlayPause.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::Stop.to_string()));
+        assert!(!features.contains(&MediaPlayerFeature::Seek.to_string()));
+
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(attributes.get("media_duration"), Some(&json!(43.544)));
+        assert_eq!(attributes.get("media_position"), Some(&json!(0)));
+        assert_eq!(
+            attributes.get("media_position_updated_at"),
+            Some(&json!(timestamp))
+        );
+    }
+
+    #[test]
+    fn idle_player_can_report_progress_on_later_playback() {
+        let server = create_test_server();
+        let mut idle_attr = serde_json::from_value(json!({
+            "supported_features": SUPPORT_PAUSE | SUPPORT_STOP
+        }))
+        .unwrap();
+        let entity = convert_media_player_entity(
+            &server,
+            "media_player.no_seek".into(),
+            "idle".into(),
+            &mut idle_attr,
+        )
+        .unwrap();
+        let features = entity.features.unwrap();
+        assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
+        assert!(!features.contains(&MediaPlayerFeature::Seek.to_string()));
+        let idle_attributes = entity.attributes.unwrap();
+        assert_eq!(idle_attributes.get("state"), Some(&json!("ON")));
+        assert!(!idle_attributes.contains_key("media_duration"));
+        assert!(!idle_attributes.contains_key("media_position"));
+        assert!(!idle_attributes.contains_key("media_position_updated_at"));
+
+        let timestamp = "2026-09-21T21:57:08.855758+00:00";
+        let event = EventData {
+            entity_id: "media_player.no_seek".into(),
+            new_state: serde_json::from_value(json!({
+                "state": "playing",
+                "attributes": {
+                    "media_duration": 43.544,
+                    "media_position": 0.962,
+                    "media_position_updated_at": timestamp
+                }
+            }))
+            .unwrap(),
+        };
+        let change = media_player_event_to_entity_change(&server, event).unwrap();
+        assert_eq!(change.attributes.get("state"), Some(&json!("PLAYING")));
+        assert_eq!(
+            change.attributes.get("media_duration"),
+            Some(&json!(43.544))
+        );
+        assert_eq!(change.attributes.get("media_position"), Some(&json!(0.962)));
+        assert_eq!(
+            change.attributes.get("media_position_updated_at"),
+            Some(&json!(timestamp))
+        );
+    }
+
+    #[test]
+    fn missing_and_null_progress_values_are_not_fabricated() {
+        let server = create_test_server();
+        let mut ha_attr = serde_json::from_value(json!({
+            "supported_features": 0,
+            "media_position": null,
+            "media_position_updated_at": null
+        }))
+        .unwrap();
+        let entity = convert_media_player_entity(
+            &server,
+            "media_player.no_progress".into(),
+            "idle".into(),
+            &mut ha_attr,
+        )
+        .unwrap();
+        let attributes = entity.attributes.unwrap();
+        assert!(!attributes.contains_key("media_duration"));
+        assert_eq!(attributes.get("media_position"), Some(&Value::Null));
+        assert_eq!(
+            attributes.get("media_position_updated_at"),
+            Some(&Value::Null)
+        );
+
+        let event = EventData {
+            entity_id: "media_player.no_progress".into(),
+            new_state: serde_json::from_value(json!({
+                "state": "idle",
+                "attributes": {"media_duration": null}
+            }))
+            .unwrap(),
+        };
+        let change = media_player_event_to_entity_change(&server, event).unwrap();
+        assert_eq!(change.attributes.get("media_duration"), Some(&Value::Null));
+        assert!(!change.attributes.contains_key("media_position"));
+        assert!(!change.attributes.contains_key("media_position_updated_at"));
     }
 
     #[test]
@@ -594,7 +719,8 @@ mod tests {
         let features = entity.features.unwrap();
 
         // Should only have the always-present features
-        assert_eq!(5, features.len());
+        assert_eq!(7, features.len());
+        assert!(!features.contains(&MediaPlayerFeature::Seek.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaTitle.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaArtist.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaAlbum.to_string()));
@@ -620,7 +746,7 @@ mod tests {
         let features = entity.features.unwrap();
 
         // Should default to 0 and only have always-present features
-        assert_eq!(5, features.len());
+        assert_eq!(7, features.len());
     }
 
     #[test]
