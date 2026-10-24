@@ -1,0 +1,4 @@
+[toolchain]
+# Clippy 1.99 `redundant_field_names` false positive: https://github.com/rust-lang/rust-clippy/issues/17525
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]
