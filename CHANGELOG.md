@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Fixed
+- Advertise media duration and position for Home Assistant players that do not support seeking.
+
 ---
 
 ## v0.17.0 - 2026-09-15
