@@ -192,9 +192,9 @@ pub(crate) fn convert_media_player_entity(
     }
     if supported_features & SUPPORT_SEEK > 0 {
         media_feats.push(MediaPlayerFeature::Seek);
-        media_feats.push(MediaPlayerFeature::MediaDuration);
-        media_feats.push(MediaPlayerFeature::MediaPosition);
     }
+    media_feats.push(MediaPlayerFeature::MediaDuration);
+    media_feats.push(MediaPlayerFeature::MediaPosition);
     media_feats.push(MediaPlayerFeature::MediaTitle);
     media_feats.push(MediaPlayerFeature::MediaArtist);
     media_feats.push(MediaPlayerFeature::MediaAlbum);
@@ -439,7 +439,9 @@ mod tests {
         let features = entity.features.unwrap();
 
         // Only the always-present features should be there
-        assert_eq!(5, features.len());
+        assert_eq!(7, features.len());
+        assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaTitle.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaArtist.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaAlbum.to_string()));
@@ -509,10 +511,72 @@ mod tests {
         let entity = result.unwrap();
         let features = entity.features.unwrap();
 
-        // Seek feature should add seek, duration, and position
+        // Seek-capable players retain all three features.
         assert!(features.contains(&MediaPlayerFeature::Seek.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
+    }
+
+    #[test]
+    fn convert_media_player_progress_without_seek() {
+        let server = create_test_server();
+        let mut ha_attr = serde_json::from_value(json!({
+            "supported_features": SUPPORT_PAUSE | SUPPORT_STOP,
+            "media_duration": 43.544,
+            "media_position": 0.962
+        }))
+        .unwrap();
+
+        let entity = convert_media_player_entity(
+            &server,
+            "media_player.no_seek".into(),
+            "playing".into(),
+            &mut ha_attr,
+        )
+        .unwrap();
+        let features = entity.features.unwrap();
+        assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
+        assert!(!features.contains(&MediaPlayerFeature::Seek.to_string()));
+    }
+
+    #[test]
+    fn idle_player_can_report_progress_on_later_playback() {
+        let server = create_test_server();
+        let mut idle_attr = serde_json::from_value(json!({
+            "supported_features": SUPPORT_PAUSE | SUPPORT_STOP
+        }))
+        .unwrap();
+        let entity = convert_media_player_entity(
+            &server,
+            "media_player.no_seek".into(),
+            "idle".into(),
+            &mut idle_attr,
+        )
+        .unwrap();
+        let features = entity.features.unwrap();
+        assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
+        assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
+        assert!(!features.contains(&MediaPlayerFeature::Seek.to_string()));
+        assert!(!entity.attributes.unwrap().contains_key("media_position"));
+
+        let event = EventData {
+            entity_id: "media_player.no_seek".into(),
+            new_state: serde_json::from_value(json!({
+                "state": "playing",
+                "attributes": {
+                    "media_duration": 43.544,
+                    "media_position": 0.962
+                }
+            }))
+            .unwrap(),
+        };
+        let change = media_player_event_to_entity_change(&server, event).unwrap();
+        assert_eq!(
+            change.attributes.get("media_duration"),
+            Some(&json!(43.544))
+        );
+        assert_eq!(change.attributes.get("media_position"), Some(&json!(0.962)));
     }
 
     #[test]
@@ -598,7 +662,8 @@ mod tests {
         let features = entity.features.unwrap();
 
         // Should only have the always-present features
-        assert_eq!(5, features.len());
+        assert_eq!(7, features.len());
+        assert!(!features.contains(&MediaPlayerFeature::Seek.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaTitle.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaArtist.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaAlbum.to_string()));
@@ -624,7 +689,7 @@ mod tests {
         let features = entity.features.unwrap();
 
         // Should default to 0 and only have always-present features
-        assert_eq!(5, features.len());
+        assert_eq!(7, features.len());
     }
 
     #[test]
