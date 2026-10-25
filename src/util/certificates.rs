@@ -13,7 +13,7 @@ use std::path::Path;
 /// # Arguments
 ///
 /// * `cert_file`: path to public key file
-/// * `key_file`: path to private key file (PKCS8-encoded)
+/// * `key_file`: path to private key file (PKCS#8, PKCS#1 or SEC1)
 ///
 /// returns: Result<ServerConfig, Error>
 pub fn create_single_cert_server_config<S: AsRef<OsStr> + ?Sized>(
