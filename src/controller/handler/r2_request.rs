@@ -14,7 +14,7 @@ use crate::configuration::get_driver_metadata;
 use crate::controller::handler::{
     SetDriverUserDataMsg, SetupDriverMsg, SubscribeHaEventsMsg, UnsubscribeHaEventsMsg,
 };
-use crate::controller::{Controller, R2AudioChunkMsg, R2RequestMsg, SendWsMessage, operation_mode};
+use crate::controller::{Controller, R2AudioChunkMsg, R2RequestMsg, operation_mode};
 use crate::errors::ServiceError;
 use crate::util::{DeserializeMsgData, return_fut_err, return_fut_ok};
 use actix::{Addr, AsyncContext, Handler, ResponseFuture, fut};
