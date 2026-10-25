@@ -688,12 +688,13 @@ mod tests {
         let server = create_test_server();
         let entity_id = "media_player.idle_test".to_string();
         let state = "idle".to_string();
-        
+
         // Provide minimal HA attributes missing all the media_* fields
         let mut ha_attr = serde_json::from_value(json!({
             "friendly_name": "Idle Player",
             "supported_features": SUPPORT_PLAY
-        })).unwrap();
+        }))
+        .unwrap();
 
         let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
         assert!(result.is_ok());
