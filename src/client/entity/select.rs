@@ -87,6 +87,7 @@ pub(crate) fn convert_select_entity(
         device_class: None,
         name,
         icon: Some("uc:list-dropdown".to_string()),
+        description: None,
         features: None,
         area: None,
         options: None,

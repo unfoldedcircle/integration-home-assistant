@@ -160,6 +160,10 @@ impl HomeAssistantClient {
                     continue;
                 }
                 EntityType::Select => convert_select_entity(entity_id, state, attr),
+                EntityType::Number => {
+                    // not yet supported
+                    continue;
+                }
                 EntityType::VoiceAssistant => {
                     // mapped from HA assist pipeline to UC entity
                     continue;

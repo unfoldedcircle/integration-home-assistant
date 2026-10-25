@@ -152,6 +152,7 @@ pub(crate) fn convert_climate_entity(
         device_class: None,
         name,
         icon: None,
+        description: None,
         features: Some(climate_feats.into_iter().map(|v| v.to_string()).collect()),
         area: None,
         options: if options.is_empty() {

@@ -48,6 +48,7 @@ impl Handler<CallService> for HomeAssistantClient {
             EntityType::MediaPlayer => media_player::handle_media_player(&msg.command),
             EntityType::Remote => remote::handle_remote(&msg.command),
             EntityType::Select => select::handle_select(&msg.command),
+            EntityType::Number => Err(ServiceError::NotYetImplemented),
             EntityType::Sensor => Err(ServiceError::BadRequest(
                 "Sensor doesn't support sending commands to! Ignoring call".to_string(),
             )),
