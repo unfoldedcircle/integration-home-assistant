@@ -82,7 +82,7 @@ url = { version = "2", features = ["serde"] }
 
 # Helpful macros for working with enums and strings
 # Attention: strum needs to be in sync with uc_api
-strum = "0.27"
+strum = "0.28"
 derive_more = { version = "2", features = ["constructor", "display"] }
 derive_builder = "0.20"
 
