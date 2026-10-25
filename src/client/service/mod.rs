@@ -13,6 +13,7 @@ use crate::client::model::{CallServiceMsg, Target};
 use crate::errors::ServiceError;
 use actix::Handler;
 use log::info;
+use std::time::Instant;
 use uc_api::EntityType;
 
 mod button;
@@ -20,6 +21,7 @@ mod climate;
 mod cover;
 mod light;
 mod media_player;
+mod number;
 mod remote;
 mod select;
 mod switch;
@@ -38,6 +40,13 @@ impl Handler<CallService> for HomeAssistantClient {
     ///
     /// returns: Result<(), ServiceError>
     fn handle(&mut self, msg: CallService, ctx: &mut Self::Context) -> Self::Result {
+        let domain = match msg.command.entity_id.split_once('.') {
+            None => return Err(ServiceError::BadRequest("Invalid entity_id format".into())),
+            Some((l, _)) => l.to_string(),
+        };
+        // expected value of a number entity after the service call
+        let mut expected_number_value = None;
+
         // map Remote Two command name & parameters to HA service name and service_data payload
         let (service, service_data) = match msg.command.entity_type {
             EntityType::Button => button::handle_button(&msg.command),
@@ -48,7 +57,16 @@ impl Handler<CallService> for HomeAssistantClient {
             EntityType::MediaPlayer => media_player::handle_media_player(&msg.command),
             EntityType::Remote => remote::handle_remote(&msg.command),
             EntityType::Select => select::handle_select(&msg.command),
-            EntityType::Number => Err(ServiceError::NotYetImplemented),
+            EntityType::Number => number::handle_number(
+                &msg.command,
+                &domain,
+                self.number_states.get(&msg.command.entity_id),
+                Instant::now(),
+            )
+            .map(|call| {
+                expected_number_value = call.expected_value;
+                (call.service, call.service_data)
+            }),
             EntityType::Sensor => Err(ServiceError::BadRequest(
                 "Sensor doesn't support sending commands to! Ignoring call".to_string(),
             )),
@@ -69,11 +87,7 @@ impl Handler<CallService> for HomeAssistantClient {
             self.id, msg.command.entity_id
         );
 
-        let domain = match msg.command.entity_id.split_once('.') {
-            None => return Err(ServiceError::BadRequest("Invalid entity_id format".into())),
-            Some((l, _)) => l.to_string(),
-        };
-
+        let entity_id = msg.command.entity_id;
         let call_srv_msg = CallServiceMsg {
             id: self.new_msg_id(),
             msg_type: "call_service".to_string(),
@@ -81,12 +95,20 @@ impl Handler<CallService> for HomeAssistantClient {
             service,
             service_data,
             target: Target {
-                entity_id: msg.command.entity_id,
+                entity_id: entity_id.clone(),
             },
         };
 
         let msg = serde_json::to_value(call_srv_msg)?;
-        self.send_json(msg, ctx)
+        self.send_json(msg, ctx)?;
+
+        if let Some(value) = expected_number_value
+            && let Some(number_state) = self.number_states.get_mut(&entity_id)
+        {
+            number_state.optimistic = Some((value, Instant::now()));
+        }
+
+        Ok(())
 
         // TODO wait for HA response message? If the service call fails we'll get a result back with "success: false"
         // However, some services take a long time to respond! E.g. Sonos might take 10 seconds if there's an issue with the network.

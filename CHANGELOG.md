@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+- Number entity support for Home Assistant number, input number and counter entities.
+
 ---
 
 ## v0.18.0 - 2026-10-28

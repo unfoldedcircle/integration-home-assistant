@@ -11,7 +11,7 @@ use crate::client::entity::*;
 use crate::client::messages::{AssistEvent, EntityEvent};
 use crate::client::model::{AssistPipelineEvent, Event};
 use crate::errors::ServiceError;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use serde_json::json;
 use std::time::Instant;
 
@@ -50,6 +50,12 @@ impl HomeAssistantClient {
             }
             "cover" => cover_event_to_entity_change(event.data),
             "select" | "input_select" => select_event_to_entity_change(event.data),
+            "number" | "input_number" | "counter" => {
+                number_event_to_entity_change(event.data).map(|(entity_change, number_state)| {
+                    self.update_number_state(&entity_change.entity_id, number_state);
+                    entity_change
+                })
+            }
             "sensor" | "binary_sensor" => sensor_event_to_entity_change(event.data),
             "climate" => climate_event_to_entity_change(event.data),
             "media_player" => media_player_event_to_entity_change(&self.server, event.data),
@@ -67,6 +73,24 @@ impl HomeAssistantClient {
         });
 
         Ok(())
+    }
+
+    /// Update the cached number entity state with a new state from HA.
+    ///
+    /// A changed value range is logged: the static entity options of the Remote are only updated
+    /// when it reloads the available entities. Commands are always processed with the current
+    /// value range from HA.
+    pub(super) fn update_number_state(&mut self, entity_id: &str, number_state: NumberState) {
+        if let Some(old) = self.number_states.get(entity_id)
+            && old.range != number_state.range
+        {
+            info!(
+                "[{}] Value range of {entity_id} changed, requires entity reload: {:?} -> {:?}",
+                self.id, old.range, number_state.range
+            );
+        }
+        self.number_states
+            .insert(entity_id.to_string(), number_state);
     }
 
     pub(super) fn handle_assist_pipeline_event(

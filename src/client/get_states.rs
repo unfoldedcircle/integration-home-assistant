@@ -109,6 +109,7 @@ impl HomeAssistantClient {
                     "binary_sensor" => "sensor",
                     "input_button" => "button",
                     "input_select" => "select",
+                    "input_number" | "counter" => "number",
                     "script" => "button",
                     "scene" => "button",
                     v => v,
@@ -161,8 +162,10 @@ impl HomeAssistantClient {
                 }
                 EntityType::Select => convert_select_entity(entity_id, state, attr),
                 EntityType::Number => {
-                    // not yet supported
-                    continue;
+                    convert_number_entity(entity_id, state, attr).map(|(entity, number_state)| {
+                        self.update_number_state(&entity.entity_id, number_state);
+                        entity
+                    })
                 }
                 EntityType::VoiceAssistant => {
                     // mapped from HA assist pipeline to UC entity

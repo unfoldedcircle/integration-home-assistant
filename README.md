@@ -37,6 +37,9 @@ The following HA entities are supported in the Unfolded Circle Remote:
 - [Media player](https://developers.home-assistant.io/docs/core/entity/media-player)
   - Media browsing and searching (if supported by the entity) were added in version 0.16.0.
   - Group members are not supported.
+- [Number](https://developers.home-assistant.io/docs/core/entity/number)
+  - Requires core / Simulator version 0.82.0 or newer. Not yet available in a public firmware release.
+  - See [number entity mapping](#number-entity-mapping) for details.
 - [Remote](https://developers.home-assistant.io/docs/core/entity/remote)
   - Supported: on, off, toggle, command, sequence.
   - Activities and command learning / deleting are not supported.
@@ -50,6 +53,8 @@ The following HA entities are supported in the Unfolded Circle Remote:
 - [Switch](https://developers.home-assistant.io/docs/core/entity/switch)
 - [Input boolean](https://www.home-assistant.io/integrations/input_boolean/): mapped to switch
 - [Input select](https://www.home-assistant.io/integrations/input_select/): mapped to select
+- [Input number](https://www.home-assistant.io/integrations/input_number/): mapped to number
+- [Counter](https://www.home-assistant.io/integrations/counter/): mapped to number
 
 The following HA integrations are mapped to a button. The functionality is limited to trigger the default action and no
 further interactions are possible:
@@ -57,6 +62,33 @@ further interactions are possible:
 - [Input button](https://www.home-assistant.io/integrations/input_button/)
 - [Scripts](https://www.home-assistant.io/integrations/script/)
 - [Scenes](https://www.home-assistant.io/integrations/scene/)
+
+### Number entity mapping
+
+HA number, input number and counter entities are mapped to the Remote number entity:
+
+- The HA entity state is the `value` attribute. The `unavailable` and `unknown` HA states are mapped to the
+  `UNAVAILABLE` and `UNKNOWN` entity states, otherwise the entity state is `ON`.
+- The value range options `min`, `max` and `step` are taken from the HA entity attributes, `unit` from the
+  `unit_of_measurement` attribute.
+  - The smallest supported step size is 0.01. A smaller HA step size is set to 0.01.
+  - `decimals` is derived from the number of decimal places of the step size and the minimum value.
+  - A counter without a minimum or maximum value uses -1000000 and 1000000 as limits.
+- `set_value` is rounded to the step size and clamped to the current value range of the HA entity. A counter value is
+  rounded to a multiple of the step size, as required by Home Assistant.
+  - The `duration` parameter is ignored. Home Assistant doesn't support a transition time for these entities.
+- `increment` and `decrement`:
+  - Input number and counter entities use the native HA increment and decrement services, unless a different step size
+    is requested.
+  - HA number entities don't provide such services: the new value is calculated from the current value and sent with
+    `set_value`. Quickly repeated commands are accumulated until Home Assistant reports the new value.
+
+Limitations:
+
+- The value range of the entity is read when the Remote loads the available entities. If the range of a HA entity
+  changes later, for example when reconfiguring an input number helper or changing a unit, the Remote uses the new range
+  after the next entity reload. Commands are always processed with the current value range from Home Assistant.
+- The HA display mode (`auto`, `box`, `slider`) and device class are not used.
 
 ## Home Assistant Assist
 
