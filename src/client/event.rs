@@ -60,10 +60,11 @@ impl HomeAssistantClient {
             }
         }?;
 
-        self.controller_actor.try_send(EntityEvent {
+        // do_send: events must not be dropped when the controller mailbox is momentarily full
+        self.controller_actor.do_send(EntityEvent {
             client_id: self.id.clone(),
             entity_change,
-        })?;
+        });
 
         Ok(())
     }
