@@ -14,7 +14,7 @@ use crate::configuration::get_driver_metadata;
 use crate::controller::handler::{
     SetDriverUserDataMsg, SetupDriverMsg, SubscribeHaEventsMsg, UnsubscribeHaEventsMsg,
 };
-use crate::controller::{Controller, OperationModeInput, R2AudioChunkMsg, R2RequestMsg};
+use crate::controller::{Controller, R2AudioChunkMsg, R2RequestMsg, operation_mode};
 use crate::errors::ServiceError;
 use crate::util::{DeserializeMsgData, return_fut_err, return_fut_ok};
 use actix::{Addr, AsyncContext, Handler, ResponseFuture, fut};
@@ -116,7 +116,7 @@ impl Handler<R2RequestMsg> for Controller {
 
         // the remaining requests can only be handled if the driver is in the "running" mode
         if self
-            .sm_consume(&msg.ws_id, &OperationModeInput::R2Request, ctx)
+            .sm_consume(&msg.ws_id, &operation_mode::Input::R2Request, ctx)
             .is_err()
         {
             return Box::pin(fut::result(Err(ServiceError::ServiceUnavailable(
