@@ -35,7 +35,7 @@ zeroconf = ["dep:zeroconf"]
 audio = ["dep:hound"]
 
 [dependencies]
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.17.1", features = ["prost"] }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.19.0", features = ["prost"] }
 # for local development:
 #uc_api = { path = "../api-model-rs", features = ["prost"] }
 # Using a GitHub revision:
