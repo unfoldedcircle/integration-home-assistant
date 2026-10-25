@@ -68,7 +68,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_with = "3"
 
-rust-fsm = "0.6"
+rust-fsm = "0.8"
 
 clap = { version = "4", features = ["derive"] }
 config = { version = "0.15", default-features = false, features = ["yaml", "json"] }
