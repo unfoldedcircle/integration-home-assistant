@@ -8,7 +8,7 @@ use crate::client::messages::{
 };
 use crate::client::model::{AssistPipelineEvent, ResponseType};
 use crate::controller::handler::{SubscribeHaEventsMsg, UnsubscribeHaEventsMsg};
-use crate::controller::{Controller, OperationModeState, SendWsMessage};
+use crate::controller::{Controller, SendWsMessage, operation_mode};
 use crate::errors::ServiceError;
 use crate::util::DeserializeMsgData;
 use actix::Handler;
@@ -235,7 +235,7 @@ impl Handler<SubscribeHaEventsMsg> for Controller {
     type Result = Result<(), ServiceError>;
 
     fn handle(&mut self, msg: SubscribeHaEventsMsg, _ctx: &mut Self::Context) -> Self::Result {
-        if !matches!(self.machine.state(), &OperationModeState::Running) {
+        if !matches!(self.machine.state(), &operation_mode::State::Running) {
             return Err(ServiceError::ServiceUnavailable("Setup required".into()));
         }
 
@@ -259,7 +259,7 @@ impl Handler<UnsubscribeHaEventsMsg> for Controller {
     type Result = Result<(), ServiceError>;
 
     fn handle(&mut self, msg: UnsubscribeHaEventsMsg, _ctx: &mut Self::Context) -> Self::Result {
-        if !matches!(self.machine.state(), &OperationModeState::Running) {
+        if !matches!(self.machine.state(), &operation_mode::State::Running) {
             return Err(ServiceError::ServiceUnavailable("Setup required".into()));
         }
         if let Some(session) = self.sessions.get_mut(&msg.0.ws_id) {

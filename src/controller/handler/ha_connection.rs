@@ -7,9 +7,9 @@ use crate::client::HomeAssistantClient;
 use crate::client::messages::{
     Close, ConnectionEvent, ConnectionState, SetRemoteId, SubscribedEntities,
 };
-use crate::controller::OperationModeInput::{AbortSetup, Connected};
 use crate::controller::handler::{ConnectMsg, DisconnectMsg};
-use crate::controller::{Controller, OperationModeState};
+use crate::controller::operation_mode::Input::{AbortSetup, Connected};
+use crate::controller::{Controller, operation_mode};
 use actix::{ActorFutureExt, AsyncContext, Context, Handler, ResponseActFuture, WrapFuture, fut};
 use futures::StreamExt;
 use log::{debug, error, info, warn};
@@ -91,7 +91,7 @@ impl Handler<ConnectMsg> for Controller {
         }
         if !matches!(
             self.machine.state(),
-            &OperationModeState::Running | &OperationModeState::RequireSetup
+            &operation_mode::State::Running | &operation_mode::State::RequireSetup
         ) {
             error!("Cannot connect in state: {:?}", self.machine.state());
             return Box::pin(fut::result(Err(Error::new(

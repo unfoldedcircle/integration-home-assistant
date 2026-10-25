@@ -4,10 +4,11 @@
 //! Driver setup flow handling.
 
 use crate::configuration::save_user_settings;
+use crate::controller::Controller;
 use crate::controller::handler::{
     AbortDriverSetup, ConnectMsg, SetDriverUserDataMsg, SetupDriverMsg,
 };
-use crate::controller::{Controller, OperationModeInput::*, OperationModeState};
+use crate::controller::operation_mode::{self, Input::*};
 use crate::errors::{ServiceError, ServiceError::BadRequest};
 use crate::util::new_websocket_client;
 use actix::clock::sleep;
@@ -563,7 +564,7 @@ impl Handler<FinishSetupFlowMsg> for Controller {
         };
 
         let mut delay = None;
-        if matches!(self.machine.state(), &OperationModeState::Running) {
+        if matches!(self.machine.state(), &operation_mode::State::Running) {
             info!("Reconnecting to HA with new configuration settings");
             ctx.notify(ConnectMsg::default());
             // delay to notify R2 that the setup flow is finished
@@ -632,7 +633,7 @@ impl Handler<AbortDriverSetup> for Controller {
             if let Some(session) = self.sessions.get_mut(&msg.ws_id) {
                 let reconfiguring = session.reconfiguring;
                 session.reconfiguring = None;
-                if matches!(self.machine.state(), &OperationModeState::RequireSetup)
+                if matches!(self.machine.state(), &operation_mode::State::RequireSetup)
                     && reconfiguring == Some(true)
                     && self.settings.hass.get_url().has_host()
                     && !self.settings.hass.get_token().is_empty()
