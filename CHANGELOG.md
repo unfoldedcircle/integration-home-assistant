@@ -24,6 +24,7 @@ _Changes in the next release_
 
 ### Changed
 - The `uc-intg-hass` binary uses the library crate instead of compiling all modules a second time.
+- Advertise media duration and position for Home Assistant players that do not support seeking.
 
 ---
 
