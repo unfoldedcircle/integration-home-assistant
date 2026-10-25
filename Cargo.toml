@@ -43,10 +43,10 @@ uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.17.
 
 # WebSockets server
 actix-web = { version = "4.11", features = ["rustls-0_23"] }
-actix-ws = "0.3"
+actix-ws = "0.4"
 actix = "0.13"
 rustls = { version = "0.23" }
-rustls-platform-verifier = "0.6"
+rustls-platform-verifier = "0.7"
 
 # WebSockets client
 actix-codec = "0.5"
@@ -59,9 +59,9 @@ prost = "0.14"
 
 # see mdns-sd patch at the end of this file
 mdns-sd = { version = "0.9.3", optional = true }
-if-addrs = "0.14"
+if-addrs = "0.15"
 hostname = "0.4"
-zeroconf = { version = "0.15", optional = true }
+zeroconf = { version = "0.18", optional = true }
 
 # JSON (de)serialization
 serde = { version = "1", features = ["derive"] }
@@ -96,7 +96,7 @@ hound = { version = "3.5", optional = true }
 built = { version = "0.8", features = ["chrono", "semver", "cargo-lock"] }
 
 [dev-dependencies]
-rstest = "0.26"
+rstest = "0.28"
 
 [patch.crates-io]
 mdns-sd = { git = "https://github.com/zehnm/mdns-sd", rev = "aa95af75e21f40ee9ea74d117ca31e0672d722fb" }
