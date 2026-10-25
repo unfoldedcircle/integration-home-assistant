@@ -75,7 +75,7 @@ fn service_publisher(
 
 fn on_service_registered(
     result: zeroconf::Result<ServiceRegistration>,
-    _context: Option<Arc<dyn Any>>,
+    _context: Option<Arc<dyn Any + Send + Sync>>,
 ) {
     match result {
         Ok(r) => info!("{:?}", r),
