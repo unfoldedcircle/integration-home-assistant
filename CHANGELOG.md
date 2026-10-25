@@ -21,10 +21,10 @@ _Changes in the next release_
 - Custom label and unit options of unsupported sensor device classes were not set.
 - The cached `available_entities` response was sent twice.
 - Panic when the remote's `version` response has no payload, or an entity id without a domain separator is used in a button command.
+- Advertise media duration and position for Home Assistant players that do not support seeking.
 
 ### Changed
 - The `uc-intg-hass` binary uses the library crate instead of compiling all modules a second time.
-- Advertise media duration and position for Home Assistant players that do not support seeking.
 
 ---
 

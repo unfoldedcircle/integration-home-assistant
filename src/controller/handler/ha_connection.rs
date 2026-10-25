@@ -109,11 +109,11 @@ impl Handler<ConnectMsg> for Controller {
         // connected), or a connection attempt is still in flight. Both will end in a
         // `Connected` or `Closed` event, which drives the next step.
         if let Some(client_id) = self.ha_client_id.as_ref() {
-            warn!("[{client_id}] Ignoring connect request: HA client already exists");
+            debug!("[{client_id}] Ignoring connect request: HA client already exists");
             return Box::pin(fut::ok(()));
         }
         if let Some(attempt) = self.ha_connect_pending {
-            warn!("Ignoring connect request: connection attempt {attempt} still in progress");
+            debug!("Ignoring connect request: connection attempt {attempt} still in progress");
             return Box::pin(fut::ok(()));
         }
 
