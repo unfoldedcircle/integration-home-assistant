@@ -12,20 +12,18 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use uc_api::intg::{AvailableIntgEntity, EntityChange};
-use uc_api::{EntityType, NumberAttribute, NumberFeature, NumberOptionField};
+use uc_api::{
+    EntityType, NumberAttribute, NumberDeviceClass, NumberDisplayMode, NumberFeature,
+    NumberOptionField,
+};
 
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
 
-/// Fallback limit for the min and max option of a HA counter without a minimum or maximum.
-///
-/// The large range makes the Remote show a value field with increment and decrement buttons
-/// instead of a slider.
-pub(crate) const COUNTER_UNBOUNDED_LIMIT: f64 = 1_000_000.0;
 /// Smallest supported step size of the UC number entity.
-pub(crate) const MIN_STEP: f64 = 0.01;
-/// Maximum number of decimal places. Matches the smallest supported step size.
-const MAX_DECIMALS: u32 = 2;
+pub(crate) const MIN_STEP: f64 = 0.000001;
+/// Maximum number of decimal places of the UC number entity. Matches the smallest step size.
+const MAX_DECIMALS: u32 = 6;
 /// Duration how long an expected value after a command is used for calculating the next
 /// `increment` or `decrement` command, while waiting for the HA state update.
 pub(crate) const OPTIMISTIC_VALUE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -33,8 +31,10 @@ pub(crate) const OPTIMISTIC_VALUE_TIMEOUT: Duration = Duration::from_secs(2);
 /// Value range of a number entity.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct NumberRange {
-    pub min: f64,
-    pub max: f64,
+    /// Minimum value, `None`: no lower limit.
+    pub min: Option<f64>,
+    /// Maximum value, `None`: no upper limit.
+    pub max: Option<f64>,
     /// UC step size: HA step size, limited to [MIN_STEP].
     pub step: f64,
     /// Original HA step size.
@@ -47,7 +47,8 @@ impl NumberRange {
     /// Create a value range from HA entity attributes.
     ///
     /// - `number` and `input_number` use the `min`, `max` and `step` attributes.
-    /// - `counter` uses the optional `minimum` and `maximum` attributes, and `step`.
+    /// - `counter` uses the optional `minimum` and `maximum` attributes, and `step`. A missing
+    ///   attribute means no limit.
     fn from_ha_attributes(domain: &str, ha_attr: Option<&Map<String, Value>>) -> Self {
         let get = |key: &str| {
             ha_attr
@@ -57,12 +58,12 @@ impl NumberRange {
         };
 
         let (min, max) = if domain == "counter" {
-            (
-                get("minimum").unwrap_or(-COUNTER_UNBOUNDED_LIMIT),
-                get("maximum").unwrap_or(COUNTER_UNBOUNDED_LIMIT),
-            )
+            (get("minimum"), get("maximum"))
         } else {
-            (get("min").unwrap_or(0.0), get("max").unwrap_or(100.0))
+            (
+                Some(get("min").unwrap_or(0.0)),
+                Some(get("max").unwrap_or(100.0)),
+            )
         };
         let ha_step = get("step").filter(|v| *v > 0.0).unwrap_or(1.0);
         let step = ha_step.max(MIN_STEP);
@@ -72,7 +73,7 @@ impl NumberRange {
             max,
             step,
             ha_step,
-            decimals: decimals_for(&[step, min]),
+            decimals: decimals_for(&[step, min.unwrap_or_default()]),
         }
     }
 
@@ -84,23 +85,28 @@ impl NumberRange {
     /// Clamp a value to the min and max range.
     pub fn clamp(&self, value: f64) -> f64 {
         // f64::clamp panics if min > max
-        value.max(self.min).min(self.max)
+        let value = self.min.map_or(value, |min| value.max(min));
+        self.max.map_or(value, |max| value.min(max))
     }
 
     /// Round a value to the step size and clamp it to the value range.
     ///
     /// - Counter: value is rounded to an integer multiple of the step size, as required by the HA
     ///   `counter.set_value` service.
-    /// - Otherwise: value is rounded to the step grid starting at `min` and to the number of
-    ///   decimal places to remove floating point artifacts.
+    /// - Otherwise: value is rounded to the step grid starting at `min` (or 0 without lower limit)
+    ///   and to the number of decimal places to remove floating point artifacts.
     pub fn normalize(&self, value: f64, counter: bool) -> f64 {
         if counter {
             let step = self.ha_step.round().max(1.0);
-            let min = (self.min / step).ceil() * step;
-            let max = (self.max / step).floor() * step;
-            ((value / step).round() * step).max(min).min(max)
+            let value = (value / step).round() * step;
+            let value = self
+                .min
+                .map_or(value, |min| value.max((min / step).ceil() * step));
+            self.max
+                .map_or(value, |max| value.min((max / step).floor() * step))
         } else {
-            let value = self.min + ((value - self.min) / self.step).round() * self.step;
+            let origin = self.min.unwrap_or_default();
+            let value = origin + ((value - origin) / self.step).round() * self.step;
             round_to(self.clamp(value), self.decimals)
         }
     }
@@ -142,6 +148,8 @@ pub(crate) struct NumberEntityInfo {
     /// UC entity state: ON, UNAVAILABLE, UNKNOWN
     pub state: &'static str,
     pub unit: Option<String>,
+    pub device_class: Option<NumberDeviceClass>,
+    pub display_mode: Option<NumberDisplayMode>,
 }
 
 impl From<&NumberEntityInfo> for NumberState {
@@ -178,17 +186,58 @@ pub(crate) fn parse_number_entity(
         },
     };
 
-    let unit = ha_attr
-        .and_then(|attr| attr.get("unit_of_measurement"))
-        .and_then(|v| v.as_str())
-        .filter(|v| !v.is_empty())
-        .map(|v| v.to_string());
+    let get_str = |key: &str| {
+        ha_attr
+            .and_then(|attr| attr.get(key))
+            .and_then(|v| v.as_str())
+            .filter(|v| !v.is_empty())
+    };
+    let unit = get_str("unit_of_measurement");
 
     NumberEntityInfo {
         range,
         value,
         state,
-        unit,
+        unit: unit.map(|v| v.to_string()),
+        device_class: get_str("device_class").and_then(|v| convert_device_class(v, unit)),
+        display_mode: get_str("mode").and_then(convert_display_mode),
+    }
+}
+
+/// Convert a HA number device class to a UC number device class.
+///
+/// HA device classes without a matching UC device class are not mapped. The entity is then a
+/// generic number with the HA unit.
+///
+/// - HA `sound_pressure` is a measured sound level and not mapped to the UC `audio_level`.
+/// - `duration` is only mapped with a unit supported by the UC `duration` device class.
+///
+/// See <https://www.home-assistant.io/integrations/number/#device-class>
+fn convert_device_class(device_class: &str, unit: Option<&str>) -> Option<NumberDeviceClass> {
+    match device_class {
+        "battery" => Some(NumberDeviceClass::Battery),
+        "current" => Some(NumberDeviceClass::Current),
+        "duration" => match unit {
+            None | Some("ms" | "s" | "min" | "h" | "d") => Some(NumberDeviceClass::Duration),
+            Some(_) => None,
+        },
+        "energy" => Some(NumberDeviceClass::Energy),
+        "humidity" => Some(NumberDeviceClass::Humidity),
+        "illuminance" => Some(NumberDeviceClass::Illuminance),
+        "power" => Some(NumberDeviceClass::Power),
+        "temperature" => Some(NumberDeviceClass::Temperature),
+        "voltage" => Some(NumberDeviceClass::Voltage),
+        _ => None,
+    }
+}
+
+/// Convert the HA `mode` attribute of a `number` or `input_number` entity to a UC display mode.
+fn convert_display_mode(mode: &str) -> Option<NumberDisplayMode> {
+    match mode {
+        "auto" => Some(NumberDisplayMode::Auto),
+        "slider" => Some(NumberDisplayMode::Slider),
+        "box" => Some(NumberDisplayMode::Stepper),
+        _ => None,
     }
 }
 
@@ -200,7 +249,8 @@ pub(crate) fn decimals_for(values: &[f64]) -> u32 {
             (0..MAX_DECIMALS)
                 .find(|decimals| {
                     let scaled = value * 10f64.powi(*decimals as i32);
-                    (scaled - scaled.round()).abs() < 1e-6
+                    // relative tolerance for floating point artifacts, e.g. 0.1 * 3
+                    (scaled - scaled.round()).abs() < 1e-9 * scaled.abs().max(1.0)
                 })
                 .unwrap_or(MAX_DECIMALS)
         })
@@ -279,14 +329,15 @@ pub(crate) fn convert_number_entity(
         );
     }
 
-    let mut options = Map::with_capacity(5);
+    let mut options = Map::with_capacity(6);
+    // An unbounded range must be set explicitly with null, otherwise the default value is used
     options.insert(
         NumberOptionField::Min.to_string(),
-        number_to_json(range.min),
+        range.min.map(number_to_json).unwrap_or(Value::Null),
     );
     options.insert(
         NumberOptionField::Max.to_string(),
-        number_to_json(range.max),
+        range.max.map(number_to_json).unwrap_or(Value::Null),
     );
     options.insert(
         NumberOptionField::Step.to_string(),
@@ -299,6 +350,12 @@ pub(crate) fn convert_number_entity(
     if let Some(unit) = &info.unit {
         options.insert(NumberOptionField::Unit.to_string(), unit.as_str().into());
     }
+    if let Some(display_mode) = info.display_mode {
+        options.insert(
+            NumberOptionField::DisplayMode.to_string(),
+            display_mode.as_ref().into(),
+        );
+    }
 
     let attributes = Some(map_number_attributes(&info));
     let number_state = NumberState::from(&info);
@@ -308,7 +365,7 @@ pub(crate) fn convert_number_entity(
             entity_id,
             device_id: None,
             entity_type: EntityType::Number,
-            device_class: None,
+            device_class: info.device_class.map(|v| v.to_string()),
             name,
             icon: None,
             description: None,
@@ -344,11 +401,19 @@ mod tests {
 
     fn range(min: f64, max: f64, step: f64) -> NumberRange {
         NumberRange {
-            min,
-            max,
+            min: Some(min),
+            max: Some(max),
             step: step.max(MIN_STEP),
             ha_step: step,
             decimals: decimals_for(&[step.max(MIN_STEP), min]),
+        }
+    }
+
+    fn unbounded_range(min: Option<f64>, max: Option<f64>, step: f64) -> NumberRange {
+        NumberRange {
+            min,
+            max,
+            ..range(min.unwrap_or_default(), 0.0, step)
         }
     }
 
@@ -370,7 +435,7 @@ mod tests {
         assert_eq!(None, entity.icon);
         assert_eq!(
             Some(ha_attributes(json!({
-                "min": 0, "max": 100, "step": 1, "decimals": 0, "unit": "%"
+                "min": 0, "max": 100, "step": 1, "decimals": 0, "unit": "%", "display_mode": "auto"
             }))),
             entity.options
         );
@@ -398,7 +463,7 @@ mod tests {
 
         assert_eq!(
             Some(ha_attributes(json!({
-                "min": -10, "max": 10, "step": 1, "decimals": 0
+                "min": -10, "max": 10, "step": 1, "decimals": 0, "display_mode": "auto"
             }))),
             entity.options
         );
@@ -432,7 +497,7 @@ mod tests {
 
         assert_eq!(
             Some(ha_attributes(json!({
-                "min": -5, "max": 5, "step": 0.5, "decimals": 1, "unit": "dB"
+                "min": -5, "max": 5, "step": 0.5, "decimals": 1, "unit": "dB", "display_mode": "slider"
             }))),
             entity.options
         );
@@ -444,7 +509,7 @@ mod tests {
     }
 
     #[test]
-    fn convert_number_entity_with_too_small_step_is_limited() {
+    fn convert_number_entity_with_fine_step() {
         let mut attr = ha_attributes(json!({ "min": 0, "max": 1, "step": 0.001 }));
 
         let (entity, state) =
@@ -452,13 +517,27 @@ mod tests {
                 .expect("valid entity");
 
         let options = entity.options.expect("options");
-        assert_eq!(Some(&json!(0.01)), options.get("step"));
-        assert_eq!(Some(&json!(2)), options.get("decimals"));
+        assert_eq!(Some(&json!(0.001)), options.get("step"));
+        assert_eq!(Some(&json!(3)), options.get("decimals"));
+        assert!(!state.range.is_step_limited());
+    }
+
+    #[test]
+    fn convert_number_entity_with_too_small_step_is_limited() {
+        let mut attr = ha_attributes(json!({ "min": 0, "max": 1, "step": 0.0000001 }));
+
+        let (entity, state) =
+            convert_number_entity("number.fine".into(), "0.1234567".into(), &mut attr)
+                .expect("valid entity");
+
+        let options = entity.options.expect("options");
+        assert_eq!(Some(&json!(0.000001)), options.get("step"));
+        assert_eq!(Some(&json!(6)), options.get("decimals"));
         assert!(state.range.is_step_limited());
-        assert_eq!(0.001, state.range.ha_step);
+        assert_eq!(0.0000001, state.range.ha_step);
         // value is not rounded
         assert_eq!(
-            Some(ha_attributes(json!({ "state": "ON", "value": 0.123 }))),
+            Some(ha_attributes(json!({ "state": "ON", "value": 0.1234567 }))),
             entity.attributes
         );
     }
@@ -502,14 +581,14 @@ mod tests {
     }
 
     #[rstest]
-    #[case(json!({ "initial": 0, "step": 1 }), -1_000_000, 1_000_000)]
-    #[case(json!({ "initial": 0, "step": 1, "minimum": null, "maximum": null }), -1_000_000, 1_000_000)]
-    #[case(json!({ "initial": 0, "step": 1, "minimum": 0 }), 0, 1_000_000)]
-    #[case(json!({ "initial": 0, "step": 1, "maximum": 20 }), -1_000_000, 20)]
-    fn convert_unbounded_counter_uses_fallback_range(
+    #[case(json!({ "initial": 0, "step": 1 }), Value::Null, Value::Null)]
+    #[case(json!({ "initial": 0, "step": 1, "minimum": null, "maximum": null }), Value::Null, Value::Null)]
+    #[case(json!({ "initial": 0, "step": 1, "minimum": 0 }), json!(0), Value::Null)]
+    #[case(json!({ "initial": 0, "step": 1, "maximum": 20 }), Value::Null, json!(20))]
+    fn convert_unbounded_counter_sets_null_limit(
         #[case] attr: Value,
-        #[case] min: i64,
-        #[case] max: i64,
+        #[case] min: Value,
+        #[case] max: Value,
     ) {
         let mut attr = ha_attributes(attr);
 
@@ -517,8 +596,10 @@ mod tests {
             .expect("valid entity");
 
         let options = entity.options.expect("options");
-        assert_eq!(Some(&json!(min)), options.get("min"));
-        assert_eq!(Some(&json!(max)), options.get("max"));
+        assert_eq!(Some(&min), options.get("min"));
+        assert_eq!(Some(&max), options.get("max"));
+        assert_eq!(None, options.get("display_mode"));
+        assert_eq!(None, entity.device_class);
     }
 
     #[test]
@@ -527,8 +608,70 @@ mod tests {
 
         let info = parse_number_entity("counter.test", "3", Some(&attr));
 
-        assert_eq!(-COUNTER_UNBOUNDED_LIMIT, info.range.min);
-        assert_eq!(COUNTER_UNBOUNDED_LIMIT, info.range.max);
+        assert_eq!(None, info.range.min);
+        assert_eq!(None, info.range.max);
+    }
+
+    #[rstest]
+    #[case("battery", Some("%"), Some("battery"))]
+    #[case("current", Some("A"), Some("current"))]
+    #[case("duration", Some("min"), Some("duration"))]
+    #[case("duration", Some("s"), Some("duration"))]
+    #[case("duration", None, Some("duration"))]
+    #[case("duration", Some("μs"), None)]
+    #[case("energy", Some("Wh"), Some("energy"))]
+    #[case("humidity", Some("%"), Some("humidity"))]
+    #[case("illuminance", Some("lx"), Some("illuminance"))]
+    #[case("power", Some("kW"), Some("power"))]
+    #[case("temperature", Some("°F"), Some("temperature"))]
+    #[case("voltage", Some("V"), Some("voltage"))]
+    // measured sound level, not an audio setting
+    #[case("sound_pressure", Some("dB"), None)]
+    // liquid volume, not audio volume
+    #[case("volume", Some("L"), None)]
+    #[case("distance", Some("cm"), None)]
+    #[case("", None, None)]
+    fn convert_number_device_class(
+        #[case] ha_device_class: &str,
+        #[case] unit: Option<&str>,
+        #[case] expected: Option<&str>,
+        #[values("number", "input_number")] domain: &str,
+    ) {
+        let mut attr = ha_attributes(json!({
+            "min": 0, "max": 100, "step": 1, "device_class": ha_device_class,
+            "unit_of_measurement": unit
+        }));
+
+        let (entity, _) = convert_number_entity(format!("{domain}.test"), "5".into(), &mut attr)
+            .expect("valid entity");
+
+        assert_eq!(expected.map(|v| v.to_string()), entity.device_class);
+        // the HA unit is always used
+        let options = entity.options.expect("options");
+        assert_eq!(unit.map(|v| json!(v)).as_ref(), options.get("unit"));
+    }
+
+    #[rstest]
+    #[case(json!("auto"), Some("auto"))]
+    #[case(json!("slider"), Some("slider"))]
+    #[case(json!("box"), Some("stepper"))]
+    #[case(json!("foobar"), None)]
+    #[case(Value::Null, None)]
+    fn convert_number_display_mode(
+        #[case] mode: Value,
+        #[case] expected: Option<&str>,
+        #[values("number", "input_number")] domain: &str,
+    ) {
+        let mut attr = ha_attributes(json!({ "min": 0, "max": 100, "step": 1, "mode": mode }));
+
+        let (entity, _) = convert_number_entity(format!("{domain}.test"), "5".into(), &mut attr)
+            .expect("valid entity");
+
+        let options = entity.options.expect("options");
+        assert_eq!(
+            expected.map(|v| json!(v)).as_ref(),
+            options.get("display_mode")
+        );
     }
 
     #[rstest]
@@ -561,10 +704,14 @@ mod tests {
     #[case(&[0.1], 1)]
     #[case(&[0.25], 2)]
     #[case(&[0.01], 2)]
-    #[case(&[0.001], 2)]
+    #[case(&[0.001], 3)]
+    #[case(&[0.000001], 6)]
+    #[case(&[0.0000001], 6)]
+    #[case(&[0.1234567], 6)]
     #[case(&[1.0, 0.5], 1)]
     #[case(&[0.5, -10.25], 2)]
     #[case(&[3.0, -1_000_000.0], 0)]
+    #[case(&[1_000_000.5], 1)]
     #[case(&[], 0)]
     fn decimals(#[case] values: &[f64], #[case] expected: u32) {
         assert_eq!(expected, decimals_for(values));
@@ -679,13 +826,19 @@ mod tests {
     #[case(range(0.5, 10.5, 1.0), 3.0, 3.5)]
     #[case(range(-5.0, 5.0, 0.5), 1.3, 1.5)]
     #[case(range(0.0, 1.0, 0.1), 0.30000000000000004, 0.3)]
-    #[case(range(0.0, 1.0, 0.001), 0.123, 0.12)]
+    #[case(range(0.0, 1.0, 0.001), 0.123, 0.123)]
+    #[case(range(0.0, 1.0, 0.001), 0.1234, 0.123)]
+    #[case(range(0.0, 1.0, 0.0000001), 0.12345678, 0.123457)]
     // clamping
     #[case(range(0.0, 100.0, 1.0), 101.0, 100.0)]
     #[case(range(0.0, 100.0, 1.0), -1.0, 0.0)]
     #[case(range(0.0, 10.0, 3.0), 10.0, 9.0)]
     #[case(range(0.0, 10.0, 3.0), 11.0, 10.0)]
     #[case(range(-10.0, 10.0, 1.0), -20.0, -10.0)]
+    // unbounded: step grid starts at 0
+    #[case(unbounded_range(None, None, 0.5), -1234.3, -1234.5)]
+    #[case(unbounded_range(None, Some(10.0), 1.0), 20.0, 10.0)]
+    #[case(unbounded_range(Some(0.5), None, 1.0), 1000.2, 1000.5)]
     fn normalize_number_value(
         #[case] range: NumberRange,
         #[case] value: f64,
@@ -702,7 +855,11 @@ mod tests {
     // multiples of step within the bounds
     #[case(range(1.0, 9.0, 2.0), 0.0, 2.0)]
     #[case(range(1.0, 9.0, 2.0), 10.0, 8.0)]
-    #[case(range(-COUNTER_UNBOUNDED_LIMIT, COUNTER_UNBOUNDED_LIMIT, 1.0), -3.0, -3.0)]
+    // unbounded
+    #[case(unbounded_range(None, None, 1.0), -3.0, -3.0)]
+    #[case(unbounded_range(None, None, 5.0), 1_000_003.0, 1_000_005.0)]
+    #[case(unbounded_range(Some(0.0), None, 1.0), -3.0, 0.0)]
+    #[case(unbounded_range(None, Some(9.0), 2.0), 12.0, 8.0)]
     fn normalize_counter_value(
         #[case] range: NumberRange,
         #[case] value: f64,

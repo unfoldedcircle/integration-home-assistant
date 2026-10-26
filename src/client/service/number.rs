@@ -150,7 +150,7 @@ fn is_equal(a: f64, b: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::entity::{NumberRange, OPTIMISTIC_VALUE_TIMEOUT, decimals_for};
+    use crate::client::entity::{MIN_STEP, NumberRange, OPTIMISTIC_VALUE_TIMEOUT, decimals_for};
     use rstest::rstest;
     use std::time::Duration;
     use uc_api::EntityType;
@@ -166,14 +166,23 @@ mod tests {
     }
 
     fn number_state(min: f64, max: f64, step: f64, value: Option<f64>) -> NumberState {
-        let uc_step = step.max(0.01);
+        unbounded_number_state(Some(min), Some(max), step, value)
+    }
+
+    fn unbounded_number_state(
+        min: Option<f64>,
+        max: Option<f64>,
+        step: f64,
+        value: Option<f64>,
+    ) -> NumberState {
+        let uc_step = step.max(MIN_STEP);
         NumberState {
             range: NumberRange {
                 min,
                 max,
                 step: uc_step,
                 ha_step: step,
-                decimals: decimals_for(&[uc_step, min]),
+                decimals: decimals_for(&[uc_step, min.unwrap_or_default()]),
             },
             value,
             optimistic: None,
@@ -406,13 +415,72 @@ mod tests {
 
     #[test]
     fn input_number_with_limited_step_uses_set_value() {
-        // HA step 0.001 is limited to 0.01: native increment would use the HA step size
+        // HA step 0.0000001 is limited to 0.000001: native increment would use the HA step size
         let cmd = new_entity_command("increment", Value::Null);
-        let state = number_state(0.0, 1.0, 0.001, Some(0.5));
+        let state = number_state(0.0, 1.0, 0.0000001, Some(0.5));
 
         let result = handle_number(&cmd, "input_number", Some(&state), Instant::now());
 
-        assert_eq!(Ok(set_value_call(json!(0.51), 0.51)), result);
+        assert_eq!(Ok(set_value_call(json!(0.500001), 0.500001)), result);
+    }
+
+    #[rstest]
+    #[case("counter", json!({ "value": -1234 }), json!(-1234), -1234.0)]
+    #[case("counter", json!({ "value": 1_000_001.4 }), json!(1_000_001), 1_000_001.0)]
+    #[case("number", json!({ "value": -1234.3 }), json!(-1234), -1234.0)]
+    fn set_value_without_limits(
+        #[case] domain: &str,
+        #[case] params: Value,
+        #[case] expected_json: Value,
+        #[case] expected_value: f64,
+    ) {
+        let cmd = new_entity_command("set_value", params);
+        let state = unbounded_number_state(None, None, 1.0, Some(0.0));
+
+        let result = handle_number(&cmd, domain, Some(&state), Instant::now());
+
+        assert_eq!(Ok(set_value_call(expected_json, expected_value)), result);
+    }
+
+    #[rstest]
+    #[case("increment", Some(0.0), json!(0), 0.0)]
+    #[case("increment", None, json!(2), 2.0)]
+    #[case("decrement", Some(0.0), json!(-8), -8.0)]
+    #[case("decrement", None, json!(-8), -8.0)]
+    fn counter_increment_decrement_with_custom_step_and_one_limit(
+        #[case] cmd_id: &str,
+        #[case] max: Option<f64>,
+        #[case] expected_json: Value,
+        #[case] expected_value: f64,
+    ) {
+        let cmd = new_entity_command(cmd_id, json!({ "step": 5 }));
+        let state = unbounded_number_state(None, max, 1.0, Some(-3.0));
+
+        let result = handle_number(&cmd, "counter", Some(&state), Instant::now());
+
+        assert_eq!(Ok(set_value_call(expected_json, expected_value)), result);
+    }
+
+    #[rstest]
+    #[case("increment", Some(1_000_001.0))]
+    #[case("decrement", Some(999_999.0))]
+    fn native_counter_increment_decrement_without_limits(
+        #[case] cmd_id: &str,
+        #[case] expected_value: Option<f64>,
+    ) {
+        let cmd = new_entity_command(cmd_id, Value::Null);
+        let state = unbounded_number_state(None, None, 1.0, Some(1_000_000.0));
+
+        let result = handle_number(&cmd, "counter", Some(&state), Instant::now());
+
+        assert_eq!(
+            Ok(NumberServiceCall {
+                service: cmd_id.into(),
+                service_data: None,
+                expected_value,
+            }),
+            result
+        );
     }
 
     #[rstest]

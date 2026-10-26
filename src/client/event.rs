@@ -81,6 +81,8 @@ impl HomeAssistantClient {
     /// when it reloads the available entities. Commands are always processed with the current
     /// value range from HA.
     pub(super) fn update_number_state(&mut self, entity_id: &str, number_state: NumberState) {
+        // TODO send the updated entity definition with an `entity_available` event, once it is
+        //  supported by the Remote and uc_api `EntityAvailableMsgData` includes the entity options.
         if let Some(old) = self.number_states.get(entity_id)
             && old.range != number_state.range
         {

@@ -71,9 +71,21 @@ HA number, input number and counter entities are mapped to the Remote number ent
   `UNAVAILABLE` and `UNKNOWN` entity states, otherwise the entity state is `ON`.
 - The value range options `min`, `max` and `step` are taken from the HA entity attributes, `unit` from the
   `unit_of_measurement` attribute.
-  - The smallest supported step size is 0.01. A smaller HA step size is set to 0.01.
-  - `decimals` is derived from the number of decimal places of the step size and the minimum value.
-  - A counter without a minimum or maximum value uses -1000000 and 1000000 as limits.
+  - The smallest supported step size is 0.000001. A smaller HA step size is set to 0.000001.
+  - `decimals` is derived from the number of decimal places of the step size and the minimum value, up to 6 decimal
+    places. HA doesn't provide a display precision for these entities.
+  - A counter without a minimum or maximum value is unbounded: `min` or `max` is set to `null`. The Remote shows it as
+    a value field with increment and decrement buttons, and it can't be used with a slider.
+- The HA display mode is mapped to the `display_mode` option: `auto` → `auto`, `slider` → `slider`, `box` →
+  `stepper`. Counters don't have a display mode.
+- The HA device class is mapped to the Remote device class, if a matching device class exists: `battery`, `current`,
+  `duration`, `energy`, `humidity`, `illuminance`, `power`, `temperature` and `voltage`.
+  - Other HA device classes are not mapped. The entity is a generic number with the HA unit.
+  - HA `sound_pressure` is a measured sound level and isn't mapped to the Remote `audio_level` device class.
+  - `duration` is only mapped with a unit supported by the Remote: `ms`, `s`, `min`, `h`, `d`.
+  - The HA unit is always passed on, there is no unit conversion in the Remote. Home Assistant already converts the
+    value to the configured unit, e.g. °F for temperatures.
+  - Input number helpers support device classes from Home Assistant 2026.11. Counters don't have a device class.
 - `set_value` is rounded to the step size and clamped to the current value range of the HA entity. A counter value is
   rounded to a multiple of the step size, as required by Home Assistant.
   - The `duration` parameter is ignored. Home Assistant doesn't support a transition time for these entities.
@@ -88,7 +100,7 @@ Limitations:
 - The value range of the entity is read when the Remote loads the available entities. If the range of a HA entity
   changes later, for example when reconfiguring an input number helper or changing a unit, the Remote uses the new range
   after the next entity reload. Commands are always processed with the current value range from Home Assistant.
-- The HA display mode (`auto`, `box`, `slider`) and device class are not used.
+  - Planned: send the updated entity definition with the `entity_available` event, once it is supported by the Remote.
 
 ## Home Assistant Assist
 
