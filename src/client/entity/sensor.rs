@@ -3,6 +3,7 @@
 
 //! Sensor entity-specific logic.
 
+use crate::client::entity::number_to_json;
 use crate::client::event::convert_ha_sensor_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
@@ -13,10 +14,69 @@ use uc_api::{
     EntityType, SensorAttribute, SensorDeviceClass, SensorOptionField, intg::EntityChange,
 };
 
+/// HA sensor device classes with a non-numeric state.
+const NON_NUMERIC_DEVICE_CLASSES: [&str; 4] = ["date", "enum", "timestamp", "uptime"];
+/// Maximum number of decimal places of the UC sensor `decimals` option.
+const MAX_DECIMALS: u32 = 6;
+/// Number of significant digits of a numeric sensor value. Every decimal number with up to 15
+/// significant digits can be represented by a f64, the remaining digits are floating point
+/// artifacts of calculated values.
+const SIGNIFICANT_DIGITS: usize = 15;
+
+/// Returns true if HA expects a numeric sensor state.
+///
+/// Same rules as `_numeric_state_expected` in HA's sensor entity: a sensor is numeric if it has a
+/// state class, a unit of measurement, a display precision or a numeric device class.
+fn is_numeric_sensor(ha_attr: Option<&Map<String, Value>>, display_precision: Option<u32>) -> bool {
+    let get = |key: &str| ha_attr.and_then(|a| a.get(key)).filter(|v| !v.is_null());
+    let device_class = get("device_class").and_then(|v| v.as_str());
+    if device_class.is_some_and(|class| NON_NUMERIC_DEVICE_CLASSES.contains(&class)) {
+        return false;
+    }
+    get("state_class").is_some()
+        || get("unit_of_measurement").is_some()
+        || display_precision.is_some()
+        || device_class.is_some()
+}
+
+/// Round a value to 15 significant digits to remove floating point artifacts, e.g.
+/// `1.499999999999997` -> `1.5`.
+fn round_significant(value: f64) -> f64 {
+    format!("{:.*e}", SIGNIFICANT_DIGITS - 1, value)
+        .parse()
+        .unwrap_or(value)
+}
+
+/// Convert a HA sensor state to the UC sensor value.
+///
+/// - `unavailable` and `unknown`: `null` to clear the last value in the Remote.
+/// - Numeric sensors: JSON number, if the state is a finite number. HA always sends the state as
+///   text, but a text value isn't formatted by the Remote.
+/// - Otherwise: the HA state as text.
+fn convert_sensor_value(
+    entity_id: &str,
+    state: &str,
+    ha_attr: Option<&Map<String, Value>>,
+    display_precision: Option<u32>,
+) -> Value {
+    if matches!(state, "unavailable" | "unknown") {
+        return Value::Null;
+    }
+    if !entity_id.starts_with("binary_sensor.")
+        && is_numeric_sensor(ha_attr, display_precision)
+        && let Ok(value) = state.parse::<f64>()
+        && value.is_finite()
+    {
+        return number_to_json(round_significant(value));
+    }
+    state.into()
+}
+
 fn map_sensor_attributes(
     entity_id: &str,
     state: &str,
     ha_attr: Option<&mut Map<String, Value>>,
+    display_precision: Option<u32>,
 ) -> Result<Map<String, Value>, ServiceError> {
     let mut attributes = serde_json::Map::with_capacity(2);
     attributes.insert(
@@ -26,7 +86,10 @@ fn map_sensor_attributes(
     // HA: the state of a sensor entity is its currently detected value, which can be either text or a number.
     //     In addition, the entity can have the following states: unavailable, unknown
     //     https://www.home-assistant.io/integrations/sensor
-    attributes.insert(SensorAttribute::Value.to_string(), state.into());
+    attributes.insert(
+        SensorAttribute::Value.to_string(),
+        convert_sensor_value(entity_id, state, ha_attr.as_deref(), display_precision),
+    );
 
     // map HA binary-sensor device class into UC sensor unit field
     if entity_id.starts_with("binary_sensor.") {
@@ -52,13 +115,21 @@ fn map_sensor_attributes(
     Ok(attributes)
 }
 
+/// Convert a HA `state_changed` event of a sensor or binary sensor to an entity change event.
+///
+/// # Arguments
+///
+/// * `data`: event data
+/// * `display_precision`: optional HA display precision of the sensor
 pub(crate) fn sensor_event_to_entity_change(
     mut data: EventData,
+    display_precision: Option<u32>,
 ) -> Result<EntityChange, ServiceError> {
     let attributes = map_sensor_attributes(
         &data.entity_id,
         &data.new_state.state,
         data.new_state.attributes.as_mut(),
+        display_precision,
     )?;
 
     Ok(EntityChange {
@@ -69,10 +140,19 @@ pub(crate) fn sensor_event_to_entity_change(
     })
 }
 
+/// Convert a HA sensor or binary sensor to an available UC sensor entity.
+///
+/// # Arguments
+///
+/// * `entity_id`: HA entity id
+/// * `state`: HA state
+/// * `ha_attr`: HA entity attributes
+/// * `display_precision`: optional HA display precision of the sensor, set as `decimals` option.
 pub(crate) fn convert_sensor_entity(
     entity_id: String,
     state: String,
     ha_attr: &mut Map<String, Value>,
+    display_precision: Option<u32>,
 ) -> Result<AvailableIntgEntity, ServiceError> {
     let friendly_name = ha_attr.get("friendly_name").and_then(|v| v.as_str());
     let name = HashMap::from([("en".into(), friendly_name.unwrap_or(&entity_id).into())]);
@@ -100,8 +180,22 @@ pub(crate) fn convert_sensor_entity(
         }
     };
 
+    if let Some(decimals) = display_precision
+        && !entity_id.starts_with("binary_sensor.")
+    {
+        options.insert(
+            SensorOptionField::Decimals.to_string(),
+            decimals.min(MAX_DECIMALS).into(),
+        );
+    }
+
     // convert attributes
-    let attributes = Some(map_sensor_attributes(&entity_id, &state, Some(ha_attr))?);
+    let attributes = Some(map_sensor_attributes(
+        &entity_id,
+        &state,
+        Some(ha_attr),
+        display_precision,
+    )?);
 
     Ok(AvailableIntgEntity {
         entity_id,
@@ -147,7 +241,7 @@ mod tests {
         ha_attr.insert("device_class".to_string(), json!("temperature"));
         ha_attr.insert("unit_of_measurement".to_string(), json!("°C"));
 
-        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr);
+        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr, None);
 
         assert!(result.is_ok(), "Expected converted entity: {result:?}");
         let entity = result.unwrap();
@@ -162,7 +256,7 @@ mod tests {
             attributes.get(SensorAttribute::State.as_ref())
         );
         assert_eq!(
-            Some(&json!("23.5")),
+            Some(&json!(23.5)),
             attributes.get(SensorAttribute::Value.as_ref())
         );
         assert_eq!(
@@ -179,7 +273,7 @@ mod tests {
         ha_attr.insert("friendly_name".to_string(), json!("Front Door"));
         ha_attr.insert("device_class".to_string(), json!("door"));
 
-        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr);
+        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr, None);
 
         assert!(result.is_ok(), "Expected converted entity: {result:?}");
         let entity = result.unwrap();
@@ -223,7 +317,8 @@ mod tests {
             ha_attr.insert("device_class".to_string(), json!(device_class));
             ha_attr.insert("unit_of_measurement".to_string(), json!("unit"));
 
-            let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr);
+            let result =
+                convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr, None);
 
             assert!(result.is_ok(), "Failed for device class: {}", device_class);
             let entity = result.unwrap();
@@ -238,7 +333,7 @@ mod tests {
         let mut ha_attr = serde_json::Map::new();
         ha_attr.insert("device_class".to_string(), json!("power"));
 
-        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr);
+        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr, None);
 
         assert!(result.is_ok(), "Expected converted entity: {result:?}");
         let entity = result.unwrap();
@@ -258,7 +353,7 @@ mod tests {
         ha_attr.insert("friendly_name".to_string(), json!("Generic Sensor"));
         ha_attr.insert("unit_of_measurement".to_string(), json!(unit));
 
-        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr);
+        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr, None);
 
         assert!(result.is_ok(), "Expected converted entity: {result:?}");
         let entity = result.unwrap();
@@ -282,7 +377,7 @@ mod tests {
         ha_attr.insert("friendly_name".to_string(), json!("Offline Sensor"));
         ha_attr.insert("device_class".to_string(), json!("temperature"));
 
-        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr);
+        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr, None);
 
         assert!(result.is_ok(), "Expected converted entity: {result:?}");
         let entity = result.unwrap();
@@ -297,7 +392,7 @@ mod tests {
             attributes.get(SensorAttribute::State.as_ref())
         );
         assert_eq!(
-            Some(&json!(state)),
+            Some(&Value::Null),
             attributes.get(SensorAttribute::Value.as_ref())
         );
     }
@@ -310,7 +405,7 @@ mod tests {
         ha_attr.insert("friendly_name".to_string(), json!("Mystery Sensor"));
         ha_attr.insert("device_class".to_string(), json!("humidity"));
 
-        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr);
+        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr, None);
 
         assert!(result.is_ok(), "Expected converted entity: {result:?}");
         let entity = result.unwrap();
@@ -321,7 +416,7 @@ mod tests {
             attributes.get(SensorAttribute::State.as_ref())
         );
         assert_eq!(
-            Some(&json!(state)),
+            Some(&Value::Null),
             attributes.get(SensorAttribute::Value.as_ref())
         );
     }
@@ -333,7 +428,7 @@ mod tests {
         let mut ha_attr = serde_json::Map::new();
         ha_attr.insert("friendly_name".to_string(), json!("Generic Binary"));
 
-        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr);
+        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr, None);
 
         assert!(result.is_ok(), "Expected converted entity: {result:?}");
         let entity = result.unwrap();
@@ -370,7 +465,7 @@ mod tests {
         ha_attr.insert("device_class".to_string(), json!("atmospheric_pressure"));
         ha_attr.insert("unit_of_measurement".to_string(), json!(unit));
 
-        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr);
+        let result = convert_sensor_entity(entity_id.clone(), state.clone(), &mut ha_attr, None);
 
         assert!(result.is_ok(), "Expected converted entity: {result:?}");
         let entity = result.unwrap();
@@ -394,12 +489,157 @@ mod tests {
             attributes.get(SensorAttribute::State.as_ref())
         );
         assert_eq!(
-            Some(&json!(state)),
+            Some(&json!(1013.25)),
             attributes.get(SensorAttribute::Value.as_ref())
         );
         assert_eq!(
             Some(&json!(unit)),
             attributes.get(SensorAttribute::Unit.as_ref())
+        );
+    }
+
+    #[rstest::rstest]
+    #[case(json!({}), None, false)]
+    #[case(json!({ "friendly_name": "Firmware" }), None, false)]
+    #[case(json!({ "unit_of_measurement": "kWh" }), None, true)]
+    #[case(json!({ "state_class": "measurement" }), None, true)]
+    #[case(json!({ "device_class": "power" }), None, true)]
+    #[case(json!({ "device_class": null }), None, false)]
+    #[case(json!({}), Some(2), true)]
+    #[case(json!({ "device_class": "enum", "unit_of_measurement": "x" }), None, false)]
+    #[case(json!({ "device_class": "timestamp", "state_class": "measurement" }), None, false)]
+    #[case(json!({ "device_class": "date" }), Some(1), false)]
+    #[case(json!({ "device_class": "uptime" }), None, false)]
+    fn numeric_sensor_follows_ha_rules(
+        #[case] attr: Value,
+        #[case] display_precision: Option<u32>,
+        #[case] expected: bool,
+    ) {
+        assert_eq!(
+            expected,
+            is_numeric_sensor(attr.as_object(), display_precision)
+        );
+    }
+
+    #[rstest::rstest]
+    #[case(1.499999999999997, 1.5)]
+    #[case(0.30000000000000004, 0.3)]
+    #[case(0.789266666666667, 0.789266666666667)]
+    #[case(-21.4, -21.4)]
+    #[case(123456789012.345, 123456789012.345)]
+    #[case(0.0, 0.0)]
+    fn round_to_significant_digits(#[case] value: f64, #[case] expected: f64) {
+        assert_eq!(expected, round_significant(value));
+    }
+
+    #[rstest::rstest]
+    // numeric sensor
+    #[case("sensor.energy", "0.789266666666667", json!({ "unit_of_measurement": "kWh" }), json!(0.789266666666667))]
+    #[case("sensor.calc", "1.499999999999997", json!({ "state_class": "measurement" }), json!(1.5))]
+    #[case("sensor.temp", "23.0", json!({ "device_class": "temperature" }), json!(23))]
+    #[case("sensor.temp", "-7", json!({ "device_class": "temperature" }), json!(-7))]
+    #[case("sensor.big", "1.2345678901235e+17", json!({ "unit_of_measurement": "B" }), json!(1.2345678901235e17))]
+    // numeric sensor without a numeric state
+    #[case("sensor.temp", "n/a", json!({ "device_class": "temperature" }), json!("n/a"))]
+    #[case("sensor.temp", "nan", json!({ "device_class": "temperature" }), json!("nan"))]
+    #[case("sensor.temp", "inf", json!({ "device_class": "temperature" }), json!("inf"))]
+    // text sensor: numeric looking text is kept
+    #[case("sensor.firmware", "1.10", json!({}), json!("1.10"))]
+    #[case("sensor.zip", "08001", json!({}), json!("08001"))]
+    #[case("sensor.mode", "1", json!({ "device_class": "enum" }), json!("1"))]
+    #[case("binary_sensor.door", "on", json!({ "device_class": "door" }), json!("on"))]
+    // no value
+    #[case("sensor.temp", "unavailable", json!({ "device_class": "temperature" }), Value::Null)]
+    #[case("sensor.temp", "unknown", json!({ "device_class": "temperature" }), Value::Null)]
+    #[case("binary_sensor.door", "unavailable", json!({}), Value::Null)]
+    fn sensor_value_conversion(
+        #[case] entity_id: &str,
+        #[case] state: &str,
+        #[case] attr: Value,
+        #[case] expected: Value,
+    ) {
+        assert_eq!(
+            expected,
+            convert_sensor_value(entity_id, state, attr.as_object(), None)
+        );
+    }
+
+    #[test]
+    fn sensor_value_with_display_precision_is_numeric() {
+        assert_eq!(
+            json!(42.5),
+            convert_sensor_value("sensor.calc", "42.5", None, Some(1))
+        );
+    }
+
+    #[rstest::rstest]
+    #[case(Some(2), Some(json!(2)))]
+    #[case(Some(0), Some(json!(0)))]
+    #[case(Some(8), Some(json!(6)))]
+    #[case(None, None)]
+    fn convert_sensor_entity_sets_decimals_from_display_precision(
+        #[case] display_precision: Option<u32>,
+        #[case] expected: Option<Value>,
+    ) {
+        let mut ha_attr = json!({ "device_class": "energy", "unit_of_measurement": "kWh" })
+            .as_object()
+            .cloned()
+            .unwrap();
+
+        let entity = convert_sensor_entity(
+            "sensor.energy".into(),
+            "0.789266666666667".into(),
+            &mut ha_attr,
+            display_precision,
+        )
+        .expect("valid entity");
+
+        assert_eq!(
+            expected.as_ref(),
+            entity
+                .options
+                .as_ref()
+                .and_then(|o| o.get(SensorOptionField::Decimals.as_ref()))
+        );
+    }
+
+    #[test]
+    fn convert_binary_sensor_entity_ignores_display_precision() {
+        let mut ha_attr = json!({ "device_class": "door" })
+            .as_object()
+            .cloned()
+            .unwrap();
+
+        let entity = convert_sensor_entity(
+            "binary_sensor.door".into(),
+            "on".into(),
+            &mut ha_attr,
+            Some(2),
+        )
+        .expect("valid entity");
+
+        assert_eq!(None, entity.options);
+    }
+
+    #[test]
+    fn sensor_event_to_entity_change_with_numeric_value() {
+        let data: EventData = serde_json::from_value(json!({
+            "entity_id": "sensor.power",
+            "new_state": {
+                "state": "1234.5",
+                "attributes": { "device_class": "power", "unit_of_measurement": "W" }
+            }
+        }))
+        .expect("valid EventData");
+
+        let change = sensor_event_to_entity_change(data, Some(0)).expect("valid event");
+
+        assert_eq!(
+            json!({ "state": "ON", "value": 1234.5, "unit": "W" })
+                .as_object()
+                .cloned()
+                .unwrap(),
+            change.attributes
         );
     }
 }
