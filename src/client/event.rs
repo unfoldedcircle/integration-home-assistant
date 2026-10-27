@@ -80,16 +80,17 @@ impl HomeAssistantClient {
     /// A changed value range is logged: the static entity options of the Remote are only updated
     /// when it reloads the available entities. Commands are always processed with the current
     /// value range from HA.
-    pub(super) fn update_number_state(&mut self, entity_id: &str, number_state: NumberState) {
+    pub(super) fn update_number_state(&mut self, entity_id: &str, mut number_state: NumberState) {
         // TODO send the updated entity definition with an `entity_available` event, once it is
         //  supported by the Remote and uc_api `EntityAvailableMsgData` includes the entity options.
-        if let Some(old) = self.number_states.get(entity_id)
-            && old.range != number_state.range
-        {
-            info!(
-                "[{}] Value range of {entity_id} changed, requires entity reload: {:?} -> {:?}",
-                self.id, old.range, number_state.range
-            );
+        if let Some(old) = self.number_states.get(entity_id) {
+            if old.range != number_state.range {
+                info!(
+                    "[{}] Value range of {entity_id} changed, requires entity reload: {:?} -> {:?}",
+                    self.id, old.range, number_state.range
+                );
+            }
+            number_state.keep_optimistic(old, Instant::now());
         }
         self.number_states
             .insert(entity_id.to_string(), number_state);

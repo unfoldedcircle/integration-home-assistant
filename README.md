@@ -72,8 +72,8 @@ HA number, input number and counter entities are mapped to the Remote number ent
 - The value range options `min`, `max` and `step` are taken from the HA entity attributes, `unit` from the
   `unit_of_measurement` attribute.
   - The smallest supported step size is 0.000001. A smaller HA step size is set to 0.000001.
-  - `decimals` is derived from the number of decimal places of the step size and the minimum value, up to 6 decimal
-    places. HA doesn't provide a display precision for these entities.
+  - `decimals` is derived from the number of decimal places of the step size, the minimum and the maximum value, up to
+    6 decimal places. HA doesn't provide a display precision for these entities.
   - A counter without a minimum or maximum value is unbounded: `min` or `max` is set to `null`. The Remote shows it as
     a value field with increment and decrement buttons, and it can't be used with a slider.
 - The HA display mode is mapped to the `display_mode` option: `auto` → `auto`, `slider` → `slider`, `box` →

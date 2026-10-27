@@ -73,7 +73,7 @@ impl NumberRange {
             max,
             step,
             ha_step,
-            decimals: decimals_for(&[step, min.unwrap_or_default()]),
+            decimals: decimals_for(&[step, min.unwrap_or_default(), max.unwrap_or_default()]),
         }
     }
 
@@ -94,7 +94,8 @@ impl NumberRange {
     /// - Counter: value is rounded to an integer multiple of the step size, as required by the HA
     ///   `counter.set_value` service.
     /// - Otherwise: value is rounded to the step grid starting at `min` (or 0 without lower limit)
-    ///   and to the number of decimal places to remove floating point artifacts.
+    ///   and to the number of decimal places to remove floating point artifacts. The value is
+    ///   clamped last, so that the rounding can't exceed the range, e.g. `max: 2.5` with `step: 1`.
     pub fn normalize(&self, value: f64, counter: bool) -> f64 {
         if counter {
             let step = self.ha_step.round().max(1.0);
@@ -107,7 +108,7 @@ impl NumberRange {
         } else {
             let origin = self.min.unwrap_or_default();
             let value = origin + ((value - origin) / self.step).round() * self.step;
-            round_to(self.clamp(value), self.decimals)
+            self.clamp(round_to(value, self.decimals))
         }
     }
 }
@@ -137,6 +138,19 @@ impl NumberState {
             }
             _ => self.value,
         }
+    }
+
+    /// Take over the expected value of the last command from the previous state.
+    ///
+    /// A HA state event of an earlier command must not drop the expected value of a later
+    /// command, otherwise the next relative change starts from an outdated value and a step is
+    /// lost. The expected value is kept until HA reports it, or it is older than
+    /// [OPTIMISTIC_VALUE_TIMEOUT].
+    pub fn keep_optimistic(&mut self, previous: &NumberState, now: Instant) {
+        self.optimistic = previous.optimistic.filter(|(value, timestamp)| {
+            now.duration_since(*timestamp) < OPTIMISTIC_VALUE_TIMEOUT
+                && !matches!(self.value, Some(v) if (v - value).abs() < 1e-9)
+        });
     }
 }
 
@@ -407,7 +421,7 @@ mod tests {
             max: Some(max),
             step: step.max(MIN_STEP),
             ha_step: step,
-            decimals: decimals_for(&[step.max(MIN_STEP), min]),
+            decimals: decimals_for(&[step.max(MIN_STEP), min, max]),
         }
     }
 
@@ -839,6 +853,11 @@ mod tests {
     #[case(range(0.0, 10.0, 3.0), 10.0, 9.0)]
     #[case(range(0.0, 10.0, 3.0), 11.0, 10.0)]
     #[case(range(-10.0, 10.0, 1.0), -20.0, -10.0)]
+    // max with more decimal places than step: rounding must not exceed max
+    #[case(range(0.0, 2.5, 1.0), 2.5, 2.5)]
+    #[case(range(0.0, 2.5, 1.0), 3.0, 2.5)]
+    #[case(range(0.0, 99.5, 1.0), 99.5, 99.5)]
+    #[case(range(0.0, 99.5, 1.0), 98.6, 99.0)]
     // unbounded: step grid starts at 0
     #[case(unbounded_range(None, None, 0.5), -1234.3, -1234.5)]
     #[case(unbounded_range(None, Some(10.0), 1.0), 20.0, 10.0)]
@@ -898,6 +917,36 @@ mod tests {
             Some(10.0),
             state.current_value(now + OPTIMISTIC_VALUE_TIMEOUT)
         );
+    }
+
+    #[rstest]
+    // HA reports the value of an earlier command: keep the expected value of the last command
+    #[case(Some(51.0), Duration::from_millis(100), Some(52.0))]
+    // HA reports the expected value
+    #[case(Some(52.0), Duration::from_millis(100), None)]
+    // expected value is too old
+    #[case(Some(51.0), OPTIMISTIC_VALUE_TIMEOUT, None)]
+    #[case(None, Duration::from_millis(100), Some(52.0))]
+    fn keep_optimistic_value_of_previous_state(
+        #[case] ha_value: Option<f64>,
+        #[case] elapsed: Duration,
+        #[case] expected: Option<f64>,
+    ) {
+        let sent = Instant::now();
+        let previous = NumberState {
+            range: range(0.0, 100.0, 1.0),
+            value: Some(50.0),
+            optimistic: Some((52.0, sent)),
+        };
+        let mut state = NumberState {
+            range: range(0.0, 100.0, 1.0),
+            value: ha_value,
+            optimistic: None,
+        };
+
+        state.keep_optimistic(&previous, sent + elapsed);
+
+        assert_eq!(expected, state.optimistic.map(|(value, _)| value));
     }
 
     #[test]
