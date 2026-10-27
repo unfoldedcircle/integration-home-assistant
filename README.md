@@ -68,7 +68,7 @@ further interactions are possible:
 HA number, input number and counter entities are mapped to the Remote number entity:
 
 - The HA entity state is the `value` attribute. The `unavailable` and `unknown` HA states are mapped to the
-  `UNAVAILABLE` and `UNKNOWN` entity states, otherwise the entity state is `ON`.
+  `UNAVAILABLE` and `UNKNOWN` entity states with a `null` value, otherwise the entity state is `ON`.
 - The value range options `min`, `max` and `step` are taken from the HA entity attributes, `unit` from the
   `unit_of_measurement` attribute.
   - The smallest supported step size is 0.000001. A smaller HA step size is set to 0.000001.

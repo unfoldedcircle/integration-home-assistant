@@ -280,9 +280,11 @@ pub(crate) fn number_to_json(value: f64) -> Value {
 fn map_number_attributes(info: &NumberEntityInfo) -> Map<String, Value> {
     let mut attributes = Map::with_capacity(2);
     attributes.insert(NumberAttribute::State.to_string(), info.state.into());
-    if let Some(value) = info.value {
-        attributes.insert(NumberAttribute::Value.to_string(), number_to_json(value));
-    }
+    // null clears the last value in the Remote while unavailable or unknown
+    attributes.insert(
+        NumberAttribute::Value.to_string(),
+        info.value.map(number_to_json).unwrap_or(Value::Null),
+    );
     attributes
 }
 
@@ -468,7 +470,9 @@ mod tests {
             entity.options
         );
         assert_eq!(
-            Some(ha_attributes(json!({ "state": "UNAVAILABLE" }))),
+            Some(ha_attributes(
+                json!({ "state": "UNAVAILABLE", "value": null })
+            )),
             entity.attributes
         );
         assert_eq!(None, state.value);
@@ -811,7 +815,7 @@ mod tests {
         let (change, state) = number_event_to_entity_change(data).expect("valid event");
 
         assert_eq!(
-            ha_attributes(json!({ "state": "UNAVAILABLE" })),
+            ha_attributes(json!({ "state": "UNAVAILABLE", "value": null })),
             change.attributes
         );
         assert_eq!(None, state.value);
