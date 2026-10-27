@@ -48,10 +48,12 @@ The following HA entities are supported in the Unfolded Circle Remote:
 - [Sensor](https://developers.home-assistant.io/docs/core/entity/sensor)
   - Numeric sensor values are sent as numbers. A sensor is numeric with the same rules as in Home Assistant: it has a
     unit of measurement, a state class, a display precision or a numeric device class (all except `date`, `enum`,
-    `timestamp` and `uptime`). Floating point artifacts are removed by rounding to 15 significant digits.
+    `timestamp` and `uptime`, custom device classes are ignored). Floating point artifacts are removed by rounding to
+    15 significant digits.
   - Other sensor values are sent as text, even if the text looks like a number, e.g. a version `1.10`.
-  - The display precision of the sensor in Home Assistant is used as `decimals` option (max 6). It is retrieved with
-    the entity states, a changed precision is applied after the next entity reload of the Remote.
+  - The display precision of the sensor in Home Assistant is used as `decimals` option (max 6). It is retrieved after
+    connecting and with the entity states. A changed precision is applied after the next entity reload of the Remote.
+    Requires Home Assistant 2023.3 or newer.
   - The value is `null` while the sensor is unavailable or unknown.
 - [Binary sensor](https://www.home-assistant.io/integrations/binary_sensor/): mapped to sensor
   - Sensor entity device class: `binary`.

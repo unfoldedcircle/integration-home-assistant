@@ -7,9 +7,8 @@ use std::str::FromStr;
 
 use crate::client::HomeAssistantClient;
 use crate::client::entity::*;
-use crate::client::messages::{
-    CallListAssistPipelines, CallListEntityDisplayPrecisions, GetStates,
-};
+use crate::client::entity_registry::fetch_display_precisions;
+use crate::client::messages::{CallListAssistPipelines, GetStates};
 use crate::errors::ServiceError;
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
 use log::{debug, error, info, warn};
@@ -42,17 +41,7 @@ impl Handler<GetStates> for HomeAssistantClient {
                     }
                 };
                 // Retrieve the sensor display precisions. Best effort as well.
-                let precisions = match ha_client.send(CallListEntityDisplayPrecisions).await {
-                    Ok(Ok(result)) => Some(result),
-                    Ok(Err(e)) => {
-                        error!("Failed to retrieve Home Assistant display precisions: {e}");
-                        None
-                    }
-                    Err(e) => {
-                        error!("Failed to send CallListEntityDisplayPrecisions: {e}");
-                        None
-                    }
-                };
+                let precisions = fetch_display_precisions(&ha_client).await;
                 (pipelines, precisions)
             }
             .into_actor(self) // converts future to ActorFuture

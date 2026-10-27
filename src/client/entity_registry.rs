@@ -8,7 +8,10 @@ use crate::client::messages::CallListEntityDisplayPrecisions;
 use crate::client::model::OpenRequest;
 use crate::errors::ServiceError;
 use crate::util::return_fut_err;
-use actix::{ActorFutureExt, Handler, ResponseActFuture, WrapFuture, fut};
+use actix::{
+    ActorFutureExt, Addr, AsyncContext, Context, Handler, ResponseActFuture, WrapFuture, fut,
+};
+use log::{debug, warn};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -56,6 +59,47 @@ impl Handler<CallListEntityDisplayPrecisions> for HomeAssistantClient {
                 }
             }),
         )
+    }
+}
+
+/// Retrieve the sensor display precisions from Home Assistant.
+///
+/// Best effort: the `config/entity_registry/list_for_display` request requires Home Assistant
+/// 2023.3 or newer. Returns `None` if the request failed.
+pub(super) async fn fetch_display_precisions(
+    ha_client: &Addr<HomeAssistantClient>,
+) -> Option<HashMap<String, u32>> {
+    match ha_client.send(CallListEntityDisplayPrecisions).await {
+        Ok(Ok(result)) => Some(result),
+        Ok(Err(e)) => {
+            warn!("Failed to retrieve Home Assistant display precisions: {e}");
+            None
+        }
+        Err(e) => {
+            warn!("Failed to send CallListEntityDisplayPrecisions: {e}");
+            None
+        }
+    }
+}
+
+impl HomeAssistantClient {
+    /// Refresh the cached sensor display precisions in the background, e.g. after connecting.
+    pub(super) fn refresh_display_precisions(&self, ctx: &mut Context<Self>) {
+        let ha_client = ctx.address();
+        ctx.spawn(
+            async move { fetch_display_precisions(&ha_client).await }
+                .into_actor(self)
+                .map(|precisions, act, _ctx| {
+                    if let Some(precisions) = precisions {
+                        debug!(
+                            "[{}] Got {} sensor display precisions",
+                            act.id,
+                            precisions.len()
+                        );
+                        act.display_precisions = precisions;
+                    }
+                }),
+        );
     }
 }
 

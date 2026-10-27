@@ -410,6 +410,9 @@ impl HomeAssistantClient {
                 // if auth occurs right after HA reboots, custom events won't be available yet
                 // We will have to check after custom events later if unavailable
                 self.send_uc_info_command(ctx);
+                // Sensor display precisions for entity change events, in case the Remote doesn't
+                // retrieve the entity states after a reconnect.
+                self.refresh_display_precisions(ctx);
                 // Store start time of HA so that we check regularly after custom events
                 let ha_start_time = Instant::now();
                 self.check_uc_ha_component(ctx, ha_start_time);

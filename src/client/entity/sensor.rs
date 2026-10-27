@@ -16,6 +16,70 @@ use uc_api::{
 
 /// HA sensor device classes with a non-numeric state.
 const NON_NUMERIC_DEVICE_CLASSES: [&str; 4] = ["date", "enum", "timestamp", "uptime"];
+/// HA sensor device classes with a numeric state: all `SensorDeviceClass` values except
+/// [NON_NUMERIC_DEVICE_CLASSES]. Unknown, custom device classes are not numeric.
+///
+/// See <https://www.home-assistant.io/integrations/sensor/#device-class>
+const NUMERIC_DEVICE_CLASSES: [&str; 58] = [
+    "absolute_humidity",
+    "apparent_power",
+    "aqi",
+    "area",
+    "atmospheric_pressure",
+    "battery",
+    "blood_glucose_concentration",
+    "carbon_monoxide",
+    "carbon_dioxide",
+    "conductivity",
+    "current",
+    "data_rate",
+    "data_size",
+    "distance",
+    "duration",
+    "energy",
+    "energy_distance",
+    "energy_storage",
+    "frequency",
+    "gas",
+    "humidity",
+    "illuminance",
+    "irradiance",
+    "moisture",
+    "monetary",
+    "nitrogen_dioxide",
+    "nitrogen_monoxide",
+    "nitrous_oxide",
+    "ozone",
+    "ph",
+    "pm1",
+    "pm10",
+    "pm25",
+    "pm4",
+    "power_factor",
+    "power",
+    "precipitation",
+    "precipitation_intensity",
+    "pressure",
+    "radon",
+    "reactive_energy",
+    "reactive_power",
+    "signal_strength",
+    "sound_pressure",
+    "speed",
+    "sulphur_dioxide",
+    "temperature",
+    "temperature_delta",
+    "volatile_organic_compounds",
+    "volatile_organic_compounds_parts",
+    "voltage",
+    "volume",
+    "volume_storage",
+    "volume_flow_rate",
+    "water",
+    "weight",
+    "wind_direction",
+    "wind_speed",
+];
 /// Maximum number of decimal places of the UC sensor `decimals` option.
 const MAX_DECIMALS: u32 = 6;
 /// Number of significant digits of a numeric sensor value. Every decimal number with up to 15
@@ -26,7 +90,8 @@ const SIGNIFICANT_DIGITS: usize = 15;
 /// Returns true if HA expects a numeric sensor state.
 ///
 /// Same rules as `_numeric_state_expected` in HA's sensor entity: a sensor is numeric if it has a
-/// state class, a unit of measurement, a display precision or a numeric device class.
+/// state class, a unit of measurement, a display precision or a numeric device class. A sensor
+/// with a non-numeric device class is never numeric, an unknown device class is ignored.
 fn is_numeric_sensor(ha_attr: Option<&Map<String, Value>>, display_precision: Option<u32>) -> bool {
     let get = |key: &str| ha_attr.and_then(|a| a.get(key)).filter(|v| !v.is_null());
     let device_class = get("device_class").and_then(|v| v.as_str());
@@ -36,7 +101,7 @@ fn is_numeric_sensor(ha_attr: Option<&Map<String, Value>>, display_precision: Op
     get("state_class").is_some()
         || get("unit_of_measurement").is_some()
         || display_precision.is_some()
-        || device_class.is_some()
+        || device_class.is_some_and(|class| NUMERIC_DEVICE_CLASSES.contains(&class))
 }
 
 /// Round a value to 15 significant digits to remove floating point artifacts, e.g.
@@ -510,6 +575,9 @@ mod tests {
     #[case(json!({ "device_class": "timestamp", "state_class": "measurement" }), None, false)]
     #[case(json!({ "device_class": "date" }), Some(1), false)]
     #[case(json!({ "device_class": "uptime" }), None, false)]
+    // unknown, custom device class
+    #[case(json!({ "device_class": "firmware" }), None, false)]
+    #[case(json!({ "device_class": "firmware", "unit_of_measurement": "x" }), None, true)]
     fn numeric_sensor_follows_ha_rules(
         #[case] attr: Value,
         #[case] display_precision: Option<u32>,
@@ -547,6 +615,7 @@ mod tests {
     #[case("sensor.firmware", "1.10", json!({}), json!("1.10"))]
     #[case("sensor.zip", "08001", json!({}), json!("08001"))]
     #[case("sensor.mode", "1", json!({ "device_class": "enum" }), json!("1"))]
+    #[case("sensor.custom", "1.10", json!({ "device_class": "firmware" }), json!("1.10"))]
     #[case("binary_sensor.door", "on", json!({ "device_class": "door" }), json!("on"))]
     // no value
     #[case("sensor.temp", "unavailable", json!({ "device_class": "temperature" }), Value::Null)]
