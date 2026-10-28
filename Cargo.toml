@@ -35,11 +35,11 @@ zeroconf = ["dep:zeroconf"]
 audio = ["dep:hound"]
 
 [dependencies]
-#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.20.0", features = ["prost"] }
+uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", tag = "v0.21.0", features = ["prost"] }
 # for local development:
 #uc_api = { path = "../api-model-rs", features = ["prost"] }
 # Using a GitHub revision:
-uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "3431420d3a0e604380527ad81561f6a9a8725a92", features = ["prost"] }
+#uc_api = { git = "https://github.com/unfoldedcircle/api-model-rs", rev = "3431420d3a0e604380527ad81561f6a9a8725a92", features = ["prost"] }
 
 # WebSockets server
 actix-web = { version = "4.11", features = ["rustls-0_23"] }
@@ -82,7 +82,7 @@ url = { version = "2", features = ["serde"] }
 
 # Helpful macros for working with enums and strings
 # Attention: strum needs to be in sync with uc_api
-strum = "0.27"
+strum = "0.28"
 derive_more = { version = "2", features = ["constructor", "display"] }
 derive_builder = "0.20"
 
