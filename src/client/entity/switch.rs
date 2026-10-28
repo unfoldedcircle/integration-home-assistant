@@ -64,6 +64,7 @@ pub(crate) fn convert_switch_entity(
         device_class,
         name,
         icon: None,
+        description: None,
         features: Some(vec!["toggle".into()]), // OnOff is a default feature
         area: None,
         options: None,
