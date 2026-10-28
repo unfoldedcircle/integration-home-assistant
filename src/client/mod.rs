@@ -35,6 +35,7 @@ mod actor;
 pub mod assist;
 mod close_handler;
 mod entity;
+mod entity_registry;
 mod event;
 mod get_entities;
 mod get_states;
@@ -86,6 +87,9 @@ pub struct HomeAssistantClient {
     entity_states_id: Option<u32>,
     /// Cached number entity states for command processing. Map: HA entity ID -> number state
     number_states: HashMap<String, entity::NumberState>,
+    /// Display precisions of HA sensors, refreshed when retrieving the entity states.
+    /// Map: HA entity ID -> display precision
+    display_precisions: HashMap<String, u32>,
     sink: SinkWrite<ws::Message, SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>>,
     controller_actor: Addr<Controller>,
     /// Last heart beat timestamp.
@@ -148,6 +152,7 @@ impl HomeAssistantClient {
                 subscribe_uc_events_id: None,
                 entity_states_id: None,
                 number_states: Default::default(),
+                display_precisions: Default::default(),
                 subscribe_configure_id: None,
                 sink: SinkWrite::new(sink, ctx),
                 controller_actor,
@@ -405,6 +410,9 @@ impl HomeAssistantClient {
                 // if auth occurs right after HA reboots, custom events won't be available yet
                 // We will have to check after custom events later if unavailable
                 self.send_uc_info_command(ctx);
+                // Sensor display precisions for entity change events, in case the Remote doesn't
+                // retrieve the entity states after a reconnect.
+                self.refresh_display_precisions(ctx);
                 // Store start time of HA so that we check regularly after custom events
                 let ha_start_time = Instant::now();
                 self.check_uc_ha_component(ctx, ha_start_time);

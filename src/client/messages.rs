@@ -8,7 +8,7 @@ use crate::errors::ServiceError;
 use actix::prelude::Message;
 use awc::ws::CloseCode;
 use derive_more::Constructor;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use uc_api::intg::ws::{
     BrowseMediaMsgData, BrowseMediaResponseMsgData, SearchMediaMsgData, SearchMediaResponseMsgData,
 };
@@ -39,6 +39,16 @@ pub struct CallRunAssistPipeline {
     pub speech_response: bool,
     pub pipeline_id: Option<String>,
 }
+
+/// Retrieve the display precision of all sensor entities from the Home Assistant entity registry.
+///
+/// Returns a map of HA entity id -> display precision. Only sensors with a display precision are
+/// included: the user setting in Home Assistant, otherwise the suggested precision of the sensor.
+///
+/// See <https://github.com/home-assistant/core/pull/87787>
+#[derive(Message, Default)]
+#[rtype(result = "Result<HashMap<String, u32>, ServiceError>")]
+pub struct CallListEntityDisplayPrecisions;
 
 /// Retrieve all available assist pipelines from Home Assistant.
 #[derive(Message)]

@@ -46,10 +46,20 @@ The following HA entities are supported in the Unfolded Circle Remote:
 - [Select](https://developers.home-assistant.io/docs/core/entity/select)
   - Requires core / Simulator version 0.68.0 or newer. Not yet available in a public firmware release.
 - [Sensor](https://developers.home-assistant.io/docs/core/entity/sensor)
+  - Numeric sensor values are sent as numbers. A sensor is numeric with the same rules as in Home Assistant: it has a
+    unit of measurement, a state class, a display precision or a numeric device class (all except `date`, `enum`,
+    `timestamp` and `uptime`, custom device classes are ignored). Floating point artifacts are removed by rounding to
+    15 significant digits.
+  - Other sensor values are sent as text, even if the text looks like a number, e.g. a version `1.10`.
+  - The display precision of the sensor in Home Assistant is used as `decimals` option (max 6). It is retrieved after
+    connecting and with the entity states. A changed precision is applied after the next entity reload of the Remote.
+    Requires Home Assistant 2023.3 or newer.
+  - The value is `null` while the sensor is unavailable or unknown.
 - [Binary sensor](https://www.home-assistant.io/integrations/binary_sensor/): mapped to sensor
   - Sensor entity device class: `binary`.
   - The Home Assistant device class is stored in the `unit` attribute.
-  - The `value` attribute contains the `on` and `off` sensor text values from Home Assistant.
+  - The `value` attribute contains the `on` and `off` sensor text values from Home Assistant, `null` while unavailable
+    or unknown.
 - [Switch](https://developers.home-assistant.io/docs/core/entity/switch)
 - [Input boolean](https://www.home-assistant.io/integrations/input_boolean/): mapped to switch
 - [Input select](https://www.home-assistant.io/integrations/input_select/): mapped to select
