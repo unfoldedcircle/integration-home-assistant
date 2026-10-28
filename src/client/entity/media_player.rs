@@ -62,16 +62,18 @@ pub(crate) fn map_media_player_attributes(
             attributes.insert("volume".into(), ((value * 100.0).round() as u64).into());
         }
         json::move_value(ha_attr, &mut attributes, "is_volume_muted", "muted");
-        json::move_entry(ha_attr, &mut attributes, "media_position");
-        json::move_entry(ha_attr, &mut attributes, "media_position_updated_at");
-        json::move_entry(ha_attr, &mut attributes, "media_duration");
-        json::move_entry(ha_attr, &mut attributes, "media_title");
-        json::move_entry(ha_attr, &mut attributes, "media_artist");
-        json::move_value(ha_attr, &mut attributes, "media_album_name", "media_album");
-        json::move_entry(ha_attr, &mut attributes, "media_playlist");
-        json::move_entry(ha_attr, &mut attributes, "media_id");
+        json::move_entry_or_null(ha_attr, &mut attributes, "media_position");
+        json::move_entry_or_null(ha_attr, &mut attributes, "media_position_updated_at");
+        json::move_entry_or_null(ha_attr, &mut attributes, "media_duration");
+        json::move_entry_or_null(ha_attr, &mut attributes, "media_title");
+        json::move_entry_or_null(ha_attr, &mut attributes, "media_artist");
+        json::move_value_or_null(ha_attr, &mut attributes, "media_album_name", "media_album");
+        json::move_entry_or_null(ha_attr, &mut attributes, "media_playlist");
+        json::move_entry_or_null(ha_attr, &mut attributes, "media_id");
         if let Some(value) = ha_attr.get("media_content_type").and_then(|v| v.as_str()) {
             attributes.insert("media_type".into(), value.into());
+        } else {
+            attributes.insert("media_type".into(), Value::Null);
         }
         json::move_entry(ha_attr, &mut attributes, "shuffle");
         if let Some(value) = ha_attr.get("repeat").and_then(|v| v.as_str()) {
@@ -86,6 +88,8 @@ pub(crate) fn map_media_player_attributes(
             && let Some(url) = set_album_art_proxy(server, value)
         {
             attributes.insert("media_image_url".into(), url.into());
+        } else {
+            attributes.insert("media_image_url".into(), Value::Null);
         }
     }
 
@@ -742,5 +746,31 @@ mod tests {
         assert!(entity.name.contains_key("en"));
         assert!(entity.features.is_some());
         assert!(entity.attributes.is_some());
+    }
+
+    #[test]
+    fn convert_media_player_idle_nullifies_media_attributes() {
+        let server = create_test_server();
+        let entity_id = "media_player.idle_test".to_string();
+        let state = "idle".to_string();
+
+        // Provide minimal HA attributes missing all the media_* fields
+        let mut ha_attr = serde_json::from_value(json!({
+            "friendly_name": "Idle Player",
+            "supported_features": SUPPORT_PLAY
+        }))
+        .unwrap();
+
+        let result = convert_media_player_entity(&server, entity_id, state, &mut ha_attr);
+        assert!(result.is_ok());
+        let entity = result.unwrap();
+        let attrs = entity.attributes.unwrap();
+
+        // Check that media attributes explicitly become Null to wipe stale UI data
+        assert_eq!(Some(&Value::Null), attrs.get("media_title"));
+        assert_eq!(Some(&Value::Null), attrs.get("media_duration"));
+        assert_eq!(Some(&Value::Null), attrs.get("media_position"));
+        assert_eq!(Some(&Value::Null), attrs.get("media_image_url"));
+        assert_eq!(Some(&Value::Null), attrs.get("media_type"));
     }
 }

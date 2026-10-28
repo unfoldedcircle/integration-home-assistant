@@ -48,6 +48,41 @@ pub fn move_value(
         .is_some()
 }
 
+/// Move an entry from one serde_json::Map to another.
+/// If the key is missing in the source, inserts a Null value into the dest to clear stale data.
+pub fn move_entry_or_null(
+    source: &mut Map<String, Value>,
+    dest: &mut Map<String, Value>,
+    key: &str,
+) {
+    match source.remove_entry(key) {
+        Some((k, v)) => {
+            dest.insert(k, v);
+        }
+        None => {
+            dest.insert(key.to_string(), Value::Null);
+        }
+    }
+}
+
+/// Move a value from one serde_json::Map to another while renaming the key.
+/// If the key is missing in the source, inserts a Null value into the dest to clear stale data.
+pub fn move_value_or_null(
+    source: &mut Map<String, Value>,
+    dest: &mut Map<String, Value>,
+    key: &str,
+    dest_key: impl Into<String>,
+) {
+    match source.remove_entry(key) {
+        Some((_, value)) => {
+            dest.insert(dest_key.into(), value);
+        }
+        None => {
+            dest.insert(dest_key.into(), Value::Null);
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub fn map_str_value<F: FnOnce(&str) -> Value>(
     source: &Map<String, Value>,
@@ -79,7 +114,7 @@ pub fn number_value(json: &Map<String, Value>, key: &str) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use crate::util::json::{copy_entry, move_entry, move_value};
-    use serde_json::{Map, json};
+    use serde_json::{Map, Value, json};
 
     #[test]
     fn copy_entry_with_non_existing_key_returns_false() {
@@ -147,5 +182,41 @@ mod tests {
         );
         assert_eq!(None, source.get("foo"), "Source entry must be removed");
         assert_eq!(Some(&json!("bar")), dest.get("bar"));
+    }
+
+    #[test]
+    fn move_entry_or_null_with_existing_key_moves_entry() {
+        let mut source = Map::new();
+        let mut dest = Map::new();
+        source.insert("foo".into(), json!("bar"));
+        super::move_entry_or_null(&mut source, &mut dest, "foo");
+        assert_eq!(None, source.get("foo"));
+        assert_eq!(Some(&json!("bar")), dest.get("foo"));
+    }
+
+    #[test]
+    fn move_entry_or_null_with_non_existing_key_inserts_null() {
+        let mut source = Map::new();
+        let mut dest = Map::new();
+        super::move_entry_or_null(&mut source, &mut dest, "foo");
+        assert_eq!(Some(&Value::Null), dest.get("foo"));
+    }
+
+    #[test]
+    fn move_value_or_null_with_existing_key_moves_entry() {
+        let mut source = Map::new();
+        let mut dest = Map::new();
+        source.insert("foo".into(), json!("bar"));
+        super::move_value_or_null(&mut source, &mut dest, "foo", "baz");
+        assert_eq!(None, source.get("foo"));
+        assert_eq!(Some(&json!("bar")), dest.get("baz"));
+    }
+
+    #[test]
+    fn move_value_or_null_with_non_existing_key_inserts_null() {
+        let mut source = Map::new();
+        let mut dest = Map::new();
+        super::move_value_or_null(&mut source, &mut dest, "foo", "baz");
+        assert_eq!(Some(&Value::Null), dest.get("baz"));
     }
 }
