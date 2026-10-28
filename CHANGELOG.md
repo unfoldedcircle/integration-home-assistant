@@ -8,25 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.18.0 - 2026-10-28
 ### Fixed
-- Home Assistant connection handling ([#39](https://github.com/unfoldedcircle/integration-home-assistant/issues/39), analysis in [#97](https://github.com/unfoldedcircle/integration-home-assistant/pull/97)):
+- Home Assistant connection handling ([#39](https://github.com/unfoldedcircle/integration-home-assistant/issues/39), analysis in [#97](https://github.com/unfoldedcircle/integration-home-assistant/pull/97), [#100](https://github.com/unfoldedcircle/integration-home-assistant/pull/100)):
   - A second connect request during a running connection attempt started a second HA client. This could happen after standby / wake, or when the remote sent a `connect` event while the driver was still connecting.
   - A connection which closed before authentication and event subscription completed was ignored and no reconnection was scheduled. The driver remained in the `CONNECTING` state.
   - An in-flight connection attempt was not invalidated by a disconnect request (standby, setup flow) and could establish the connection afterwards.
   - Reconnect backoff is now reset after a fully established connection and applied when the connection is closed before being usable.
-- HA requests are only forwarded to the HA client after authentication and event subscription.
-- Respond with an error to `entity_command` requests if the HA connection is not available, instead of not responding at all.
-- Browse and search media requests time out after 10 seconds if Home Assistant doesn't respond.
-- Entity events are no longer dropped if an internal message queue is temporarily full.
-- Custom label and unit options of unsupported sensor device classes were not set.
-- The cached `available_entities` response was sent twice.
-- Panic when the remote's `version` response has no payload, or an entity id without a domain separator is used in a button command.
-- Advertise media duration and position for Home Assistant players that do not support seeking.
+- HA requests are only forwarded to the HA client after authentication and event subscription ([#100](https://github.com/unfoldedcircle/integration-home-assistant/pull/100)).
+- Respond with an error to `entity_command` requests if the HA connection is not available, instead of not responding at all ([#100](https://github.com/unfoldedcircle/integration-home-assistant/pull/100)).
+- Browse and search media requests time out after 10 seconds if Home Assistant doesn't respond ([#100](https://github.com/unfoldedcircle/integration-home-assistant/pull/100)).
+- Entity events are no longer dropped if an internal message queue is temporarily full ([#100](https://github.com/unfoldedcircle/integration-home-assistant/pull/100)).
+- Custom label and unit options of unsupported sensor device classes were not set ([#100](https://github.com/unfoldedcircle/integration-home-assistant/pull/100)).
+- The cached `available_entities` response was sent twice ([#100](https://github.com/unfoldedcircle/integration-home-assistant/pull/100)).
+- Panic when the remote's `version` response has no payload, or an entity id without a domain separator is used in a button command ([#100](https://github.com/unfoldedcircle/integration-home-assistant/pull/100)).
+- Replace deprecated PEM reader dependency. Contributed by @henrikwidlund, thanks! ([#102](https://github.com/unfoldedcircle/integration-home-assistant/pull/102)).
+- Advertise media duration and position for Home Assistant players that do not support seeking. Contributed by @JackJPowell, thanks! ([#105](https://github.com/unfoldedcircle/integration-home-assistant/pull/105)).
 
 ### Changed
-- The `uc-intg-hass` binary uses the library crate instead of compiling all modules a second time.
-
----
+- The `uc-intg-hass` binary uses the library crate instead of compiling all modules a second time ([#100](https://github.com/unfoldedcircle/integration-home-assistant/pull/100)).
+- Pin Docker image in CI ([#101](https://github.com/unfoldedcircle/integration-home-assistant/pull/101)).
+- Pin Rust toolchain to 1.98.1 ([#113](https://github.com/unfoldedcircle/integration-home-assistant/pull/113)).
+- Add Dependabot cargo update support ([#114](https://github.com/unfoldedcircle/integration-home-assistant/pull/114)).
+- Update dependencies and GitHub build actions ([#109](https://github.com/unfoldedcircle/integration-home-assistant/pull/109), [#110](https://github.com/unfoldedcircle/integration-home-assistant/pull/110), [#111](https://github.com/unfoldedcircle/integration-home-assistant/pull/111), [#112](https://github.com/unfoldedcircle/integration-home-assistant/pull/112), [#115](https://github.com/unfoldedcircle/integration-home-assistant/pull/115), [#118](https://github.com/unfoldedcircle/integration-home-assistant/pull/118)).
 
 ## v0.17.0 - 2026-09-15
 ### Changed
