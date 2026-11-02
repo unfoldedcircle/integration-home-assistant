@@ -3,7 +3,7 @@
 
 //! Sensor entity-specific logic.
 
-use crate::client::entity::number_to_json;
+use crate::client::entity::{number_to_json, round_significant};
 use crate::client::event::convert_ha_sensor_state;
 use crate::client::model::EventData;
 use crate::errors::ServiceError;
@@ -82,10 +82,6 @@ const NUMERIC_DEVICE_CLASSES: [&str; 58] = [
 ];
 /// Maximum number of decimal places of the UC sensor `decimals` option.
 const MAX_DECIMALS: u32 = 6;
-/// Number of significant digits of a numeric sensor value. Every decimal number with up to 15
-/// significant digits can be represented by a f64, the remaining digits are floating point
-/// artifacts of calculated values.
-const SIGNIFICANT_DIGITS: usize = 15;
 
 /// Returns true if HA expects a numeric sensor state.
 ///
@@ -102,14 +98,6 @@ fn is_numeric_sensor(ha_attr: Option<&Map<String, Value>>, display_precision: Op
         || get("unit_of_measurement").is_some()
         || display_precision.is_some()
         || device_class.is_some_and(|class| NUMERIC_DEVICE_CLASSES.contains(&class))
-}
-
-/// Round a value to 15 significant digits to remove floating point artifacts, e.g.
-/// `1.499999999999997` -> `1.5`.
-fn round_significant(value: f64) -> f64 {
-    format!("{:.*e}", SIGNIFICANT_DIGITS - 1, value)
-        .parse()
-        .unwrap_or(value)
 }
 
 /// Convert a HA sensor state to the UC sensor value.
@@ -587,17 +575,6 @@ mod tests {
             expected,
             is_numeric_sensor(attr.as_object(), display_precision)
         );
-    }
-
-    #[rstest::rstest]
-    #[case(1.499999999999997, 1.5)]
-    #[case(0.30000000000000004, 0.3)]
-    #[case(0.789266666666667, 0.789266666666667)]
-    #[case(-21.4, -21.4)]
-    #[case(123456789012.345, 123456789012.345)]
-    #[case(0.0, 0.0)]
-    fn round_to_significant_digits(#[case] value: f64, #[case] expected: f64) {
-        assert_eq!(expected, round_significant(value));
     }
 
     #[rstest::rstest]
