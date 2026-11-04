@@ -24,6 +24,10 @@ use crate::errors::ServiceError;
 pub(crate) const MIN_STEP: f64 = 0.000001;
 /// Maximum number of decimal places of the UC number entity. Matches the smallest step size.
 const MAX_DECIMALS: u32 = 6;
+/// Number of significant digits of a numeric value. Every decimal number with up to 15
+/// significant digits can be represented by a f64, the remaining digits are floating point
+/// artifacts of calculated values.
+const SIGNIFICANT_DIGITS: usize = 15;
 /// Duration how long an expected value after a command is used for calculating the next
 /// `increment` or `decrement` command, while waiting for the HA state update.
 pub(crate) const OPTIMISTIC_VALUE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -192,7 +196,7 @@ pub(crate) fn parse_number_entity(
         "unavailable" => ("UNAVAILABLE", None),
         "unknown" => ("UNKNOWN", None),
         _ => match state.parse::<f64>() {
-            Ok(value) if value.is_finite() => ("ON", Some(value)),
+            Ok(value) if value.is_finite() => ("ON", Some(round_significant(value))),
             _ => {
                 warn!("Invalid number entity state of {entity_id}: {state}");
                 ("UNKNOWN", None)
@@ -276,6 +280,14 @@ pub(crate) fn decimals_for(values: &[f64]) -> u32 {
 pub(crate) fn round_to(value: f64, decimals: u32) -> f64 {
     let factor = 10f64.powi(decimals as i32);
     (value * factor).round() / factor
+}
+
+/// Round a value to 15 significant digits to remove floating point artifacts, e.g.
+/// `1.499999999999997` -> `1.5`.
+pub(crate) fn round_significant(value: f64) -> f64 {
+    format!("{:.*e}", SIGNIFICANT_DIGITS - 1, value)
+        .parse()
+        .unwrap_or(value)
 }
 
 /// Convert a number to a JSON value. Whole numbers are converted to an integer value.
@@ -697,6 +709,8 @@ mod tests {
     #[case("23.0", "ON", Some(23.0))]
     #[case("-7.5", "ON", Some(-7.5))]
     #[case("0.3", "ON", Some(0.3))]
+    #[case("0.30000000000000004", "ON", Some(0.3))]
+    #[case("1.499999999999997", "ON", Some(1.5))]
     #[case("1.2345678901235e+17", "ON", Some(1.2345678901235e17))]
     #[case("unavailable", "UNAVAILABLE", None)]
     #[case("unknown", "UNKNOWN", None)]
@@ -733,6 +747,17 @@ mod tests {
     #[case(&[], 0)]
     fn decimals(#[case] values: &[f64], #[case] expected: u32) {
         assert_eq!(expected, decimals_for(values));
+    }
+
+    #[rstest]
+    #[case(1.499999999999997, 1.5)]
+    #[case(0.30000000000000004, 0.3)]
+    #[case(0.789266666666667, 0.789266666666667)]
+    #[case(-21.4, -21.4)]
+    #[case(123456789012.345, 123456789012.345)]
+    #[case(0.0, 0.0)]
+    fn round_to_significant_digits(#[case] value: f64, #[case] expected: f64) {
+        assert_eq!(expected, round_significant(value));
     }
 
     #[rstest]

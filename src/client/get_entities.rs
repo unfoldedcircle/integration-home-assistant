@@ -4,6 +4,7 @@
 //! Actix actor handler implementation for the `GetStates` message
 
 use crate::client::HomeAssistantClient;
+use crate::client::entity_registry::fetch_display_precisions;
 use crate::client::messages::{CallListAssistPipelines, GetAvailableEntities};
 use crate::errors::ServiceError;
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
@@ -28,7 +29,7 @@ impl Handler<GetAvailableEntities> for HomeAssistantClient {
             async move {
                 // Retrieve available assist pipelines and map them to UC voice-assistant entities
                 // This is best effort, old HA setups might return an error
-                match ha_client.send(CallListAssistPipelines::default()).await {
+                let pipelines = match ha_client.send(CallListAssistPipelines::default()).await {
                     Ok(Ok(result)) => Some(result),
                     Ok(Err(e)) => {
                         error!("Failed to retrieve Home Assistant assist pipelines: {e}");
@@ -38,13 +39,20 @@ impl Handler<GetAvailableEntities> for HomeAssistantClient {
                         error!("Failed to send CallListAssistPipelines: {e}");
                         None
                     }
-                }
+                };
+                // Retrieve the sensor display precisions. Best effort as well.
+                let precisions = fetch_display_precisions(&ha_client).await;
+                (pipelines, precisions)
             }
             .into_actor(self) // converts future to ActorFuture
-            .map(move |result, act, ctx| {
+            .map(move |(result, precisions), act, ctx| {
                 if let Some(result) = result {
                     info!("Got assist pipelines: {result:?}");
                     act.assist_pipelines = Some(result);
+                }
+                if let Some(precisions) = precisions {
+                    debug!("Got {} sensor display precisions", precisions.len());
+                    act.display_precisions = precisions;
                 }
                 // Retrieve Home Assistant entities
                 let id = act.new_msg_id();

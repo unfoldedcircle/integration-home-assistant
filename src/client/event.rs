@@ -56,7 +56,10 @@ impl HomeAssistantClient {
                     entity_change
                 })
             }
-            "sensor" | "binary_sensor" => sensor_event_to_entity_change(event.data),
+            "sensor" | "binary_sensor" => {
+                let precision = self.display_precisions.get(&event.data.entity_id).copied();
+                sensor_event_to_entity_change(event.data, precision)
+            }
             "climate" => climate_event_to_entity_change(event.data),
             "media_player" => media_player_event_to_entity_change(&self.server, event.data),
             "remote" => remote_event_to_entity_change(event.data),
