@@ -45,6 +45,7 @@ pub(crate) fn convert_remote_entity(
         name,
         // toggle, on and off seem to be fixed features in HA
         icon: None,
+        description: None,
         features: Some(vec![
             IntgRemoteFeature::SendCmd.to_string(),
             IntgRemoteFeature::OnOff.to_string(),

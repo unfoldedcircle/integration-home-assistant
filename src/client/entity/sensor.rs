@@ -110,6 +110,7 @@ pub(crate) fn convert_sensor_entity(
         device_class,
         name,
         icon: None,
+        description: None,
         features: None,
         area: None,
         options: if options.is_empty() {

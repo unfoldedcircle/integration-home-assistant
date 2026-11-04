@@ -84,6 +84,8 @@ pub struct HomeAssistantClient {
     assist_sessions: HashMap<u32, AssistSession>,
     assist_pipelines: Option<GetPipelinesResult>,
     entity_states_id: Option<u32>,
+    /// Cached number entity states for command processing. Map: HA entity ID -> number state
+    number_states: HashMap<String, entity::NumberState>,
     sink: SinkWrite<ws::Message, SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>>,
     controller_actor: Addr<Controller>,
     /// Last heart beat timestamp.
@@ -145,6 +147,7 @@ impl HomeAssistantClient {
                 subscribe_standard_events_id: None,
                 subscribe_uc_events_id: None,
                 entity_states_id: None,
+                number_states: Default::default(),
                 subscribe_configure_id: None,
                 sink: SinkWrite::new(sink, ctx),
                 controller_actor,

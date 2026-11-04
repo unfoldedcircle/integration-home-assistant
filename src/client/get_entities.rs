@@ -157,6 +157,7 @@ impl HomeAssistantClient {
                 device_class: None,
                 name,
                 icon: Some("uc:microphone".to_string()),
+                description: None,
                 features: Some(features),
                 area: None,
                 options: None,

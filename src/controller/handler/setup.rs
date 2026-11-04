@@ -583,6 +583,7 @@ impl Handler<FinishSetupFlowMsg> for Controller {
                 event_type: SetupChangeEventType::Stop,
                 state,
                 error: msg.error,
+                error_message: None,
                 require_user_action: None,
             })
             .expect("DriverSetupChange serialize error"),
