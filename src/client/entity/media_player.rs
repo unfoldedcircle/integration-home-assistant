@@ -559,7 +559,10 @@ mod tests {
         assert!(features.contains(&MediaPlayerFeature::MediaDuration.to_string()));
         assert!(features.contains(&MediaPlayerFeature::MediaPosition.to_string()));
         assert!(!features.contains(&MediaPlayerFeature::Seek.to_string()));
-        assert!(!entity.attributes.unwrap().contains_key("media_position"));
+        assert_eq!(
+            entity.attributes.unwrap().get("media_duration"),
+            Some(&Value::Null)
+        );
 
         let event = EventData {
             entity_id: "media_player.no_seek".into(),

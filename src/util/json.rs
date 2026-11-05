@@ -55,14 +55,7 @@ pub fn move_entry_or_null(
     dest: &mut Map<String, Value>,
     key: &str,
 ) {
-    match source.remove_entry(key) {
-        Some((k, v)) => {
-            dest.insert(k, v);
-        }
-        None => {
-            dest.insert(key.to_string(), Value::Null);
-        }
-    }
+    dest.insert(key.into(), source.remove(key).unwrap_or(Value::Null));
 }
 
 /// Move a value from one serde_json::Map to another while renaming the key.
@@ -73,14 +66,7 @@ pub fn move_value_or_null(
     key: &str,
     dest_key: impl Into<String>,
 ) {
-    match source.remove_entry(key) {
-        Some((_, value)) => {
-            dest.insert(dest_key.into(), value);
-        }
-        None => {
-            dest.insert(dest_key.into(), Value::Null);
-        }
-    }
+    dest.insert(dest_key.into(), source.remove(key).unwrap_or(Value::Null));
 }
 
 #[allow(dead_code)]
