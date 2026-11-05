@@ -71,7 +71,7 @@ jobs:
           use_gh_cache: ${{ env.USE_GH_CACHE }}
           incremental: ${{ env.INCREMENTAL_BUILD }}
 
-      - run: cargo test --features mdns-sd --bin uc-intg-hass
+      - run: cargo test --features mdns-sd
 
       - name: Run clippy
         run: cargo clippy --features mdns-sd -- -D warnings

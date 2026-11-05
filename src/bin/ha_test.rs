@@ -53,8 +53,23 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
 
+    // Simulate the Remote: `exit_standby` and `connect` events arrive shortly after each other.
+    if env::var("HA_TEST_DOUBLE_CONNECT").is_ok() {
+        sleep(Duration::from_millis(300)).await;
+        controller
+            .send(R2EventMsg {
+                ws_id: ws_id.clone(),
+                event: R2Event::Connect,
+                msg_data: None,
+            })
+            .await?;
+    }
+
     // quick and dirty for now
-    sleep(Duration::from_secs(30)).await;
+    sleep(Duration::from_secs(
+        u64::from_str(&env::var("HA_TEST_RUN_SECS").unwrap_or_default()).unwrap_or(30),
+    ))
+    .await;
 
     Ok(())
 }

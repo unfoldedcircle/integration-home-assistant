@@ -24,6 +24,7 @@ pub(crate) fn convert_button_entity(
         device_class: None,
         name,
         icon: None,
+        description: None,
         features: None, // no optional features, default = "press"
         area: None,
         options: None,

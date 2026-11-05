@@ -15,7 +15,7 @@ use crate::errors::ServiceError;
 use crate::util::new_websocket_client;
 use actix::prelude::{Actor, Context, Recipient};
 use actix::{Addr, AsyncContext, SpawnHandle};
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use rust_fsm::*;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
@@ -26,8 +26,8 @@ use uc_api::intg::{AvailableIntgEntity, DeviceState, IntegrationDriverUpdate};
 use uc_api::ws::{EventCategory, WsMessage};
 
 state_machine! {
-    derive(Debug)
-    OperationMode(RequireSetup)
+    #[derive(Debug)]
+    operation_mode(RequireSetup)
 
     RequireSetup => {
         ConfigurationAvailable => Running,
@@ -111,13 +111,19 @@ pub struct Controller {
     ws_client: awc::Client,
     /// HomeAssistant client actor
     ha_client: Option<Addr<HomeAssistantClient>>,
-    /// HomeAssistant client identifier
+    /// HomeAssistant client identifier. Set together with `ha_client` as soon as the client
+    /// actor exists (before authentication) so that every client event can be attributed.
     ha_client_id: Option<String>,
+    /// Sequence number of connection attempts. Used to detect superseded attempts.
+    ha_connect_seq: u32,
+    /// In-flight connection attempt (TCP / WebSocket handshake). `None` if no attempt is pending.
+    /// Cleared by [`Controller::disconnect`] to invalidate the attempt.
+    ha_connect_pending: Option<u32>,
     ha_reconnect_duration: Duration,
     ha_reconnect_attempt: u32,
     drv_metadata: IntegrationDriverUpdate,
     /// State machine for driver state: setup flow or running state
-    machine: StateMachine<OperationMode>,
+    machine: operation_mode::StateMachine,
     /// Driver setup timeout handle
     setup_timeout: Option<SpawnHandle>,
     /// Handle to a scheduled connect message for a reconnect attempt.
@@ -130,11 +136,11 @@ pub struct Controller {
 
 impl Controller {
     pub fn new(settings: Settings, drv_metadata: IntegrationDriverUpdate) -> Self {
-        let mut machine = StateMachine::new();
+        let mut machine = operation_mode::StateMachine::new();
         let url = settings.hass.get_url();
         // if we have all required HA connection settings, we can skip driver setup
         if url.has_host() && !settings.hass.get_token().is_empty() {
-            let _ = machine.consume(&OperationModeInput::ConfigurationAvailable);
+            let _ = machine.consume(&operation_mode::Input::ConfigurationAvailable);
         } else {
             info!("Home Assistant connection requires setup");
         }
@@ -150,6 +156,8 @@ impl Controller {
             settings,
             ha_client: None,
             ha_client_id: None,
+            ha_connect_seq: 0,
+            ha_connect_pending: None,
             ha_reconnect_attempt: 0,
             drv_metadata,
             machine,
@@ -167,13 +175,8 @@ impl Controller {
                 debug!("Remote is in standby, not sending message: {:?}", message);
                 return;
             }
-            let msg = message.msg.clone();
-            if let Err(e) = session.recipient.try_send(SendWsMessage(message)) {
-                error!(
-                    "[{ws_id}] Internal message send error of '{}': {e}",
-                    msg.unwrap_or_default()
-                );
-            }
+            // do_send: bursts of entity events must not be dropped on a full mailbox
+            session.recipient.do_send(SendWsMessage(message));
         } else {
             warn!("attempting to send message but couldn't find session: {ws_id}");
         }
@@ -242,7 +245,7 @@ impl Controller {
     fn sm_consume(
         &mut self,
         ws_id: &str,
-        input: &OperationModeInput,
+        input: &operation_mode::Input,
         ctx: &mut Context<Controller>,
     ) -> Result<(), ServiceError> {
         let old_state = format!("{:?}", self.machine.state());
@@ -255,7 +258,7 @@ impl Controller {
                 }
                 Ok(())
             }
-            Ok(Some(OperationModeOutput::SetupFlowTimer)) => {
+            Ok(Some(operation_mode::Output::SetupFlowTimer)) => {
                 if let Some(handle) = self.setup_timeout.take() {
                     ctx.cancel_future(handle);
                 }
@@ -274,7 +277,7 @@ impl Controller {
                 }
                 Ok(())
             }
-            Ok(Some(OperationModeOutput::CancelSetupFlowTimer)) => {
+            Ok(Some(operation_mode::Output::CancelSetupFlowTimer)) => {
                 debug!("Cancelling SetupFlowTimer");
                 if let Some(handle) = self.setup_timeout.take() {
                     ctx.cancel_future(handle);
