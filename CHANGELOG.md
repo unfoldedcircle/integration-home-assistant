@@ -12,6 +12,9 @@ _Changes in the next release_
 - Number entity support for Home Assistant number, input number and counter entities.
 - Sensor display precision from Home Assistant as `decimals` option ([#85](https://github.com/unfoldedcircle/integration-home-assistant/issues/85)).
 
+### Changed
+- Update dependencies.
+
 ---
 
 ## v0.18.0 - 2026-10-28
