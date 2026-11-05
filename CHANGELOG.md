@@ -8,14 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.19.0 - 2026-11-05
 ### Added
-- Number entity support for Home Assistant number, input number and counter entities.
-- Sensor display precision from Home Assistant as `decimals` option ([#85](https://github.com/unfoldedcircle/integration-home-assistant/issues/85)).
+- Number entity support for Home Assistant number, input number and counter entities ([#119](https://github.com/unfoldedcircle/integration-home-assistant/pull/119)).
+- Sensor display precision from Home Assistant as `decimals` option ([#85](https://github.com/unfoldedcircle/integration-home-assistant/issues/85), [#120](https://github.com/unfoldedcircle/integration-home-assistant/pull/120)).
+
+### Fixed
+- Explicitly nullify missing media attributes to clear stale data. Contributed by @matteoraf, thanks! ([#106](https://github.com/unfoldedcircle/integration-home-assistant/pull/106)).
 
 ### Changed
 - Update dependencies.
-
----
 
 ## v0.18.0 - 2026-10-28
 ### Fixed
