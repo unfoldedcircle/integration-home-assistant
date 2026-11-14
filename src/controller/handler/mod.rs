@@ -27,8 +27,11 @@ struct SubscribeHaEventsMsg(pub R2RequestMsg);
 struct UnsubscribeHaEventsMsg(pub R2RequestMsg);
 
 /// Internal message to connect to Home Assistant.
+///
+/// Starts the HA client if not already running. The connection state is reported with
+/// `ConnectionEvent` messages from the client.
 #[derive(Message, Default)]
-#[rtype(result = "Result<(), std::io::Error>")]
+#[rtype(result = "()")]
 struct ConnectMsg {
     // device identifier for multi-HA connections: feature not yet available
     // pub device_id: String,

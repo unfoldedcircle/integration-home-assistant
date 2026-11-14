@@ -10,10 +10,8 @@ use crate::client::messages::{
 use crate::controller::handler::{ConnectMsg, DisconnectMsg};
 use crate::controller::operation_mode::Input::{AbortSetup, Connected};
 use crate::controller::{Controller, operation_mode};
-use actix::{ActorFutureExt, AsyncContext, Context, Handler, ResponseActFuture, WrapFuture, fut};
-use futures::StreamExt;
-use log::{debug, error, info, warn};
-use std::io::{Error, ErrorKind};
+use actix::{AsyncContext, Context, Handler};
+use log::{debug, error, info};
 use uc_api::intg::DeviceState;
 
 impl Handler<ConnectionEvent> for Controller {
@@ -28,32 +26,40 @@ impl Handler<ConnectionEvent> for Controller {
         }
 
         match msg.state {
+            ConnectionState::Opened => {
+                let dummy_ws_id = "0"; // we don't have a WS request msg id
+                if let Err(e) = self.sm_consume(dummy_ws_id, &Connected, ctx) {
+                    error!("{e}");
+                }
+            }
             ConnectionState::AuthenticationFailed => {
-                // error state prevents auto-reconnect in upcoming Closed event
+                // The client doesn't reconnect with an invalid token: it stops and sends a
+                // Closed event.
                 self.set_device_state(DeviceState::Error);
             }
             ConnectionState::Connected => {
-                // fully connected (authenticated & subscribed): reset reconnect backoff
-                self.ha_reconnect_duration = self.settings.hass.reconnect.duration;
-                self.ha_reconnect_attempt = 0;
+                // fully connected (authenticated & subscribed)
                 self.set_device_state(DeviceState::Connected);
+            }
+            ConnectionState::Disconnected => {
+                // the client reconnects on its own
+                if self.device_state == DeviceState::Connected {
+                    info!("[{}] HA connection lost, reconnecting", msg.client_id);
+                    self.set_device_state(DeviceState::Connecting);
+                }
             }
             ConnectionState::Closed => {
                 info!("[{}] HA client disconnected", msg.client_id);
                 self.ha_client = None;
                 self.ha_client_id = None;
 
+                // The client only stops on its own if it gave up reconnecting. A new connect
+                // request from the Remote starts a new client.
                 if matches!(
                     self.device_state,
                     DeviceState::Connecting | DeviceState::Connected
                 ) {
-                    info!("[{}] Start reconnecting to HA", msg.client_id);
-                    self.set_device_state(DeviceState::Connecting);
-
-                    self.reconnect_handle =
-                        Some(ctx.notify_later(ConnectMsg::default(), self.ha_reconnect_duration));
-                    // back off if the server keeps closing the connection before it's usable
-                    self.increment_reconnect_timeout();
+                    self.set_device_state(DeviceState::Error);
                 }
             }
         };
@@ -70,51 +76,36 @@ impl Handler<DisconnectMsg> for Controller {
 }
 
 impl Controller {
-    pub(crate) fn disconnect(&mut self, ctx: &mut Context<Controller>) {
-        // this prevents automatic reconnects
+    pub(crate) fn disconnect(&mut self, _ctx: &mut Context<Controller>) {
+        // an explicit disconnect is not an error
         self.set_device_state(DeviceState::Disconnected);
 
-        if let Some(handle) = self.reconnect_handle.take() {
-            ctx.cancel_future(handle);
-        }
-        // invalidate an in-flight connection attempt: its result will be discarded
-        self.ha_connect_pending = None;
+        // the client stops reconnecting, closes the connection and stops
         if let Some(addr) = self.ha_client.take() {
             addr.do_send(Close::default());
         }
-        // Make sure the old connection is no longer used and doesn't interfere with reconnection
+        // Make sure the old client is no longer used: its remaining events are ignored
         self.ha_client_id = None;
     }
 }
 
 impl Handler<ConnectMsg> for Controller {
-    type Result = ResponseActFuture<Self, Result<(), Error>>;
+    type Result = ();
 
     fn handle(&mut self, _msg: ConnectMsg, ctx: &mut Self::Context) -> Self::Result {
-        if let Some(handle) = self.reconnect_handle.take() {
-            ctx.cancel_future(handle);
-        }
         if !matches!(
             self.machine.state(),
             &operation_mode::State::Running | &operation_mode::State::RequireSetup
         ) {
             error!("Cannot connect in state: {:?}", self.machine.state());
-            return Box::pin(fut::result(Err(Error::new(
-                ErrorKind::InvalidInput,
-                "Not in running state",
-            ))));
+            return;
         }
 
-        // One client at a time: either a client actor exists (connecting, authenticating or
-        // connected), or a connection attempt is still in flight. Both will end in a
-        // `Connected` or `Closed` event, which drives the next step.
+        // One client at a time. An existing client is connecting, authenticating, connected or
+        // reconnecting: it reports the outcome with a connection event.
         if let Some(client_id) = self.ha_client_id.as_ref() {
             debug!("[{client_id}] Ignoring connect request: HA client already exists");
-            return Box::pin(fut::ok(()));
-        }
-        if let Some(attempt) = self.ha_connect_pending {
-            debug!("Ignoring connect request: connection attempt {attempt} still in progress");
-            return Box::pin(fut::ok(()));
+            return;
         }
 
         let url = self.settings.hass.get_url();
@@ -126,125 +117,52 @@ impl Handler<ConnectMsg> for Controller {
             if let Err(e) = self.sm_consume(dummy_ws_id, &AbortSetup, ctx) {
                 error!("{e}");
             }
-            return Box::pin(fut::result(Err(Error::new(
-                ErrorKind::InvalidInput,
-                "Missing HA url or token",
-            ))));
+            return;
         }
 
-        self.set_device_state(DeviceState::Connecting);
-
-        self.ha_connect_seq = self.ha_connect_seq.wrapping_add(1);
-        let attempt = self.ha_connect_seq;
-        self.ha_connect_pending = Some(attempt);
         let client_id = HomeAssistantClient::new_client_id(&url);
-
-        let ws_request = self.ws_client.ws(url.as_str());
-        // align frame size to Home Assistant
-        let ws_request = ws_request.max_frame_size(self.settings.hass.max_frame_size_kb * 1024);
-        let client_address = ctx.address();
-        let heartbeat = self.settings.hass.heartbeat;
-        let remote_id = self.remote_id.clone();
-
         info!(
             "[{client_id}] Connecting to: {url} (timeout: {}s, request_timeout: {}s)",
             self.settings.hass.connection_timeout, self.settings.hass.request_timeout
         );
-        Box::pin(
-            async move {
-                let (_, framed) = match ws_request.connect().await {
-                    Ok((r, f)) => (r, f),
-                    Err(e) => {
-                        warn!("[{client_id}] Could not connect to {url}: {e:?}");
-                        return Err(Error::other(e.to_string()));
-                    }
-                };
-                info!("[{client_id}] Connected to: {url} ({heartbeat})");
-
-                let (sink, stream) = framed.split();
-                let addr = HomeAssistantClient::start(
-                    client_id.clone(),
-                    url,
-                    client_address,
-                    token,
-                    sink,
-                    stream,
-                    heartbeat,
-                );
-
-                Ok((addr, client_id))
+        let ha_client = match HomeAssistantClient::start(
+            client_id.clone(),
+            url,
+            ctx.address(),
+            token,
+            &self.settings.hass,
+        ) {
+            Ok(client) => client,
+            Err(e) => {
+                error!("[{client_id}] Cannot connect to HA: {e}");
+                self.set_device_state(DeviceState::Error);
+                return;
             }
-            .into_actor(self) // converts future to ActorFuture
-            .map(move |result, act, ctx| {
-                if act.ha_connect_pending != Some(attempt) {
-                    // superseded by a disconnect (standby, setup flow) or a newer attempt
-                    match result {
-                        Ok((addr, client_id)) => {
-                            info!("[{client_id}] Discarding superseded HA connection");
-                            addr.do_send(Close::default());
-                        }
-                        Err(e) => debug!("Ignoring failed, superseded connection attempt: {e}"),
-                    }
-                    return Ok(());
-                }
-                act.ha_connect_pending = None;
+        };
+        self.set_device_state(DeviceState::Connecting);
 
-                match result {
-                    Ok((addr, client_id)) => {
-                        let dummy_ws_id = "0"; // we don't have a WS request msg id
-                        if let Err(e) = act.sm_consume(dummy_ws_id, &Connected, ctx) {
-                            error!("{e}");
-                        }
+        // The client keeps these settings over reconnects and uses them after authentication.
+        if let Some(language) = self.language.clone()
+            && let Err(e) = ha_client.try_send(SetLanguage { language })
+        {
+            error!("Error sending language to client: {e:?}");
+        }
+        debug!("Sending subscribed entities to client for events subscriptions");
+        if let Some(session) = self.sessions.values().next() {
+            let entities = session.subscribed_entities.clone();
+            let remote_id = self.remote_id.clone();
+            if let Err(e) = ha_client.try_send(SetRemoteId { remote_id }) {
+                error!("Error sending remote identifier to client: {:?}", e);
+            }
 
-                        act.ha_client_id = Some(client_id);
-                        act.ha_client = Some(addr);
-                        // Before the client is authenticated and retrieves the translations
-                        if let Some(language) = act.language.clone()
-                            && let Some(ha_client) = &act.ha_client
-                            && let Err(e) = ha_client.try_send(SetLanguage { language })
-                        {
-                            error!("Error sending language to client: {e:?}");
-                        }
-                        debug!("Sending subscribed entities to client for events subscriptions");
-                        if let Some(session) = act.sessions.values().next() {
-                            let entities = session.subscribed_entities.clone();
-                            if let Some(ha_client) = &act.ha_client {
-                                if let Err(e) = ha_client.try_send(SetRemoteId { remote_id }) {
-                                    error!("Error sending remote identifier to client: {:?}", e);
-                                }
+            if let Err(e) = ha_client.try_send(SubscribedEntities {
+                entity_ids: entities,
+            }) {
+                error!("Error updating subscribed entities to client: {:?}", e);
+            }
+        }
 
-                                if let Err(e) = ha_client.try_send(SubscribedEntities {
-                                    entity_ids: entities,
-                                }) {
-                                    error!("Error updating subscribed entities to client: {:?}", e);
-                                }
-                            }
-                        }
-                        Ok(())
-                    }
-                    Err(e) => {
-                        if act.device_state != DeviceState::Disconnected {
-                            act.ha_reconnect_attempt += 1;
-                            if act.settings.hass.reconnect.attempts > 0
-                                && act.ha_reconnect_attempt > act.settings.hass.reconnect.attempts
-                            {
-                                info!(
-                                    "Max reconnect attempts reached ({}). Giving up!",
-                                    act.settings.hass.reconnect.attempts
-                                );
-                                act.set_device_state(DeviceState::Error);
-                            } else {
-                                act.reconnect_handle = Some(ctx.notify_later(
-                                    ConnectMsg::default(),
-                                    act.ha_reconnect_duration,
-                                ));
-                                act.increment_reconnect_timeout();
-                            }
-                        }
-                        Err(e)
-                    }
-                }
-            }),
-        )
+        self.ha_client_id = Some(client_id);
+        self.ha_client = Some(ha_client);
     }
 }

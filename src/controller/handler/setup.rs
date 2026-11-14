@@ -10,7 +10,6 @@ use crate::controller::handler::{
 };
 use crate::controller::operation_mode::{self, Input::*};
 use crate::errors::{ServiceError, ServiceError::BadRequest};
-use crate::util::new_websocket_client;
 use actix::clock::sleep;
 use actix::{ActorFutureExt, AsyncContext, Handler, Message, ResponseActFuture, WrapFuture, fut};
 use derive_more::Constructor;
@@ -183,18 +182,8 @@ impl Handler<SetDriverUserDataMsg> for Controller {
 
         save_user_settings(&cfg)?;
 
-        let new_client_required = self.settings.hass.connection_timeout != cfg.connection_timeout
-            || self.settings.hass.request_timeout != cfg.request_timeout
-            || self.settings.hass.disable_cert_validation != cfg.disable_cert_validation;
+        // the new settings are used with the next connection: a new HA client is created
         self.settings.hass = cfg;
-
-        if new_client_required {
-            self.ws_client = new_websocket_client(
-                Duration::from_secs(self.settings.hass.connection_timeout as u64),
-                Duration::from_secs(self.settings.hass.request_timeout as u64),
-                self.settings.hass.disable_cert_validation,
-            );
-        }
 
         // use a delay that the ack response will be sent first
         ctx.notify_later(

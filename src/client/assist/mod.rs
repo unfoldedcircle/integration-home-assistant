@@ -5,7 +5,6 @@ use crate::client::HomeAssistantClient;
 use crate::controller::R2AudioChunkMsg;
 use crate::errors::ServiceError;
 use actix::Handler;
-use awc::ws;
 use bytes::{BufMut, BytesMut};
 
 mod call_pipeline;
@@ -15,7 +14,7 @@ pub const DEF_SAMPLE_RATE: u32 = 16000;
 impl Handler<R2AudioChunkMsg> for HomeAssistantClient {
     type Result = Result<(), ServiceError>;
 
-    fn handle(&mut self, msg: R2AudioChunkMsg, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: R2AudioChunkMsg, _ctx: &mut Self::Context) -> Self::Result {
         let (_, session) = self
             .assist_sessions
             .iter()
@@ -35,7 +34,7 @@ impl Handler<R2AudioChunkMsg> for HomeAssistantClient {
         buffer.put_u8(bin_id);
         buffer.put_slice(&msg.data);
 
-        self.send_message(ws::Message::Binary(buffer.into()), "Audio", ctx)?;
+        self.send_binary(buffer.into(), "Audio")?;
 
         Ok(())
     }

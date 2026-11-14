@@ -131,11 +131,12 @@ pub struct HomeAssistantSettings {
     url: Url,
     token: String,
     /// WebSocket connection timeout in seconds.
-    /// This is the max time allowed to connect to the remote host, including DNS name resolution.
-    /// Make sure that `request_timeout` >= `connection_timeout`.
+    /// A connection attempt is limited by `request_timeout`. This value is only used if it is
+    /// longer than `request_timeout`.
     pub connection_timeout: u8,
     /// WebSocket request timeout in seconds.
-    /// This is the total time before a response must be received. Should be equal or greater than `connection_timeout`.
+    /// This is the total time of a connection attempt: connecting to the host, including DNS name
+    /// resolution and TLS, until the WebSocket handshake response is received.
     // simplifies data migration: missing value in existing configuration will be set with a default!
     #[serde(default = "default_request_timeout")]
     pub request_timeout: u8,

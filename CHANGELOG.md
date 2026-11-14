@@ -13,6 +13,9 @@ _Changes in the next release_
 - Sensor text values are translated like in Home Assistant, in the language of the Remote. E.g. the state `returning_home` of a vacuum status sensor is shown as `Returning home`. A value without a translation in Home Assistant is shown as before.
 
 ### Changed
+- New WebSocket client for the Home Assistant connection, shared with the Remote's core service. It reconnects on its own with the configured reconnect settings, with a small random variation of the reconnect delay.
+  - The `request_timeout` setting is the total time of a connection attempt. `connection_timeout` is only used if it is longer.
+  - With `ping_frames` heartbeat, a connection is considered lost after `timeout_sec / interval_sec` (rounded up) consecutive unanswered pings.
 - Monetary sensors without a display precision in Home Assistant are shown with 2 decimal places, e.g. `0.04 CHF` instead of `0.0431179733276392 CHF`.
 
 ---
