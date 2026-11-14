@@ -58,7 +58,15 @@ impl HomeAssistantClient {
             }
             "sensor" | "binary_sensor" => {
                 let precision = self.display_precisions.get(&event.data.entity_id).copied();
-                sensor_event_to_entity_change(event.data, precision)
+                let device_class = sensor_device_class(event.data.new_state.attributes.as_ref());
+                sensor_event_to_entity_change(event.data, precision).map(|mut entity_change| {
+                    self.sensor_translations.apply(
+                        &entity_change.entity_id,
+                        device_class.as_deref(),
+                        &mut entity_change.attributes,
+                    );
+                    entity_change
+                })
             }
             "climate" => climate_event_to_entity_change(event.data),
             "media_player" => media_player_event_to_entity_change(&self.server, event.data),

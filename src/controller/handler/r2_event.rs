@@ -29,6 +29,8 @@ impl Handler<R2EventMsg> for Controller {
                 }
                 // make sure client has the correct state, it might be out of sync, or not calling get_device_state
                 self.send_device_state(&msg.ws_id);
+                // the language might have been changed
+                self.request_localization(&msg.ws_id);
             }
             R2Event::Disconnect => {
                 ctx.notify(DisconnectMsg {});

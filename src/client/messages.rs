@@ -4,6 +4,7 @@
 //! Actix Actor message definitions for HomeAssistantClient
 
 use crate::client::model::{AssistPipelineEvent, GetPipelinesResult};
+use crate::client::translations::TranslationKey;
 use crate::errors::ServiceError;
 use actix::prelude::Message;
 use awc::ws::CloseCode;
@@ -40,15 +41,45 @@ pub struct CallRunAssistPipeline {
     pub pipeline_id: Option<String>,
 }
 
-/// Retrieve the display precision of all sensor entities from the Home Assistant entity registry.
-///
-/// Returns a map of HA entity id -> display precision. Only sensors with a display precision are
-/// included: the user setting in Home Assistant, otherwise the suggested precision of the sensor.
+/// Retrieve the display information of the entities from the Home Assistant entity registry.
 ///
 /// See <https://github.com/home-assistant/core/pull/87787>
 #[derive(Message, Default)]
-#[rtype(result = "Result<HashMap<String, u32>, ServiceError>")]
-pub struct CallListEntityDisplayPrecisions;
+#[rtype(result = "Result<EntityRegistryDisplay, ServiceError>")]
+pub(super) struct CallListEntityRegistryDisplay;
+
+/// Display information of the Home Assistant entity registry.
+#[derive(Debug, Default)]
+pub(super) struct EntityRegistryDisplay {
+    /// Map: HA entity id -> display precision. Only sensors with a display precision are
+    /// included: the user setting in Home Assistant, otherwise the suggested precision of the
+    /// sensor.
+    pub precisions: HashMap<String, u32>,
+    /// Map: HA entity id -> integration and translation key. Only sensors with a translation key
+    /// are included.
+    pub translation_keys: HashMap<String, TranslationKey>,
+}
+
+/// Retrieve the sensor state translations of a translation category from Home Assistant, in the
+/// language set with [SetLanguage].
+///
+/// Returns a map of HA translation resource key -> translated text.
+#[derive(Message)]
+#[rtype(result = "Result<HashMap<String, String>, ServiceError>")]
+pub(super) struct CallGetTranslations {
+    /// HA translation category: `entity` or `entity_component`.
+    pub category: &'static str,
+    /// Only return the translations of these HA integrations.
+    pub integrations: Vec<String>,
+}
+
+/// Set the language of the Remote, used for the sensor state translations.
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SetLanguage {
+    /// Language code of the Remote, e.g. `de_CH`.
+    pub language: String,
+}
 
 /// Retrieve all available assist pipelines from Home Assistant.
 #[derive(Message)]

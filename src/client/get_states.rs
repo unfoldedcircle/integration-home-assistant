@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 use crate::client::HomeAssistantClient;
 use crate::client::entity::*;
-use crate::client::entity_registry::fetch_display_precisions;
+use crate::client::entity_registry::fetch_sensor_display;
 use crate::client::messages::{CallListAssistPipelines, GetStates};
 use crate::errors::ServiceError;
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
@@ -40,19 +40,19 @@ impl Handler<GetStates> for HomeAssistantClient {
                         None
                     }
                 };
-                // Retrieve the sensor display precisions. Best effort as well.
-                let precisions = fetch_display_precisions(&ha_client).await;
-                (pipelines, precisions)
+                // Retrieve the sensor display precisions and state translations. Best effort as
+                // well.
+                let sensor_display = fetch_sensor_display(&ha_client).await;
+                (pipelines, sensor_display)
             }
             .into_actor(self) // converts future to ActorFuture
-            .map(move |(result, precisions), act, ctx| {
+            .map(move |(result, sensor_display), act, ctx| {
                 if let Some(result) = result {
                     info!("Got assist pipelines: {result:?}");
                     act.assist_pipelines = Some(result);
                 }
-                if let Some(precisions) = precisions {
-                    debug!("Got {} sensor display precisions", precisions.len());
-                    act.display_precisions = precisions;
+                if let Some(sensor_display) = sensor_display {
+                    act.set_sensor_display(sensor_display);
                 }
                 // Retrieve Home Assistant entities
                 let id = act.new_msg_id();
@@ -160,7 +160,17 @@ impl HomeAssistantClient {
                 EntityType::Remote => convert_remote_entity(entity_id, state, attr),
                 EntityType::Sensor => {
                     let precision = self.display_precisions.get(&entity_id).copied();
-                    convert_sensor_entity(entity_id, state, attr, precision)
+                    let device_class = sensor_device_class(Some(attr));
+                    convert_sensor_entity(entity_id, state, attr, precision).map(|mut entity| {
+                        if let Some(attributes) = entity.attributes.as_mut() {
+                            self.sensor_translations.apply(
+                                &entity.entity_id,
+                                device_class.as_deref(),
+                                attributes,
+                            );
+                        }
+                        entity
+                    })
                 }
                 EntityType::IrEmitter => {
                     // no related HA entity

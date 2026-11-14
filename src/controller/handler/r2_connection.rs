@@ -27,6 +27,7 @@ impl Handler<NewR2Session> for Controller {
                 Err(e) => error!("[{}] Error sending entity_states: {e:?}", msg.id),
             }
         }
+        self.request_localization(&msg.id);
     }
 }
 

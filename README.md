@@ -68,6 +68,15 @@ The following HA entities are supported in the Unfolded Circle Remote:
     - Remote firmware versions without support for these device classes show the unformatted value.
   - `monetary` sensors are mapped to a custom sensor with the currency code as unit, e.g. `CHF`. Without a display
     precision in Home Assistant, the `decimals` option is set to 2, as Home Assistant shows an amount of money.
+  - Text values are translated like in Home Assistant, e.g. the state `returning_home` of an `enum` sensor is sent as
+    `Returning home`.
+    - The translations are retrieved from Home Assistant, in the language of the Remote. Home Assistant returns the
+      english text if an integration is not translated to this language.
+    - A value without a translation in Home Assistant is sent as is.
+    - The language is retrieved from the Remote when it connects to the integration. After changing the language of
+      the Remote, the sensor values are translated to the new language with the next value update, after the Remote
+      has reconnected.
+    - Requires Home Assistant 2023.3 or newer.
   - The value is `null` while the sensor is unavailable or unknown.
 - [Binary sensor](https://www.home-assistant.io/integrations/binary_sensor/): mapped to sensor
   - Sensor entity device class: `binary`.

@@ -4,7 +4,7 @@
 //! Actix actor handler implementation for the `GetStates` message
 
 use crate::client::HomeAssistantClient;
-use crate::client::entity_registry::fetch_display_precisions;
+use crate::client::entity_registry::fetch_sensor_display;
 use crate::client::messages::{CallListAssistPipelines, GetAvailableEntities};
 use crate::errors::ServiceError;
 use actix::{ActorFutureExt, AsyncContext, Handler, ResponseActFuture, WrapFuture};
@@ -40,19 +40,19 @@ impl Handler<GetAvailableEntities> for HomeAssistantClient {
                         None
                     }
                 };
-                // Retrieve the sensor display precisions. Best effort as well.
-                let precisions = fetch_display_precisions(&ha_client).await;
-                (pipelines, precisions)
+                // Retrieve the sensor display precisions and state translations. Best effort as
+                // well.
+                let sensor_display = fetch_sensor_display(&ha_client).await;
+                (pipelines, sensor_display)
             }
             .into_actor(self) // converts future to ActorFuture
-            .map(move |(result, precisions), act, ctx| {
+            .map(move |(result, sensor_display), act, ctx| {
                 if let Some(result) = result {
                     info!("Got assist pipelines: {result:?}");
                     act.assist_pipelines = Some(result);
                 }
-                if let Some(precisions) = precisions {
-                    debug!("Got {} sensor display precisions", precisions.len());
-                    act.display_precisions = precisions;
+                if let Some(sensor_display) = sensor_display {
+                    act.set_sensor_display(sensor_display);
                 }
                 // Retrieve Home Assistant entities
                 let id = act.new_msg_id();

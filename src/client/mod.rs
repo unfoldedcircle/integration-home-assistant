@@ -47,6 +47,7 @@ mod service;
 mod set_remote_id;
 mod streamhandler;
 mod subscribed_entities;
+mod translations;
 
 static CLIENT_SEQ: AtomicU32 = AtomicU32::new(1);
 
@@ -90,6 +91,10 @@ pub struct HomeAssistantClient {
     /// Display precisions of HA sensors, refreshed when retrieving the entity states.
     /// Map: HA entity ID -> display precision
     display_precisions: HashMap<String, u32>,
+    /// State translations of HA sensors, refreshed with the display precisions.
+    sensor_translations: translations::SensorTranslations,
+    /// HA language code of the sensor state translations: the language of the Remote.
+    language: String,
     sink: SinkWrite<ws::Message, SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>>,
     controller_actor: Addr<Controller>,
     /// Last heart beat timestamp.
@@ -153,6 +158,8 @@ impl HomeAssistantClient {
                 entity_states_id: None,
                 number_states: Default::default(),
                 display_precisions: Default::default(),
+                sensor_translations: Default::default(),
+                language: "en".to_string(),
                 subscribe_configure_id: None,
                 sink: SinkWrite::new(sink, ctx),
                 controller_actor,
@@ -410,9 +417,9 @@ impl HomeAssistantClient {
                 // if auth occurs right after HA reboots, custom events won't be available yet
                 // We will have to check after custom events later if unavailable
                 self.send_uc_info_command(ctx);
-                // Sensor display precisions for entity change events, in case the Remote doesn't
-                // retrieve the entity states after a reconnect.
-                self.refresh_display_precisions(ctx);
+                // Sensor display precisions and state translations for entity change events, in
+                // case the Remote doesn't retrieve the entity states after a reconnect.
+                self.refresh_sensor_display(ctx);
                 // Store start time of HA so that we check regularly after custom events
                 let ha_start_time = Instant::now();
                 self.check_uc_ha_component(ctx, ha_start_time);

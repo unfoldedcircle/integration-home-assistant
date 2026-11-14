@@ -10,6 +10,7 @@ _Changes in the next release_
 
 ### Added
 - Sensor device classes `timestamp`, `date` and `duration` for Home Assistant sensors with the `timestamp`, `uptime`, `date` and `duration` device classes. The Remote can format these values as a date, time or time span, instead of showing the raw value.
+- Sensor text values are translated like in Home Assistant, in the language of the Remote. E.g. the state `returning_home` of a vacuum status sensor is shown as `Returning home`. A value without a translation in Home Assistant is shown as before.
 
 ### Changed
 - Monetary sensors without a display precision in Home Assistant are shown with 2 decimal places, e.g. `0.04 CHF` instead of `0.0431179733276392 CHF`.
