@@ -66,6 +66,8 @@ The following HA entities are supported in the Unfolded Circle Remote:
       - To get a time span for a sensor in seconds, change its unit of measurement in the Home Assistant entity
         settings.
     - Remote firmware versions without support for these device classes show the unformatted value.
+  - `monetary` sensors are mapped to a custom sensor with the currency code as unit, e.g. `CHF`. Without a display
+    precision in Home Assistant, the `decimals` option is set to 2, as Home Assistant shows an amount of money.
   - The value is `null` while the sensor is unavailable or unknown.
 - [Binary sensor](https://www.home-assistant.io/integrations/binary_sensor/): mapped to sensor
   - Sensor entity device class: `binary`.

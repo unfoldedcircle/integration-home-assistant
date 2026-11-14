@@ -85,6 +85,9 @@ const DURATION_UNITS: [&str; 5] = ["ms", "s", "min", "h", "d"];
 /// UC sensor device classes with a text value which is formatted by the Remote. The `decimals`
 /// option doesn't apply.
 const DATE_TIME_DEVICE_CLASSES: [&str; 2] = ["date", "timestamp"];
+/// Default number of decimal places of a HA `monetary` sensor without a display precision.
+/// The HA frontend shows an amount of money with at least 2 decimal places.
+const MONETARY_DECIMALS: u32 = 2;
 /// Maximum number of decimal places of the UC sensor `decimals` option.
 const MAX_DECIMALS: u32 = 6;
 
@@ -216,6 +219,9 @@ pub(crate) fn convert_sensor_entity(
     let name = HashMap::from([("en".into(), friendly_name.unwrap_or(&entity_id).into())]);
     let mut options = serde_json::Map::new();
     let device_class = ha_attr.get("device_class").and_then(|v| v.as_str());
+    // Amount of money: there's no matching UC device class, it is mapped to a custom sensor with
+    // the currency code as unit.
+    let monetary = device_class == Some("monetary");
     let device_class = match device_class {
         _ if entity_id.starts_with("binary_sensor.") => Some(SensorDeviceClass::Binary.to_string()),
         // supported device classes
@@ -250,7 +256,8 @@ pub(crate) fn convert_sensor_entity(
     let date_time_class = device_class
         .as_deref()
         .is_some_and(|class| DATE_TIME_DEVICE_CLASSES.contains(&class));
-    if let Some(decimals) = display_precision
+    let decimals = display_precision.or(monetary.then_some(MONETARY_DECIMALS));
+    if let Some(decimals) = decimals
         && !entity_id.starts_with("binary_sensor.")
         && !date_time_class
     {
@@ -711,6 +718,58 @@ mod tests {
         );
         assert_eq!(
             expected_unit.map(|u| json!(u)).as_ref(),
+            attributes.get(SensorAttribute::Unit.as_ref())
+        );
+    }
+
+    #[rstest::rstest]
+    // without a display precision: 2 decimal places as in the HA frontend
+    #[case(None, json!(2))]
+    #[case(Some(0), json!(0))]
+    #[case(Some(3), json!(3))]
+    fn convert_monetary_sensor_maps_to_custom_with_default_decimals(
+        #[case] display_precision: Option<u32>,
+        #[case] expected_decimals: Value,
+    ) {
+        let mut ha_attr = json!({
+            "device_class": "monetary", "unit_of_measurement": "CHF", "state_class": "total"
+        })
+        .as_object()
+        .cloned()
+        .unwrap();
+
+        let entity = convert_sensor_entity(
+            "sensor.energy_cost".into(),
+            "0.0431179733276392".into(),
+            &mut ha_attr,
+            display_precision,
+        )
+        .expect("valid entity");
+
+        assert_eq!(
+            Some(SensorDeviceClass::Custom.to_string()),
+            entity.device_class
+        );
+        let options = entity.options.expect("custom sensor options expected");
+        assert_eq!(
+            Some(&json!("Monetary")),
+            options.get(SensorOptionField::CustomLabel.as_ref())
+        );
+        assert_eq!(
+            Some(&json!("CHF")),
+            options.get(SensorOptionField::CustomUnit.as_ref())
+        );
+        assert_eq!(
+            Some(&expected_decimals),
+            options.get(SensorOptionField::Decimals.as_ref())
+        );
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(
+            Some(&json!(0.0431179733276392)),
+            attributes.get(SensorAttribute::Value.as_ref())
+        );
+        assert_eq!(
+            Some(&json!("CHF")),
             attributes.get(SensorAttribute::Unit.as_ref())
         );
     }
