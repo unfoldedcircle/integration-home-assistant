@@ -80,6 +80,14 @@ const NUMERIC_DEVICE_CLASSES: [&str; 58] = [
     "wind_direction",
     "wind_speed",
 ];
+/// Units of a HA `duration` sensor which are supported by the UC `duration` sensor device class.
+const DURATION_UNITS: [&str; 5] = ["ms", "s", "min", "h", "d"];
+/// UC sensor device classes with a text value which is formatted by the Remote. The `decimals`
+/// option doesn't apply.
+const DATE_TIME_DEVICE_CLASSES: [&str; 2] = ["date", "timestamp"];
+/// Default number of decimal places of a HA `monetary` sensor without a display precision.
+/// The HA frontend shows an amount of money with at least 2 decimal places.
+const MONETARY_DECIMALS: u32 = 2;
 /// Maximum number of decimal places of the UC sensor `decimals` option.
 const MAX_DECIMALS: u32 = 6;
 
@@ -211,11 +219,23 @@ pub(crate) fn convert_sensor_entity(
     let name = HashMap::from([("en".into(), friendly_name.unwrap_or(&entity_id).into())]);
     let mut options = serde_json::Map::new();
     let device_class = ha_attr.get("device_class").and_then(|v| v.as_str());
+    // Amount of money: there's no matching UC device class, it is mapped to a custom sensor with
+    // the currency code as unit.
+    let monetary = device_class == Some("monetary");
     let device_class = match device_class {
         _ if entity_id.starts_with("binary_sensor.") => Some(SensorDeviceClass::Binary.to_string()),
         // supported device classes
         Some("battery") | Some("current") | Some("energy") | Some("humidity") | Some("power")
         | Some("temperature") | Some("voltage") => device_class.map(|v| v.into()),
+        // The value is sent as provided by HA and formatted by the Remote:
+        // - timestamp: ISO 8601 date time with UTC offset, e.g. `2026-11-15T04:23:31+00:00`
+        // - date: ISO 8601 date, e.g. `2026-11-15`
+        Some("timestamp") | Some("date") => device_class.map(|v| v.into()),
+        // - uptime: the time the device was started. HA handles it as a timestamp.
+        Some("uptime") => Some("timestamp".into()),
+        // - duration: number in the unit of the `unit` attribute. The Remote formats it with the
+        //   same logic as the HA frontend, which uses the display precision to round the value.
+        Some("duration") if has_duration_unit(ha_attr) => device_class.map(|v| v.into()),
         // Map non-supported device classes to a custom sensor and use device class as label
         v => {
             if let Some(v) = v
@@ -233,8 +253,13 @@ pub(crate) fn convert_sensor_entity(
         }
     };
 
-    if let Some(decimals) = display_precision
+    let date_time_class = device_class
+        .as_deref()
+        .is_some_and(|class| DATE_TIME_DEVICE_CLASSES.contains(&class));
+    let decimals = display_precision.or(monetary.then_some(MONETARY_DECIMALS));
+    if let Some(decimals) = decimals
         && !entity_id.starts_with("binary_sensor.")
+        && !date_time_class
     {
         options.insert(
             SensorOptionField::Decimals.to_string(),
@@ -267,6 +292,15 @@ pub(crate) fn convert_sensor_entity(
         },
         attributes,
     })
+}
+
+/// Returns true if the HA sensor has a unit of measurement supported by the UC `duration` sensor
+/// device class.
+fn has_duration_unit(ha_attr: &Map<String, Value>) -> bool {
+    ha_attr
+        .get("unit_of_measurement")
+        .and_then(|v| v.as_str())
+        .is_some_and(|unit| DURATION_UNITS.contains(&unit))
 }
 
 fn device_class_to_label(class: &str) -> Option<String> {
@@ -646,6 +680,123 @@ mod tests {
                 .options
                 .as_ref()
                 .and_then(|o| o.get(SensorOptionField::Decimals.as_ref()))
+        );
+    }
+
+    #[rstest::rstest]
+    #[case(json!({ "device_class": "timestamp" }), "2026-11-15T04:23:31+00:00", "timestamp", json!("2026-11-15T04:23:31+00:00"), None, None)]
+    #[case(json!({ "device_class": "uptime" }), "2026-11-01T10:00:00+00:00", "timestamp", json!("2026-11-01T10:00:00+00:00"), None, None)]
+    #[case(json!({ "device_class": "date" }), "2026-11-15", "date", json!("2026-11-15"), None, None)]
+    // duration: the display precision is used by the Remote to round the value
+    #[case(json!({ "device_class": "duration", "unit_of_measurement": "s" }), "673492", "duration", json!(673492), Some("s"), Some(2))]
+    #[case(json!({ "device_class": "duration", "unit_of_measurement": "h" }), "93", "duration", json!(93), Some("h"), Some(2))]
+    #[case(json!({ "device_class": "duration", "unit_of_measurement": "s", "state_class": "total_increasing" }), "650428.4375", "duration", json!(650428.4375), Some("s"), Some(2))]
+    // overdue maintenance counter
+    #[case(json!({ "device_class": "duration", "unit_of_measurement": "s" }), "-33952", "duration", json!(-33952), Some("s"), Some(2))]
+    fn convert_sensor_entity_with_time_device_classes(
+        #[case] attr: Value,
+        #[case] state: &str,
+        #[case] expected_class: &str,
+        #[case] expected_value: Value,
+        #[case] expected_unit: Option<&str>,
+        #[case] expected_decimals: Option<u32>,
+    ) {
+        let mut ha_attr = attr.as_object().cloned().unwrap();
+
+        let entity =
+            convert_sensor_entity("sensor.test".into(), state.into(), &mut ha_attr, Some(2))
+                .expect("valid entity");
+
+        assert_eq!(Some(expected_class.to_string()), entity.device_class);
+        let expected_options = expected_decimals
+            .map(|d| Map::from_iter([(SensorOptionField::Decimals.to_string(), json!(d))]));
+        assert_eq!(expected_options, entity.options, "no custom options");
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(
+            Some(&expected_value),
+            attributes.get(SensorAttribute::Value.as_ref())
+        );
+        assert_eq!(
+            expected_unit.map(|u| json!(u)).as_ref(),
+            attributes.get(SensorAttribute::Unit.as_ref())
+        );
+    }
+
+    #[rstest::rstest]
+    // without a display precision: 2 decimal places as in the HA frontend
+    #[case(None, json!(2))]
+    #[case(Some(0), json!(0))]
+    #[case(Some(3), json!(3))]
+    fn convert_monetary_sensor_maps_to_custom_with_default_decimals(
+        #[case] display_precision: Option<u32>,
+        #[case] expected_decimals: Value,
+    ) {
+        let mut ha_attr = json!({
+            "device_class": "monetary", "unit_of_measurement": "CHF", "state_class": "total"
+        })
+        .as_object()
+        .cloned()
+        .unwrap();
+
+        let entity = convert_sensor_entity(
+            "sensor.energy_cost".into(),
+            "0.0431179733276392".into(),
+            &mut ha_attr,
+            display_precision,
+        )
+        .expect("valid entity");
+
+        assert_eq!(
+            Some(SensorDeviceClass::Custom.to_string()),
+            entity.device_class
+        );
+        let options = entity.options.expect("custom sensor options expected");
+        assert_eq!(
+            Some(&json!("Monetary")),
+            options.get(SensorOptionField::CustomLabel.as_ref())
+        );
+        assert_eq!(
+            Some(&json!("CHF")),
+            options.get(SensorOptionField::CustomUnit.as_ref())
+        );
+        assert_eq!(
+            Some(&expected_decimals),
+            options.get(SensorOptionField::Decimals.as_ref())
+        );
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(
+            Some(&json!(0.0431179733276392)),
+            attributes.get(SensorAttribute::Value.as_ref())
+        );
+        assert_eq!(
+            Some(&json!("CHF")),
+            attributes.get(SensorAttribute::Unit.as_ref())
+        );
+    }
+
+    #[rstest::rstest]
+    // units not supported by the UC duration device class
+    #[case(json!({ "device_class": "duration", "unit_of_measurement": "μs" }))]
+    #[case(json!({ "device_class": "duration" }))]
+    fn convert_duration_sensor_with_unsupported_unit_maps_to_custom(#[case] attr: Value) {
+        let mut ha_attr = attr.as_object().cloned().unwrap();
+
+        let entity =
+            convert_sensor_entity("sensor.test".into(), "42".into(), &mut ha_attr, Some(1))
+                .expect("valid entity");
+
+        assert_eq!(
+            Some(SensorDeviceClass::Custom.to_string()),
+            entity.device_class
+        );
+        let options = entity.options.expect("custom sensor options expected");
+        assert_eq!(
+            Some(&json!("Duration")),
+            options.get(SensorOptionField::CustomLabel.as_ref())
+        );
+        assert_eq!(
+            Some(&json!(1)),
+            options.get(SensorOptionField::Decimals.as_ref())
         );
     }
 
