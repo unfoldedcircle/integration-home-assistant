@@ -61,10 +61,11 @@ The following HA entities are supported in the Unfolded Circle Remote:
     - `date`: date in ISO 8601 format, e.g. `2026-11-15`.
     - `duration`: number in the unit of measurement of the sensor, if it is `ms`, `s`, `min`, `h` or `d`. Sensors with
       another unit are mapped to a custom sensor.
-      - The Remote formats a duration with the same logic as Home Assistant: a value in `min`, `h` or `d` is shown as
-        a time span, e.g. `1h 30m`, a value in `ms` or `s` as a number with the unit.
-      - To get a time span for a sensor in seconds, change its unit of measurement in the Home Assistant entity
-        settings.
+      - The Remote formats a duration in `min`, `h` or `d` with the same logic as Home Assistant: as a time span,
+        e.g. `1h 30m`.
+      - A duration in `s` is shown as a time span from 120 seconds on, e.g. `7d 19h` for `673492` seconds. Home
+        Assistant shows the number of seconds.
+      - A duration in `ms` is shown as a number with the unit.
     - Remote firmware versions without support for these device classes show the unformatted value.
   - `monetary` sensors are mapped to a custom sensor with the currency code as unit, e.g. `CHF`. Without a display
     precision in Home Assistant, the `decimals` option is set to 2, as Home Assistant shows an amount of money.
