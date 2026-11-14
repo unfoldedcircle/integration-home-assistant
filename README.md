@@ -54,6 +54,18 @@ The following HA entities are supported in the Unfolded Circle Remote:
   - The display precision of the sensor in Home Assistant is used as `decimals` option (max 6). It is retrieved after
     connecting and with the entity states. A changed precision is applied after the next entity reload of the Remote.
     Requires Home Assistant 2023.3 or newer.
+  - Date, time and time span sensors are mapped to the same sensor entity device class. The value is sent as provided
+    by Home Assistant and is formatted by the Remote.
+    - `timestamp` and `uptime`: mapped to `timestamp`. Date and time in ISO 8601 format with UTC offset, e.g.
+      `2026-11-15T04:23:31+00:00`.
+    - `date`: date in ISO 8601 format, e.g. `2026-11-15`.
+    - `duration`: number in the unit of measurement of the sensor, if it is `ms`, `s`, `min`, `h` or `d`. Sensors with
+      another unit are mapped to a custom sensor.
+      - The Remote formats a duration with the same logic as Home Assistant: a value in `min`, `h` or `d` is shown as
+        a time span, e.g. `1h 30m`, a value in `ms` or `s` as a number with the unit.
+      - To get a time span for a sensor in seconds, change its unit of measurement in the Home Assistant entity
+        settings.
+    - Remote firmware versions without support for these device classes show the unformatted value.
   - The value is `null` while the sensor is unavailable or unknown.
 - [Binary sensor](https://www.home-assistant.io/integrations/binary_sensor/): mapped to sensor
   - Sensor entity device class: `binary`.

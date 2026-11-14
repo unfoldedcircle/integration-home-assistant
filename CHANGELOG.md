@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Added
+- Sensor device classes `timestamp`, `date` and `duration` for Home Assistant sensors with the `timestamp`, `uptime`, `date` and `duration` device classes. The Remote can format these values as a date, time or time span, instead of showing the raw value.
+
 ---
 
 ## v0.19.0 - 2026-11-05
