@@ -10,10 +10,12 @@ use log::{debug, error, info};
 use std::env;
 use std::str::FromStr;
 use std::time::Duration;
-use uc_api::intg::ws::{R2Event, R2Request};
+use uc_api::intg::ws::{R2Event, R2Request, R2Response};
+use uc_api::ws::WsMessage;
 use uc_intg_hass::configuration::{ENV_HASS_MSG_TRACING, Settings, get_configuration};
 use uc_intg_hass::{
-    APP_VERSION, Controller, NewR2Session, R2EventMsg, R2RequestMsg, SendWsMessage, configuration,
+    APP_VERSION, Controller, NewR2Session, R2EventMsg, R2RequestMsg, R2ResponseMsg, SendWsMessage,
+    configuration,
 };
 use url::Url;
 
@@ -193,6 +195,20 @@ impl Handler<SendWsMessage> for ServerMock {
                     msg_data: None,
                 });
             }
+        }
+
+        // Language of the Remote for the sensor state translations: HA_TEST_LANGUAGE, e.g. `de_CH`
+        if msg_name == "get_localization_cfg" {
+            let language = env::var("HA_TEST_LANGUAGE").unwrap_or_else(|_| "en_US".into());
+            self.controller_addr.do_send(R2ResponseMsg {
+                ws_id: self.id.clone(),
+                msg: R2Response::LocalizationCfg,
+                response: WsMessage::response_json(
+                    msg.0.id.unwrap_or_default(),
+                    "localization_cfg",
+                    serde_json::json!({ "language_code": language }),
+                ),
+            });
         }
 
         if let Ok(msg) = serde_json::to_string(&msg.0) {

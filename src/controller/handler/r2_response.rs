@@ -3,7 +3,7 @@
 
 //! Actix message handler for [R2ResponseMsg].
 
-use crate::client::messages::SetRemoteId;
+use crate::client::messages::{SetLanguage, SetRemoteId};
 use crate::controller::{Controller, R2ResponseMsg};
 use actix::Handler;
 use log::{debug, error, info};
@@ -34,6 +34,26 @@ impl Handler<R2ResponseMsg> for Controller {
                         })
                     {
                         error!("Error sending remote identifier to client: {e:?}");
+                    }
+                }
+            }
+            R2Response::LocalizationCfg => {
+                if let Some(language) = msg
+                    .response
+                    .msg_data
+                    .as_ref()
+                    .and_then(|v| v.get("language_code"))
+                    .and_then(|v| v.as_str())
+                    .filter(|v| !v.is_empty())
+                {
+                    debug!("[{}] Remote language: '{language}'", msg.ws_id);
+                    self.language = Some(language.to_string());
+                    if let Some(ha_client) = &self.ha_client
+                        && let Err(e) = ha_client.try_send(SetLanguage {
+                            language: language.to_string(),
+                        })
+                    {
+                        error!("Error sending language to client: {e:?}");
                     }
                 }
             }

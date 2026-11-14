@@ -176,6 +176,14 @@ fn map_sensor_attributes(
     Ok(attributes)
 }
 
+/// Returns the HA device class of a sensor from the HA entity attributes.
+pub(crate) fn sensor_device_class(ha_attr: Option<&Map<String, Value>>) -> Option<String> {
+    ha_attr?
+        .get("device_class")
+        .and_then(|v| v.as_str())
+        .map(|v| v.to_string())
+}
+
 /// Convert a HA `state_changed` event of a sensor or binary sensor to an entity change event.
 ///
 /// # Arguments

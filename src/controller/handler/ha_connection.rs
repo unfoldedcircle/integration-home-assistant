@@ -5,7 +5,7 @@
 
 use crate::client::HomeAssistantClient;
 use crate::client::messages::{
-    Close, ConnectionEvent, ConnectionState, SetRemoteId, SubscribedEntities,
+    Close, ConnectionEvent, ConnectionState, SetLanguage, SetRemoteId, SubscribedEntities,
 };
 use crate::controller::handler::{ConnectMsg, DisconnectMsg};
 use crate::controller::operation_mode::Input::{AbortSetup, Connected};
@@ -198,6 +198,13 @@ impl Handler<ConnectMsg> for Controller {
 
                         act.ha_client_id = Some(client_id);
                         act.ha_client = Some(addr);
+                        // Before the client is authenticated and retrieves the translations
+                        if let Some(language) = act.language.clone()
+                            && let Some(ha_client) = &act.ha_client
+                            && let Err(e) = ha_client.try_send(SetLanguage { language })
+                        {
+                            error!("Error sending language to client: {e:?}");
+                        }
                         debug!("Sending subscribed entities to client for events subscriptions");
                         if let Some(session) = act.sessions.values().next() {
                             let entities = session.subscribed_entities.clone();

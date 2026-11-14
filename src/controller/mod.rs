@@ -15,7 +15,7 @@ use crate::errors::ServiceError;
 use crate::util::new_websocket_client;
 use actix::prelude::{Actor, Context, Recipient};
 use actix::{Addr, AsyncContext, SpawnHandle};
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use rust_fsm::*;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
@@ -132,6 +132,9 @@ pub struct Controller {
     susbcribed_entity_ids: Option<Vec<AvailableIntgEntity>>,
     /// Request id sent to the remote to get the version information
     remote_id: String,
+    /// Language code of the Remote, e.g. `de_CH`. `None` until the localization settings have
+    /// been retrieved from the Remote.
+    language: Option<String>,
 }
 
 impl Controller {
@@ -165,6 +168,22 @@ impl Controller {
             reconnect_handle: None,
             susbcribed_entity_ids: None,
             remote_id: "".to_string(),
+            language: None,
+        }
+    }
+
+    /// Request the localization settings from the Remote. The language is used for the sensor
+    /// state translations.
+    ///
+    /// The Remote doesn't notify a driver about changed localization settings. They are requested
+    /// with a new session and whenever the Remote requests to connect.
+    fn request_localization(&mut self, ws_id: &str) {
+        if let Some(session) = self.sessions.get_mut(ws_id) {
+            let request_id = session.new_msg_id();
+            let message = WsMessage::simple_request(request_id, "get_localization_cfg");
+            if let Err(e) = session.recipient.try_send(SendWsMessage(message)) {
+                error!("[{ws_id}] Error sending get_localization_cfg: {e:?}");
+            }
         }
     }
 
