@@ -8,14 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## v0.19.1 - 2026-11-16
 ### Added
-- Sensor device classes `timestamp`, `date` and `duration` for Home Assistant sensors with the `timestamp`, `uptime`, `date` and `duration` device classes. The Remote can format these values as a date, time or time span, instead of showing the raw value.
-- Sensor text values are translated like in Home Assistant, in the language of the Remote. E.g. the state `returning_home` of a vacuum status sensor is shown as `Returning home`. A value without a translation in Home Assistant is shown as before.
+- Sensor device classes `timestamp`, `date` and `duration` for Home Assistant sensors with the `timestamp`, `uptime`, `date` and `duration` device classes. The Remote can format these values as a date, time or time span, instead of showing the raw value ([#125](https://github.com/unfoldedcircle/integration-home-assistant/pull/125)).
+- Sensor text values are translated like in Home Assistant, in the language of the Remote. E.g. the state `returning_home` of a vacuum status sensor is shown as `Returning home`. A value without a translation in Home Assistant is shown as before ([#126](https://github.com/unfoldedcircle/integration-home-assistant/pull/126)).
 
 ### Changed
 - Monetary sensors without a display precision in Home Assistant are shown with 2 decimal places, e.g. `0.04 CHF` instead of `0.0431179733276392 CHF`.
-
----
 
 ## v0.19.0 - 2026-11-05
 ### Added
