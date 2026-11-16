@@ -599,6 +599,8 @@ mod tests {
     #[case(json!({ "unit_of_measurement": "kWh" }), None, true)]
     #[case(json!({ "state_class": "measurement" }), None, true)]
     #[case(json!({ "device_class": "power" }), None, true)]
+    #[case(json!({ "device_class": "duration" }), None, true)]
+    #[case(json!({ "device_class": "duration", "unit_of_measurement": "s" }), None, true)]
     #[case(json!({ "device_class": null }), None, false)]
     #[case(json!({}), Some(2), true)]
     #[case(json!({ "device_class": "enum", "unit_of_measurement": "x" }), None, false)]
@@ -809,6 +811,41 @@ mod tests {
     }
 
     #[test]
+    fn convert_duration_sensor_without_display_precision() {
+        let mut ha_attr = json!({
+            "unit_of_measurement": "s",
+            "device_class": "duration",
+            "friendly_name": "Rocky Verbleibende Zeit der Hauptbürste"
+        })
+        .as_object()
+        .cloned()
+        .unwrap();
+
+        let entity = convert_sensor_entity(
+            "sensor.rocky_main_brush_time_left".into(),
+            "324951".into(),
+            &mut ha_attr,
+            None,
+        )
+        .expect("valid entity");
+
+        assert_eq!(
+            Some(SensorDeviceClass::Duration.to_string()),
+            entity.device_class
+        );
+        assert_eq!(None, entity.options);
+        let attributes = entity.attributes.unwrap();
+        assert_eq!(
+            Some(&json!(324951)),
+            attributes.get(SensorAttribute::Value.as_ref())
+        );
+        assert_eq!(
+            Some(&json!("s")),
+            attributes.get(SensorAttribute::Unit.as_ref())
+        );
+    }
+
+    #[test]
     fn convert_binary_sensor_entity_ignores_display_precision() {
         let mut ha_attr = json!({ "device_class": "door" })
             .as_object()
@@ -824,6 +861,28 @@ mod tests {
         .expect("valid entity");
 
         assert_eq!(None, entity.options);
+    }
+
+    #[test]
+    fn sensor_event_to_entity_change_with_duration_value() {
+        let data: EventData = serde_json::from_value(json!({
+            "entity_id": "sensor.rocky_main_brush_time_left",
+            "new_state": {
+                "state": "324950",
+                "attributes": { "device_class": "duration", "unit_of_measurement": "s" }
+            }
+        }))
+        .expect("valid EventData");
+
+        let change = sensor_event_to_entity_change(data, None).expect("valid event");
+
+        assert_eq!(
+            json!({ "state": "ON", "value": 324950, "unit": "s" })
+                .as_object()
+                .cloned()
+                .unwrap(),
+            change.attributes
+        );
     }
 
     #[test]
