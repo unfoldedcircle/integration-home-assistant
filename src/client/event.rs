@@ -44,7 +44,7 @@ impl HomeAssistantClient {
         let entity_change = match entity_type {
             "light" => light_event_to_entity_change(event.data),
             "switch" | "input_boolean" => switch_event_to_entity_change(event.data),
-            "button" | "input_button" | "script" => {
+            "button" | "input_button" | "scene" | "script" => {
                 // the button & script entity is stateless and the remote doesn't need to be notified when the button was pressed externally
                 return Ok(());
             }
