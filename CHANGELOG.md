@@ -10,6 +10,10 @@ _Changes in the next release_
 
 ---
 
+## v0.19.2 - 2026-11-22
+### Fixed
+- Populate state attribute for button entities ([#129](https://github.com/unfoldedcircle/integration-home-assistant/pull/125), [tracker#837](https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/837)).
+
 ## v0.19.1 - 2026-11-16
 ### Added
 - Sensor device classes `timestamp`, `date` and `duration` for Home Assistant sensors with the `timestamp`, `uptime`, `date` and `duration` device classes. The Remote can format these values as a date, time or time span, instead of showing the raw value ([#125](https://github.com/unfoldedcircle/integration-home-assistant/pull/125)).
