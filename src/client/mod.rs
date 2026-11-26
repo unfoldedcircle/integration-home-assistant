@@ -835,6 +835,7 @@ impl HomeAssistantClient {
 /// Create the WebSocket client configuration from the Home Assistant connection settings.
 fn websocket_config(settings: &HomeAssistantSettings) -> Result<WebSocketConfig, ServiceError> {
     let heartbeat = &settings.heartbeat;
+    let reconnect = &settings.reconnect;
     // WebSocket ping frames are sent and monitored by the WebSocket client. Otherwise, the
     // client sends Home Assistant API ping messages, see `HomeAssistantClient::heartbeat`.
     let ping_frames = heartbeat.ping_frames && !heartbeat.interval.is_zero();
@@ -847,15 +848,16 @@ fn websocket_config(settings: &HomeAssistantSettings) -> Result<WebSocketConfig,
         ))
         // align frame size to Home Assistant
         .max_frame_size(settings.max_frame_size_kb * 1024)
-        .initial_backoff(settings.reconnect.duration)
-        .max_backoff(settings.reconnect.duration_max)
-        .backoff_factor(settings.reconnect.backoff_factor as f64)
+        .initial_backoff(reconnect.duration)
+        // both delays are set independently: the maximum must not be below the initial delay
+        .max_backoff(reconnect.duration_max.max(reconnect.duration))
+        .backoff_factor(reconnect.backoff_factor as f64)
         .danger_accept_invalid_certs(
             settings.disable_cert_validation || bool_from_env(ENV_DISABLE_CERT_VERIFICATION),
         )
         .ping_enabled(ping_frames);
-    if settings.reconnect.attempts > 0 {
-        builder = builder.max_reconnect_attempts(settings.reconnect.attempts);
+    if reconnect.attempts > 0 {
+        builder = builder.max_reconnect_attempts(reconnect.attempts);
     }
     if ping_frames {
         // a missing pong is detected with the next ping

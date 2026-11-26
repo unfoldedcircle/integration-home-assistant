@@ -48,7 +48,7 @@ actix = "0.13"
 rustls = { version = "0.23" }
 
 # WebSockets client
-actix-ws-client = { git = "https://github.com/unfoldedcircle/actix-ws-client", tag = "v0.2.0", default-features = false, features = ["rustls-platform-verifier"] }
+actix-ws-client = { git = "https://github.com/unfoldedcircle/actix-ws-client", tag = "v0.3.0", default-features = false, features = ["rustls-platform-verifier"] }
 # for local development:
 #actix-ws-client = { path = "../../../../unfoldedcircle/actix-ws-client", default-features = false, features = ["rustls-platform-verifier"] }
 bytes = "1"

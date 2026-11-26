@@ -70,16 +70,19 @@ impl WebSocketMessageHandler for WsBridge {
         Vec::new()
     }
 
-    fn on_closed(&mut self, reason: &DisconnectReason) {
+    fn on_closed(&mut self, reason: &DisconnectReason) -> Vec<HandlerAction> {
         self.forward(WsEvent::Closed(reason.clone()));
+        Vec::new()
     }
 
-    fn on_error(&mut self, error: &Error) {
+    fn on_error(&mut self, error: &Error) -> Vec<HandlerAction> {
         self.forward(WsEvent::Error(error.clone()));
+        Vec::new()
     }
 
-    fn on_reconnect_exhausted(&mut self) {
+    fn on_reconnect_exhausted(&mut self) -> Vec<HandlerAction> {
         self.forward(WsEvent::ReconnectExhausted);
+        Vec::new()
     }
 }
 

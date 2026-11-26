@@ -339,6 +339,20 @@ async fn unreachable_server_is_retried_until_it_is_back() {
 }
 
 #[actix_web::test]
+async fn reconnect_delay_above_its_maximum_still_connects() {
+    // both values are accepted by the setup flow on their own
+    let h = Harness::start(|settings| {
+        settings.hass.reconnect.duration = Duration::from_millis(300);
+        settings.hass.reconnect.duration_max = Duration::from_millis(200);
+    })
+    .await;
+
+    h.remote_event(R2Event::Connect).await;
+
+    h.wait_for_state("CONNECTED").await;
+}
+
+#[actix_web::test]
 async fn reconnect_attempt_limit_ends_in_error_state() {
     let h = Harness::start(|settings| settings.hass.reconnect.attempts = 2).await;
     h.ha.refuse_connections.store(true, Ordering::SeqCst);
