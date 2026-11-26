@@ -836,6 +836,7 @@ impl HomeAssistantClient {
 fn websocket_config(settings: &HomeAssistantSettings) -> Result<WebSocketConfig, ServiceError> {
     let heartbeat = &settings.heartbeat;
     let reconnect = &settings.reconnect;
+    let max_size = settings.max_frame_size_kb * 1024;
     // WebSocket ping frames are sent and monitored by the WebSocket client. Otherwise, the
     // client sends Home Assistant API ping messages, see `HomeAssistantClient::heartbeat`.
     let ping_frames = heartbeat.ping_frames && !heartbeat.interval.is_zero();
@@ -847,7 +848,10 @@ fn websocket_config(settings: &HomeAssistantSettings) -> Result<WebSocketConfig,
             settings.request_timeout.max(settings.connection_timeout) as u64,
         ))
         // align frame size to Home Assistant
-        .max_frame_size(settings.max_frame_size_kb * 1024)
+        .max_frame_size(max_size)
+        // Home Assistant sends a message in one frame: the same limit for a message in several
+        // frames, instead of the 64 MiB default of the WebSocket client
+        .max_message_size(max_size)
         .initial_backoff(reconnect.duration)
         // both delays are set independently: the maximum must not be below the initial delay
         .max_backoff(reconnect.duration_max.max(reconnect.duration))

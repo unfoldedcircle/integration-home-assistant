@@ -10,12 +10,14 @@
 use actix::prelude::*;
 use futures::{SinkExt, StreamExt};
 use serde_json::{Value, json};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
 use tokio_tungstenite::tungstenite::Message as WsFrame;
+use tokio_tungstenite::tungstenite::protocol::frame::Frame;
+use tokio_tungstenite::tungstenite::protocol::frame::coding::{Data, OpCode};
 use uc_api::intg::ws::R2Event;
 use uc_intg_hass::configuration::{Settings, get_driver_metadata};
 use uc_intg_hass::{Controller, NewR2Session, R2EventMsg, SendWsMessage};
@@ -34,6 +36,9 @@ struct FakeHa {
     ignore_pings: AtomicBool,
     /// Send a message which is not valid JSON after the next successful authentication.
     send_garbage: AtomicBool,
+    /// Send a message in two frames of this payload size after the next successful
+    /// authentication. 0 = disabled.
+    send_fragmented: AtomicUsize,
     /// Refuse new connections: close them before the WebSocket handshake.
     refuse_connections: AtomicBool,
     /// Drops the current connection without a close frame.
@@ -95,6 +100,15 @@ async fn spawn_fake_ha(ha: Arc<FakeHa>) -> Url {
                                         {
                                             let _ = ws.send(WsFrame::Text("no json".into())).await;
                                         }
+                                        if reply["type"] == "auth_ok" {
+                                            let size = ha.send_fragmented.swap(0, Ordering::SeqCst);
+                                            if size > 0 {
+                                                for frame in fragmented_event(size) {
+                                                    let _ = ws.send(WsFrame::Frame(frame)).await;
+                                                }
+                                                ha.record("fragmented");
+                                            }
+                                        }
                                         if auth_invalid {
                                             // Home Assistant disconnects the client
                                             ha.record("auth_invalid");
@@ -121,6 +135,18 @@ async fn spawn_fake_ha(ha: Arc<FakeHa>) -> Url {
 
 fn text(msg: Value) -> WsFrame {
     WsFrame::Text(msg.to_string().into())
+}
+
+/// An event message the client ignores, split into two frames of the given payload size.
+fn fragmented_event(frame_size: usize) -> [Frame; 2] {
+    let mut msg = json!({"id": 9999, "type": "event", "event": {"pad": ""}}).to_string();
+    let pad = "x".repeat(2 * frame_size - msg.len());
+    msg.insert_str(msg.find("\"\"").unwrap() + 1, &pad);
+    let (first, second) = msg.split_at(frame_size);
+    [
+        Frame::message(first.to_string(), OpCode::Data(Data::Text), false),
+        Frame::message(second.to_string(), OpCode::Data(Data::Continue), true),
+    ]
 }
 
 impl FakeHa {
@@ -401,6 +427,35 @@ async fn invalid_message_closes_the_session_and_reconnects() {
     .await;
     h.wait_for_state("CONNECTED").await;
     assert_eq!(h.ha.count("connect"), 2);
+}
+
+#[actix_web::test]
+async fn fragmented_message_within_the_size_limit_is_accepted() {
+    let h = Harness::start(|settings| settings.hass.max_frame_size_kb = 1).await;
+    // two frames of 500 bytes: a message of 1000 bytes
+    h.ha.send_fragmented.store(500, Ordering::SeqCst);
+
+    h.remote_event(R2Event::Connect).await;
+
+    h.wait_for_state("CONNECTED").await;
+    wait_until(|| h.ha.count("fragmented") == 1, "fragmented message").await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_eq!(h.ha.count("connect"), 1);
+    assert_eq!(h.last_state().as_deref(), Some("CONNECTED"));
+}
+
+#[actix_web::test]
+async fn fragmented_message_above_the_size_limit_drops_the_connection() {
+    let h = Harness::start(|settings| settings.hass.max_frame_size_kb = 1).await;
+    // two frames of 700 bytes, each within the limit: a message of 1400 bytes
+    h.ha.send_fragmented.store(700, Ordering::SeqCst);
+
+    h.remote_event(R2Event::Connect).await;
+
+    // the client reconnects, the next session is not disturbed
+    wait_until(|| h.ha.count("connect") == 2, "reconnect").await;
+    h.wait_for_state("CONNECTED").await;
+    assert_eq!(h.ha.count("fragmented"), 1);
 }
 
 #[actix_web::test]
