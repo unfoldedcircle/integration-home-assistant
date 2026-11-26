@@ -192,7 +192,7 @@ impl HomeAssistantSettings {
         let key = format!("{TOKEN_ID}-URL");
         if let Some(url) = self.get_token_value(&key) {
             match Url::parse(&url) {
-                Ok(url) => return Some(url),
+                Ok(url) => return Some(to_ws_scheme(url)),
                 Err(e) => error!("Invalid URL in token '{key}': {e}"),
             }
         }
@@ -240,6 +240,20 @@ impl HomeAssistantSettings {
             }
         }
     }
+}
+
+/// Use the WebSocket scheme for a Home Assistant URL given with `http` or `https`.
+///
+/// A URL with another scheme is returned unchanged.
+fn to_ws_scheme(mut url: Url) -> Url {
+    let scheme = match url.scheme() {
+        "http" => "ws",
+        "https" => "wss",
+        _ => return url,
+    };
+    url.set_scheme(scheme)
+        .expect("http and ws schemes are interchangeable");
+    url
 }
 
 fn default_request_timeout() -> u8 {
@@ -383,10 +397,9 @@ fn check_cfg_values(mut settings: Settings) -> Result<Settings, config::ConfigEr
         settings.hass.heartbeat = Default::default();
     }
 
+    settings.hass.url = to_ws_scheme(settings.hass.url);
     match settings.hass.url.scheme() {
         "ws" | "wss" => {}
-        "http" => settings.hass.url.set_scheme("ws").unwrap(),
-        "https" => settings.hass.url.set_scheme("wss").unwrap(),
         scheme => {
             return Err(config::ConfigError::Message(format!(
                 "invalid scheme in home_assistant.url: {}. Valid: [ws, wss]",
@@ -451,4 +464,66 @@ pub fn save_user_settings(cfg: &HomeAssistantSettings) -> Result<(), ServiceErro
 fn user_settings_path() -> PathBuf {
     let file = env::var(ENV_USER_CFG_FILENAME).unwrap_or(DEV_USER_CFG_FILENAME.into());
     Path::new(&env::var(ENV_CONFIG_HOME).unwrap_or_default()).join(file)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(
+        "http://hassio.local:8123/api/websocket",
+        "ws://hassio.local:8123/api/websocket"
+    )]
+    #[case(
+        "https://ha.example.com/api/websocket",
+        "wss://ha.example.com/api/websocket"
+    )]
+    #[case(
+        "https://ha.example.com:8443/api/websocket?a=b",
+        "wss://ha.example.com:8443/api/websocket?a=b"
+    )]
+    #[case(
+        "HTTP://hassio.local:8123/api/websocket",
+        "ws://hassio.local:8123/api/websocket"
+    )]
+    #[case(
+        "ws://hassio.local:8123/api/websocket",
+        "ws://hassio.local:8123/api/websocket"
+    )]
+    #[case(
+        "wss://ha.example.com/api/websocket",
+        "wss://ha.example.com/api/websocket"
+    )]
+    #[case(
+        "ftp://ha.example.com/api/websocket",
+        "ftp://ha.example.com/api/websocket"
+    )]
+    fn to_ws_scheme_converts_http_schemes_only(#[case] url: &str, #[case] expected: &str) {
+        let url = to_ws_scheme(Url::parse(url).unwrap());
+
+        assert_eq!(url.as_str(), expected);
+    }
+
+    #[test]
+    fn configuration_url_with_http_scheme_is_converted() {
+        let mut settings = Settings::default();
+        settings.hass.url = Url::parse("https://ha.example.com/api/websocket").unwrap();
+
+        let settings = check_cfg_values(settings).unwrap();
+
+        assert_eq!(
+            settings.hass.url.as_str(),
+            "wss://ha.example.com/api/websocket"
+        );
+    }
+
+    #[test]
+    fn configuration_url_with_another_scheme_is_rejected() {
+        let mut settings = Settings::default();
+        settings.hass.url = Url::parse("ftp://ha.example.com/api/websocket").unwrap();
+
+        assert!(check_cfg_values(settings).is_err());
+    }
 }
