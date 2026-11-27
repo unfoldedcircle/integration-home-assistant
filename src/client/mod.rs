@@ -15,14 +15,14 @@ use crate::client::messages::{
 use crate::client::model::{
     AssistPipelineEvent, AssistSession, Event, GetPipelinesResult, OpenRequest, ResponseMsg,
 };
-use crate::configuration::{ENV_HASS_MSG_TRACING, HeartbeatSettings};
+use crate::configuration::{
+    ENV_DISABLE_CERT_VERIFICATION, ENV_HASS_MSG_TRACING, HeartbeatSettings, HomeAssistantSettings,
+};
 use crate::errors::ServiceError;
-use actix::io::SinkWrite;
-use actix::{Actor, ActorContext, Addr, AsyncContext, Context, SpawnHandle};
-use actix_codec::Framed;
-use awc::{BoxedSocket, ws};
+use crate::util::bool_from_env;
+use actix::{Actor, Addr, AsyncContext, Context, SpawnHandle};
+use actix_ws_client::{GenericWebSocketClient, SendBinary, SendText, WebSocketConfig};
 use bytes::Bytes;
-use futures::stream::{SplitSink, SplitStream};
 use log::{debug, error, info, warn};
 use messages::Close;
 use serde::de::Error;
@@ -30,6 +30,7 @@ use serde_json::{Map, Value, json};
 use std::sync::atomic::{AtomicU32, Ordering};
 use uc_api::intg::EntityCommand;
 use url::Url;
+use ws_handler::WsBridge;
 
 mod actor;
 pub mod assist;
@@ -45,15 +46,17 @@ pub mod messages;
 pub mod model;
 mod service;
 mod set_remote_id;
-mod streamhandler;
 mod subscribed_entities;
 mod translations;
+mod ws_handler;
 
 static CLIENT_SEQ: AtomicU32 = AtomicU32::new(1);
 
 pub struct HomeAssistantClient {
     /// Unique HA client id
     id: String,
+    /// Home Assistant WebSocket API URL
+    url: Url,
     /// Base server address for media image access (e.g. <http://hassio.local:8123>)
     server: Url,
     /// HA request message id
@@ -95,11 +98,19 @@ pub struct HomeAssistantClient {
     sensor_translations: translations::SensorTranslations,
     /// HA language code of the sensor state translations: the language of the Remote.
     language: String,
-    sink: SinkWrite<ws::Message, SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>>,
+    /// WebSocket client actor. Owns the connection: connects, reconnects with backoff and sends
+    /// the keep-alive ping frames if enabled.
+    ws: Addr<GenericWebSocketClient<WsBridge>>,
+    /// True while the WebSocket connection is established.
+    connected: bool,
+    /// Configured maximum number of reconnect attempts, 0 = unlimited. For logging only.
+    max_reconnect_attempts: u32,
     controller_actor: Addr<Controller>,
     /// Last heart beat timestamp.
     last_hb: Instant,
     heartbeat: HeartbeatSettings,
+    /// Handle of the scheduled API message heartbeat.
+    heartbeat_handle: Option<SpawnHandle>,
     /// Enable incoming websocket message tracing: log every message.
     msg_tracing_in: bool,
     /// Enable outgoing websocket message tracing: log every message, except messages with key
@@ -127,59 +138,74 @@ impl HomeAssistantClient {
         )
     }
 
+    /// Start a new client which connects to the given Home Assistant server and keeps the
+    /// connection alive: it reconnects with the configured reconnect settings until it is closed
+    /// with a [`Close`] message, or the maximum number of reconnect attempts is reached.
+    ///
+    /// Connection state changes are reported to the controller with [`ConnectionEvent`]s.
     pub fn start(
         id: String,
         url: Url,
         controller_actor: Addr<Controller>,
         access_token: String,
-        sink: SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>,
-        stream: SplitStream<Framed<BoxedSocket, ws::Codec>>,
-        heartbeat: HeartbeatSettings,
-    ) -> Addr<Self> {
-        HomeAssistantClient::create(|ctx| {
-            ctx.add_stream(stream);
-            let scheme = url.scheme();
-            let msg_tracing = env::var(ENV_HASS_MSG_TRACING).unwrap_or_default();
-            HomeAssistantClient {
-                id,
-                server: {
-                    let mut server = url.clone();
-                    server
-                        .set_scheme(if scheme == "wss" { "https" } else { "http" })
-                        .expect("invalid scheme");
-                    server.set_path("");
-                    server
-                },
-                ws_id: 0,
-                access_token,
-                subscribed_events: false,
-                subscribe_standard_events_id: None,
-                subscribe_uc_events_id: None,
-                entity_states_id: None,
-                number_states: Default::default(),
-                display_precisions: Default::default(),
-                sensor_translations: Default::default(),
-                language: "en".to_string(),
-                subscribe_configure_id: None,
-                sink: SinkWrite::new(sink, ctx),
-                controller_actor,
-                last_hb: Instant::now(),
-                heartbeat,
-                msg_tracing_in: msg_tracing == "all" || msg_tracing == "in",
-                msg_tracing_out: msg_tracing == "all" || msg_tracing == "out",
-                uc_ha_component: false,
-                uc_ha_component_info_id: None,
-                subscribed_entities: HashSet::new(),
-                authenticated: false,
-                remote_id: "".to_string(),
-                uc_ha_component_check_interval: Duration::from_secs(5),
-                uc_ha_component_check_duration: None, // check forever
-                uc_ha_comp_check_handle: None,
-                open_requests: Default::default(),
-                assist_sessions: Default::default(),
-                assist_pipelines: None,
-            }
-        })
+        settings: &HomeAssistantSettings,
+    ) -> Result<Addr<Self>, ServiceError> {
+        let ctx = Context::new();
+        let ws = GenericWebSocketClient::new(
+            id.clone(),
+            url.as_str(),
+            websocket_config(settings)?,
+            WsBridge::new(ctx.address().downgrade()),
+        )
+        .map_err(|e| ServiceError::BadRequest(format!("Invalid Home Assistant URL {url}: {e}")))?
+        .start();
+
+        let scheme = url.scheme();
+        let msg_tracing = env::var(ENV_HASS_MSG_TRACING).unwrap_or_default();
+        let client = HomeAssistantClient {
+            id,
+            server: {
+                let mut server = url.clone();
+                server
+                    .set_scheme(if scheme == "wss" { "https" } else { "http" })
+                    .expect("invalid scheme");
+                server.set_path("");
+                server
+            },
+            url,
+            ws_id: 0,
+            access_token,
+            subscribed_events: false,
+            subscribe_standard_events_id: None,
+            subscribe_uc_events_id: None,
+            entity_states_id: None,
+            number_states: Default::default(),
+            display_precisions: Default::default(),
+            sensor_translations: Default::default(),
+            language: "en".to_string(),
+            subscribe_configure_id: None,
+            ws,
+            connected: false,
+            max_reconnect_attempts: settings.reconnect.attempts,
+            controller_actor,
+            last_hb: Instant::now(),
+            heartbeat: settings.heartbeat,
+            heartbeat_handle: None,
+            msg_tracing_in: msg_tracing == "all" || msg_tracing == "in",
+            msg_tracing_out: msg_tracing == "all" || msg_tracing == "out",
+            uc_ha_component: false,
+            uc_ha_component_info_id: None,
+            subscribed_entities: HashSet::new(),
+            authenticated: false,
+            remote_id: "".to_string(),
+            uc_ha_component_check_interval: Duration::from_secs(5),
+            uc_ha_component_check_duration: None, // check forever
+            uc_ha_comp_check_handle: None,
+            open_requests: Default::default(),
+            assist_sessions: Default::default(),
+            assist_pipelines: None,
+        };
+        Ok(ctx.run(client))
     }
 
     fn new_msg_id(&mut self) -> u32 {
@@ -187,13 +213,22 @@ impl HomeAssistantClient {
         self.ws_id
     }
 
-    fn heartbeat(&self, ctx: &mut Context<Self>) {
+    /// Start the heartbeat with Home Assistant API ping messages for the current connection.
+    ///
+    /// Not used with WebSocket ping frames: they are sent and monitored by the WebSocket client.
+    fn heartbeat(&mut self, ctx: &mut Context<Self>) {
         if self.heartbeat.interval.is_zero() {
             warn!("[{}] Websocket server heartbeat is disabled", self.id);
             return;
         }
+        if self.heartbeat.ping_frames {
+            return;
+        }
 
-        ctx.run_later(self.heartbeat.interval, |act, ctx| {
+        self.heartbeat_handle = Some(ctx.run_later(self.heartbeat.interval, |act, ctx| {
+            if !act.connected {
+                return;
+            }
             // check server heartbeats
             if !act.heartbeat.timeout.is_zero()
                 && Instant::now().duration_since(act.last_hb) > act.heartbeat.timeout
@@ -203,22 +238,18 @@ impl HomeAssistantClient {
                     "[{}] Websocket server heartbeat failed, disconnecting!",
                     act.id
                 );
-
-                // Stop sending pings & Stop actor
-                ctx.stop();
+                act.close(Close::heartbeat_timeout(), ctx);
                 return;
             }
 
-            let msg = if act.heartbeat.ping_frames {
-                ws::Message::Ping(Bytes::new())
-            } else {
-                let id = act.new_msg_id();
-                ws::Message::Text(json!({"id": id, "type": "ping"}).to_string().into())
-            };
-            if act.send_message(msg, "Ping", ctx).is_ok() {
+            let id = act.new_msg_id();
+            if act
+                .send_json(json!({"id": id, "type": "ping"}), ctx)
+                .is_ok()
+            {
                 act.heartbeat(ctx);
             }
-        });
+        }));
     }
 
     fn on_text_message(&mut self, txt: Bytes, ctx: &mut Context<HomeAssistantClient>) {
@@ -397,6 +428,9 @@ impl HomeAssistantClient {
                     client_id: self.id.clone(),
                     state: ConnectionState::AuthenticationFailed,
                 });
+                // Home Assistant closes the connection after a failed authentication. Don't
+                // reconnect: retrying an invalid token gets the client banned.
+                self.close(Close::default(), ctx);
             }
             "auth_ok" => {
                 self.authenticated = true;
@@ -521,22 +555,10 @@ impl HomeAssistantClient {
         self.authenticated = false;
     }
 
-    fn on_ping_message(&mut self, bytes: Bytes, ctx: &mut Context<HomeAssistantClient>) {
-        // HA doesn't seem to initiate pings, but this might change in the future...
-        debug!("[{}] -> Ping", self.id);
-        self.last_hb = Instant::now();
-        let _ = self.send_message(ws::Message::Pong(bytes), "Pong", ctx);
-    }
-
-    fn on_pong_message(&mut self, _: Bytes, _: &mut Context<HomeAssistantClient>) {
-        debug!("[{}] -> Pong", self.id);
-        self.last_hb = Instant::now();
-    }
-
     fn send_json(
         &mut self,
         msg: Value,
-        ctx: &mut Context<HomeAssistantClient>,
+        _ctx: &mut Context<HomeAssistantClient>,
     ) -> Result<(), ServiceError> {
         let obj = msg.as_object().ok_or(ServiceError::BadRequest(
             "json message must be an object".into(),
@@ -549,38 +571,27 @@ impl HomeAssistantClient {
         } else {
             debug!("[{}] <- {name}", self.id);
         }
-        if self.sink.write(ws::Message::Text(msg.into())).is_err() {
-            // sink is closed or closing, no chance to send a Close message
-            warn!("[{}] Could not send {name}, closing connection", self.id);
-            ctx.stop();
+        if !self.connected {
+            warn!("[{}] Could not send {name}: not connected", self.id);
             return Err(ServiceError::NotConnected);
         }
+        // Queued by the WebSocket client. A failed write ends the connection, which is reported
+        // as a connection event.
+        self.ws.do_send(SendText::new(msg));
         Ok(())
     }
 
-    fn send_message(
-        &mut self,
-        msg: ws::Message,
-        name: &str,
-        ctx: &mut Context<HomeAssistantClient>,
-    ) -> Result<(), ServiceError> {
+    fn send_binary(&mut self, data: Bytes, name: &str) -> Result<(), ServiceError> {
         if self.msg_tracing_out {
-            if let ws::Message::Text(txt) = &msg {
-                debug!("[{}] <- {txt}", self.id);
-            } else if let ws::Message::Binary(bin) = &msg {
-                debug!("[{}] <- BINARY ({})", self.id, bin.len());
-            } else {
-                debug!("[{}] <- {:?}", self.id, msg);
-            }
+            debug!("[{}] <- BINARY ({})", self.id, data.len());
         } else {
             debug!("[{}] <- {}", self.id, name);
         }
-        if self.sink.write(msg).is_err() {
-            // sink is closed or closing, no chance to send a Close message
-            warn!("[{}] Could not send {}, closing connection", self.id, name);
-            ctx.stop();
+        if !self.connected {
+            warn!("[{}] Could not send {name}: not connected", self.id);
             return Err(ServiceError::NotConnected);
         }
+        self.ws.do_send(SendBinary::new(data));
         Ok(())
     }
 
@@ -819,6 +830,52 @@ impl HomeAssistantClient {
             req.ts.elapsed() < Duration::from_secs(180)
         });
     }
+}
+
+/// Create the WebSocket client configuration from the Home Assistant connection settings.
+fn websocket_config(settings: &HomeAssistantSettings) -> Result<WebSocketConfig, ServiceError> {
+    let heartbeat = &settings.heartbeat;
+    let reconnect = &settings.reconnect;
+    let max_size = settings.max_frame_size_kb * 1024;
+    // WebSocket ping frames are sent and monitored by the WebSocket client. Otherwise, the
+    // client sends Home Assistant API ping messages, see `HomeAssistantClient::heartbeat`.
+    let ping_frames = heartbeat.ping_frames && !heartbeat.interval.is_zero();
+
+    let mut builder = WebSocketConfig::builder()
+        .connect_on_start(true)
+        // total time of a connection attempt, until the WebSocket handshake response
+        .connect_timeout(Duration::from_secs(
+            settings.request_timeout.max(settings.connection_timeout) as u64,
+        ))
+        // align frame size to Home Assistant
+        .max_frame_size(max_size)
+        // Home Assistant sends a message in one frame: the same limit for a message in several
+        // frames, instead of the 64 MiB default of the WebSocket client
+        .max_message_size(max_size)
+        .initial_backoff(reconnect.duration)
+        // both delays are set independently: the maximum must not be below the initial delay
+        .max_backoff(reconnect.duration_max.max(reconnect.duration))
+        .backoff_factor(reconnect.backoff_factor as f64)
+        .danger_accept_invalid_certs(
+            settings.disable_cert_validation || bool_from_env(ENV_DISABLE_CERT_VERIFICATION),
+        )
+        .ping_enabled(ping_frames);
+    if reconnect.attempts > 0 {
+        builder = builder.max_reconnect_attempts(reconnect.attempts);
+    }
+    if ping_frames {
+        // a missing pong is detected with the next ping
+        let missed = heartbeat
+            .timeout
+            .as_secs()
+            .div_ceil(heartbeat.interval.as_secs().max(1));
+        builder = builder
+            .ping_interval(heartbeat.interval)
+            .max_missed_pongs(missed.max(1) as u32);
+    }
+    builder
+        .build()
+        .map_err(|e| ServiceError::BadRequest(format!("Invalid Home Assistant settings: {e}")))
 }
 
 pub fn json_object_from_text_msg(id: &str, txt: &[u8]) -> Result<Value, serde_json::Error> {

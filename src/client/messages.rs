@@ -7,7 +7,6 @@ use crate::client::model::{AssistPipelineEvent, GetPipelinesResult};
 use crate::client::translations::TranslationKey;
 use crate::errors::ServiceError;
 use actix::prelude::Message;
-use awc::ws::CloseCode;
 use derive_more::Constructor;
 use std::collections::{HashMap, HashSet};
 use uc_api::intg::ws::{
@@ -138,8 +137,14 @@ pub struct SubscribedEntities {
 
 /// HA client connection states
 pub enum ConnectionState {
+    /// The WebSocket connection is established; authentication follows.
+    Opened,
     AuthenticationFailed,
+    /// Authenticated and subscribed to entity events: the connection is usable.
     Connected,
+    /// The connection was lost or closed. The client reconnects on its own.
+    Disconnected,
+    /// The client stopped: it was closed, or it gave up reconnecting.
     Closed,
 }
 
@@ -178,36 +183,55 @@ pub struct SetRemoteId {
     pub remote_id: String,
 }
 
-/// HA client request: disconnect and close the session.
+/// HA client request: close the Home Assistant connection.
 // Used internally by the client and from Controller
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct Close {
     /// WebSocket close code
-    pub code: CloseCode,
+    pub code: u16,
     pub description: Option<String>,
+    /// `false`: close the session, the client stops. `true`: the session is broken, close the
+    /// connection and reconnect with the configured reconnect delay.
+    pub reconnect: bool,
 }
 
+/// Close the session: the client disconnects and stops.
 impl Default for Close {
     fn default() -> Self {
         Self {
-            code: CloseCode::Normal,
+            code: 1000, // normal closure
             description: None,
+            reconnect: false,
         }
     }
 }
 
 impl Close {
+    /// Invalid data received: close the connection and reconnect.
     pub fn invalid() -> Self {
         Self {
-            code: CloseCode::Invalid,
+            code: 1007, // invalid frame payload data
             description: None,
+            reconnect: true,
         }
     }
+
+    /// Unsupported data received: close the connection and reconnect.
     pub fn unsupported() -> Self {
         Self {
-            code: CloseCode::Unsupported,
+            code: 1003, // unsupported data
             description: None,
+            reconnect: true,
+        }
+    }
+
+    /// The server doesn't answer the heartbeat anymore: close the connection and reconnect.
+    pub fn heartbeat_timeout() -> Self {
+        Self {
+            code: 1000,
+            description: Some("heartbeat timeout".into()),
+            reconnect: true,
         }
     }
 }

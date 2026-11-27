@@ -46,11 +46,11 @@ actix-web = { version = "4.11", features = ["rustls-0_23"] }
 actix-ws = "0.4"
 actix = "0.13"
 rustls = { version = "0.23" }
-rustls-platform-verifier = "0.7"
 
 # WebSockets client
-actix-codec = "0.5"
-awc = { version = "3.8", features = ["rustls-0_23"] }
+actix-ws-client = { git = "https://github.com/unfoldedcircle/actix-ws-client", tag = "v0.3.0", default-features = false, features = ["rustls-platform-verifier"] }
+# for local development:
+#actix-ws-client = { path = "../../../../unfoldedcircle/actix-ws-client", default-features = false, features = ["rustls-platform-verifier"] }
 bytes = "1"
 futures = "0.3"
 # Tokio is used by actix, but AFAIK the select! macro is not re-exported
@@ -97,3 +97,6 @@ built = { version = "0.8", features = ["chrono", "semver", "cargo-lock"] }
 
 [dev-dependencies]
 rstest = "0.28"
+# connection tests against a local fake Home Assistant WebSocket server
+tokio = { version = "1", features = ["macros", "net", "sync", "time"] }
+tokio-tungstenite = "0.28"

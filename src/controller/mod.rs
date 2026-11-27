@@ -12,7 +12,6 @@ use crate::client::HomeAssistantClient;
 use crate::configuration::{DEF_SETUP_TIMEOUT_SEC, ENV_SETUP_TIMEOUT, Settings};
 use crate::controller::handler::AbortDriverSetup;
 use crate::errors::ServiceError;
-use crate::util::new_websocket_client;
 use actix::prelude::{Actor, Context, Recipient};
 use actix::{Addr, AsyncContext, SpawnHandle};
 use log::{debug, error, info, warn};
@@ -106,28 +105,18 @@ pub struct Controller {
     /// Home Assistant connection state
     device_state: DeviceState,
     settings: Settings,
-    /// WebSocket client
-    // creating an expensive client is sufficient once per process and can be used to create multiple connections
-    ws_client: awc::Client,
-    /// HomeAssistant client actor
+    /// HomeAssistant client actor. It exists from a connect request until the connection is
+    /// closed again (disconnect request, standby, setup flow), or until the client gave up
+    /// reconnecting. In between, the client keeps the connection alive and reconnects on its own.
     ha_client: Option<Addr<HomeAssistantClient>>,
-    /// HomeAssistant client identifier. Set together with `ha_client` as soon as the client
-    /// actor exists (before authentication) so that every client event can be attributed.
+    /// HomeAssistant client identifier. Set together with `ha_client` so that every client event
+    /// can be attributed: events of a previous client are ignored.
     ha_client_id: Option<String>,
-    /// Sequence number of connection attempts. Used to detect superseded attempts.
-    ha_connect_seq: u32,
-    /// In-flight connection attempt (TCP / WebSocket handshake). `None` if no attempt is pending.
-    /// Cleared by [`Controller::disconnect`] to invalidate the attempt.
-    ha_connect_pending: Option<u32>,
-    ha_reconnect_duration: Duration,
-    ha_reconnect_attempt: u32,
     drv_metadata: IntegrationDriverUpdate,
     /// State machine for driver state: setup flow or running state
     machine: operation_mode::StateMachine,
     /// Driver setup timeout handle
     setup_timeout: Option<SpawnHandle>,
-    /// Handle to a scheduled connect message for a reconnect attempt.
-    reconnect_handle: Option<SpawnHandle>,
     /// List of subscribed entities sent by HA component
     susbcribed_entity_ids: Option<Vec<AvailableIntgEntity>>,
     /// Request id sent to the remote to get the version information
@@ -150,22 +139,12 @@ impl Controller {
         Self {
             sessions: Default::default(),
             device_state: DeviceState::Disconnected,
-            ws_client: new_websocket_client(
-                Duration::from_secs(settings.hass.connection_timeout as u64),
-                Duration::from_secs(settings.hass.request_timeout as u64),
-                settings.hass.disable_cert_validation,
-            ),
-            ha_reconnect_duration: settings.hass.reconnect.duration,
             settings,
             ha_client: None,
             ha_client_id: None,
-            ha_connect_seq: 0,
-            ha_connect_pending: None,
-            ha_reconnect_attempt: 0,
             drv_metadata,
             machine,
             setup_timeout: None,
-            reconnect_handle: None,
             susbcribed_entity_ids: None,
             remote_id: "".to_string(),
             language: None,
@@ -238,23 +217,6 @@ impl Controller {
     fn set_device_state(&mut self, state: DeviceState) {
         self.device_state = state;
         self.broadcast_device_state();
-    }
-
-    fn increment_reconnect_timeout(&mut self) {
-        let new_timeout = Duration::from_millis(
-            (self.ha_reconnect_duration.as_millis() as f32
-                * self.settings.hass.reconnect.backoff_factor) as u64,
-        );
-
-        self.ha_reconnect_duration = if new_timeout.gt(&self.settings.hass.reconnect.duration_max) {
-            self.settings.hass.reconnect.duration_max
-        } else {
-            new_timeout
-        };
-        info!(
-            "New reconnect timeout: {}",
-            self.ha_reconnect_duration.as_millis()
-        )
     }
 
     /// Perform a state machine transition for the given input.
