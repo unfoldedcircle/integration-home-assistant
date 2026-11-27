@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Changed
+- Update GitHub Actions.
+- Update contribution guidelines.
+
 ---
 
 ## v0.19.2 - 2026-11-22
